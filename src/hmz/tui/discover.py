@@ -1,0 +1,161 @@
+"""Which agents are installed here, what each one runs, and where their turns could land.
+
+Installed backends are found here, and optional backends somebody can add are named separately
+so the picker can teach them how. An effort a model does not take is not offered against it.
+What each backend runs is what that backend last said it runs, which the SDK's accounts keep --
+read off the disk here, because asking means starting a coding agent and a prompt cannot wait
+on one.
+
+Nothing is asked of the backends either. Measured on the machine this was written on,
+`claude --help` took over thirty seconds, `codex app-server` seventy-six, and `kimi web` about
+a minute. So a catalogue is filled where there is time for it -- when an account is made, and
+on the key that says to ask again -- and read here.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import subprocess
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from hmz.backends import named, profiles, program, speaking
+from hmz.sdk import Hmz
+
+if TYPE_CHECKING:
+    from hmz.backends import Model
+
+__all__ = ["installable", "installed", "machines", "ready_to_open"]
+
+#: How long the machines around here are given to name themselves before the list goes up
+#: without them. A docker daemon that is not answering is not a reason to sit at a sheet.
+_LOOKING_SECONDS = 2.0
+
+
+def installed() -> dict[str, tuple[Model, ...]]:
+    """The backends on this machine, and what each last said it runs.
+
+    Costs a look for each backend's program and one file read, so it can be asked for at a
+    prompt.
+
+    Returns:
+      One entry per backend that is on this machine, as the models it last said it runs for
+      the account nobody chose. Empty for one that has never been asked, which is a catalogue
+      to fill rather than a backend with nothing in it.
+    """
+    accounts = Hmz().accounts
+    return {
+        profile.name: accounts.models(profile.name)
+        for profile in profiles()
+        if _is_installed(profile.name)
+    }
+
+
+def installable() -> dict[str, tuple[Model, ...]]:
+    """Optional backends that can be added to this humanize installation.
+
+    These are kept apart from :func:`installed`: they belong in the agent picker so that
+    somebody can discover and install them, but they must not make an unopened prompt look
+    ready to run or be asked for models in the background.
+
+    Returns:
+      One entry per supported optional backend missing from this Python environment, with
+      the models it will offer once installed.
+    """
+    return {"dsh": Hmz().accounts.models("dsh")} if not _is_installed("dsh") else {}
+
+
+def _is_installed(backend: str) -> bool:
+    """Whether a backend's executable or Python SDK is installed here."""
+    if backend == "dsh":
+        return importlib.util.find_spec("deepseek_harness") is not None
+    # A CLI somebody added is started by the command they gave rather than by its own name.
+    if (added := speaking().get(backend)) is not None:
+        return bool(added) and program(added[0]) is not None
+    # And one humanize drives is started by the command it is installed as, which is its own
+    # name unless its profile says otherwise.
+    profile = named(backend)
+    return program(profile.runs() if profile is not None else backend) is not None
+
+
+def ready_to_open(backend: str, where: Path) -> bool:
+    """Whether an installed backend may be chosen without somebody choosing it.
+
+    A CLI on ``PATH`` is there because somebody installed it. DeepSeek Harness is different:
+    its SDK arrives with humanize, so its presence says nothing about whether its local
+    account has been configured. It remains installed and selectable without a key, but must
+    not make a new prompt look ready to run.
+
+    Args:
+      backend: The backend being considered as the implicit fallback.
+      where: The workspace its local account would run in.
+
+    Returns:
+      Whether the backend may be used as the implicit local fallback.
+    """
+    if backend != "dsh":
+        return True
+
+    # Local so discovering ordinary CLIs does not import any agent implementation. The SDK
+    # runtime itself remains lazy inside the dsh driver and is not started by this check.
+    from hmz.agents.dsh import native_ready
+
+    return native_ready(where)
+
+
+def machines() -> list[tuple[str, str]]:
+    """Where an agent's turns could land, besides this machine.
+
+    Found rather than typed, for the same reason the models are: a container that is not
+    running and a host with no entry in your ssh config are not places work can go, and a
+    list of what is actually there is shorter than the one you would have to remember. What
+    is not found is still typed -- a target is a string, and any string that reads as one is
+    taken.
+
+    Returns:
+      One `(target, where it came from)` pair apiece, containers first and then hosts, in the
+      order each source gave them. Empty where there is no docker and no ssh config, which is
+      a machine that only runs its own turns.
+    """
+    found: list[tuple[str, str]] = [
+        (f"docker://{named}", "container") for named in _containers()
+    ]
+    found.extend((f"ssh://{host}", "ssh config") for host in _hosts())
+    return found
+
+
+def _containers() -> list[str]:
+    """The containers running here, which are the ones a turn could be run in."""
+    try:
+        listed = subprocess.run(
+            ["docker", "ps", "--format", "{{.Names}}"],
+            capture_output=True,
+            text=True,
+            timeout=_LOOKING_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []  # no docker here, or none that answered: no containers to offer
+    return [named for named in listed.stdout.split() if named]
+
+
+def _hosts() -> list[str]:
+    """The hosts named in this user's ssh config, in the order they are written there.
+
+    A pattern is not a host: `Host *` is what the settings under it apply to rather than
+    somewhere to send a turn, and choosing it would send one nowhere.
+    """
+    named: list[str] = []
+    try:
+        written = (Path.home() / ".ssh" / "config").read_text(encoding="utf-8")
+    except OSError:
+        return []
+    for line in written.splitlines():
+        said = line.strip()
+        if said.lower().startswith("host ") and not said.startswith("#"):
+            named.extend(
+                host
+                for host in said.split()[1:]
+                if not set(host) & set("*?!") and host not in named
+            )
+    return named

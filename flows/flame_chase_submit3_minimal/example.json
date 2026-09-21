@@ -1,0 +1,35 @@
+{
+  "root": "/ABS/new-submit3-experiment-root",
+  "task_file": "/ABS/fresh-cell/agent/workspace/.flowbench/task.md",
+  "agent_image": "PINNED_LOCAL_AGENT_IMAGE",
+  "evaluator_image": "PINNED_LOCAL_EVALUATOR_IMAGE",
+  "evaluator_seed_home": "/ABS/fresh-cell/evaluator",
+  "actors": [
+    {
+      "spec": "cli=codex,model=gpt-5.6-sol,effort=max,permission=bypass,web_search=on",
+      "environment_names": [],
+      "seed_files": [
+        {"source": "/ABS/codex-auth.json", "target": ".codex/auth.json"},
+        {"source": "/ABS/codex-config.toml", "target": ".codex/config.toml"}
+      ]
+    },
+    {
+      "spec": "cli=kimi,model=__kimi_env_model__,effort=max,permission=auto",
+      "environment_names": ["KIMI_MODEL_BASE_URL", "KIMI_MODEL_API_KEY", "KIMI_MODEL_NAME"],
+      "seed_files": [{"source": "/ABS/kimi-config.toml", "target": ".kimi/config.toml"}]
+    }
+  ],
+  "agent_data": [
+    {"source": "/ABS/prepared/public", "target": "/home/user/.flowbench-data/input"}
+  ],
+  "evaluator_data": [
+    {"source": "/ABS/prepared", "target": "/home/user/.flowbench-data/prepared"},
+    {"source": "/ABS/control", "target": "/home/user/.flowbench-data/control"}
+  ],
+  "active_time_limit_seconds": 21600,
+  "max_valid_submissions_per_session": 3,
+  "cpus": 26,
+  "memory": "200000m",
+  "shm_size": "65536m",
+  "gpu": "0"
+}

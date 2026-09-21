@@ -1,0 +1,315 @@
+"""opencode: one ``opencode run`` per turn, reading the JSON it answers in.
+
+Its command line says everything an agent is configured with -- the model, the variant that is
+its reasoning effort, the session to carry on, the directory to work in -- so a turn is one run
+of it rather than a conversation held open on a server. What it writes on stdout with
+``--format json`` is a protocol rather than the agent talking: the events of the turn, one per
+line, which is where the session it opened, what it reached for and what it spent all are.
+
+mimocode is the same program under another name, and is driven from here: what differs is what
+the command is called and which of its own variables it takes.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, ClassVar, cast
+
+from .base import AgentBase, CommandSessionBase
+from .config import AgentConfig
+from .event import Event, Failed, Usage
+
+if TYPE_CHECKING:
+    import os
+    from collections.abc import Iterator
+
+#: What each kind of event reads as. A step beginning or ending is the turn's own plumbing,
+#: and is read for what it cost rather than shown.
+_SAYS = {"text": "text", "reasoning": "reasoning"}
+
+#: What the tokens of one step are called, and what each of them is here. `reasoning` is
+#: counted beside the output rather than inside it, so it is a kind of its own; the cache
+#: counts arrive under `cache` rather than beside these.
+_COUNTED = ("input", "output", "reasoning")
+_CACHED = ("read", "write")
+
+#: What each rung of the ladder is, said the way opencode takes it: a permission apiece for
+#: editing a file, running a command and fetching a page, each `allow`, `ask` or `deny`. A
+#: `deny` here is the tool not being offered at all, which is what makes `read-only` real; there
+#: is no sandbox, so `workspace-write` is the same agent with nothing outside the workspace to reach
+#: for, and `auto` and `bypass` are that agent with the reaching allowed. `ask` is never
+#: used: a run per turn has nobody to answer it.
+_PERMITTED = {
+    "read-only": {"edit": "deny", "bash": "deny", "webfetch": "allow"},
+    "workspace-write": {"edit": "allow", "bash": "allow", "webfetch": "deny"},
+    "auto": {"edit": "allow", "bash": "allow", "webfetch": "allow"},
+    "bypass": {"edit": "allow", "bash": "allow", "webfetch": "allow"},
+}
+
+
+class OpencodeSession(CommandSessionBase):
+    """An opencode conversation, resumed by the id the first turn's events name it with.
+
+    The id is minted by opencode as the session opens, so it is read back out of the turn that
+    opened it and given to every turn after -- which is what keeps the conversation one
+    conversation rather than a new one per run.
+    """
+
+    #: What it writes on stdout is the turn as events rather than the agent talking.
+    protocol: ClassVar[bool] = True
+
+    #: The command this backend is installed as, and the variable it is told what the agent
+    #: may do in -- the two things mimocode differs by on the way in.
+    command: ClassVar[str] = "opencode"
+    permits: ClassVar[str] = "OPENCODE_PERMISSION"
+
+    def __init__(
+        self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
+    ) -> None:
+        """Initializes a session that has run no turn yet.
+
+        Args:
+          agent: The agent whose config every turn of this session runs at.
+          cwd: The directory this conversation works in, as for `SessionBase`.
+        """
+        super().__init__(agent, cwd)
+        #: What the agent has said so far in the turn now running, and what went wrong with
+        #: it if anything did.
+        self._said = ""
+        self._failed: str | None = None
+        #: What the turn now running has cost, added up as each step of it comes back, and
+        #: which parts of it have already been shown -- a part is written once here, but a
+        #: turn that saw it twice would show it twice.
+        self._spent = 0
+        self._costing = Usage()
+        self._shown: set[str] = set()
+
+    def _turn(self, prompt: str) -> tuple[list[str], str | None]:
+        """Builds the ``opencode run`` one turn is, and hands it the prompt on stdin.
+
+        On stdin rather than as an argument: a prompt is a paragraph and may open with a dash,
+        neither of which belongs on a command line.
+
+        Args:
+          prompt: The input prompt for this turn.
+
+        Returns:
+          The command and the prompt to write to it.
+        """
+        self._said, self._failed, self._spent, self._shown = "", None, 0, set()
+        self._costing = Usage()
+        argv = [
+            type(self).command,
+            "run",
+            "--format",
+            "json",
+            "--dir",
+            self._workspace(),
+            "--model",
+            self._agent.config.model,
+            "--variant",
+            self.effort,
+        ]
+        if self._id is not None:
+            argv += ["--session", self._id]
+        argv += self._unattended()
+        return argv, prompt
+
+    def _unattended(self) -> list[str]:
+        """What tells this backend that nobody is there to answer it.
+
+        A flow watches its agent rather than gating it, as humanize' own flows do, and a turn
+        waiting on an approval nobody is there to give is a flow that has stopped. It answers
+        yes to everything that is not refused outright, which is why the rung below is said as
+        refusals: what the agent may not do is denied, and the flag is what carries the rest.
+        """
+        return ["--auto"]
+
+    def _environment(self) -> dict[str, str]:
+        """What the agent may do, which this backend takes as a variable rather than a flag.
+
+        Set for this turn and for nothing else, rather than written into the settings file:
+        two agents of one flow may be allowed different things, and neither is a reason to
+        change what the person who started the flow has configured.
+        """
+        allowed = dict(
+            _PERMITTED.get(self._agent.config.permission, _PERMITTED["bypass"])
+        )
+        if not self._agent.config.web_search:
+            # `webfetch` is the one tool opencode reaches the web with, so it is the one to
+            # deny. A rung that already denies it is not asked twice: the two say the same
+            # thing here, and either of them saying it is enough.
+            allowed["webfetch"] = "deny"
+        return {
+            **super()._environment(),
+            type(self).permits: json.dumps(allowed),
+        }
+
+    def _reads(self, line: str, *, error: bool) -> Iterator[Event]:
+        """Reads one event opencode wrote, as the things it says the agent did.
+
+        Args:
+          line: The line, as written.
+          error: Whether it came from stderr, which is opencode's own log rather than the
+            turn -- kept for a failed turn's diagnostic and shown nowhere.
+
+        Yields:
+          What it said, which is nothing for a line saying nothing worth showing.
+        """
+        if error:
+            return
+        try:
+            said: dict[str, Any] = json.loads(line)
+        except json.JSONDecodeError:
+            return  # not ours: the odd plain line among the JSON
+        part: dict[str, Any] = said.get("part") or {}
+        kind = str(said.get("type") or "")
+        if kind == "error":
+            failed: dict[str, Any] = said.get("error") or {}
+            self._failed = json.dumps(failed) if failed else "the turn failed"
+        elif kind == "step_finish":
+            # Told as the step lands rather than once the run is over, which is what a rate
+            # read while the turn is still running is made of.
+            counted = self._cost(cast("dict[str, Any]", part.get("tokens") or {}))
+            self._spent += int(counted.total)
+            self._costing = self._costing + counted
+            self._spends(counted)
+        elif kind == "tool_use":
+            yield from self._tool(part)
+        elif (says := _SAYS.get(kind)) is not None:
+            words = str(part.get("text") or "")
+            marked = str(part.get("id") or "")
+            if not words.strip() or (marked and marked in self._shown):
+                return  # a part already shown is not the agent saying it twice
+            self._shown.add(marked)
+            if says == "text":
+                # The last thing it says is what the turn answers with; the reasoning on the
+                # way there is shown and nothing more.
+                self._said = words
+            yield Event(kind=says, text=words)
+
+    def _tool(self, part: dict[str, Any]) -> Iterator[Event]:
+        """Reads one tool call, as the one line a row of a transcript has room for.
+
+        Args:
+          part: The `tool` part, as read.
+
+        Yields:
+          What it reached for and what with, once per call.
+        """
+        marked = str(part.get("id") or "")
+        if marked and marked in self._shown:
+            return
+        self._shown.add(marked)
+        state: dict[str, Any] = part.get("state") or {}
+        called: dict[str, Any] = state.get("input") or {}
+        about = str(state.get("title") or "") or next(
+            (
+                str(value)
+                for value in called.values()
+                if isinstance(value, str) and value.strip()
+            ),
+            "",
+        )
+        yield Event(
+            kind="tool", text=f"{part.get('tool') or 'tool'} {about}".strip()[:120]
+        )
+
+    def _cost(self, counted: dict[str, Any]) -> Usage:
+        """What one step of a turn cost, by the kind each token went on.
+
+        Every kind of token counts: what a rate is measuring is the traffic, and a cache read
+        crosses the wire like anything else. Reasoning is counted beside the output here
+        rather than inside it, which is why it is a kind of its own.
+
+        Args:
+          counted: The step's `tokens`, as read.
+
+        Returns:
+          What that step spent.
+        """
+        cached: dict[str, Any] = counted.get("cache") or {}
+        return Usage(
+            {
+                name: float(counted.get(name) or 0)
+                for name in _COUNTED
+                if counted.get(name)
+            }
+            | {
+                f"cache_{name}": float(cached.get(name) or 0)
+                for name in _CACHED
+                if cached.get(name)
+            }
+        )
+
+    def _result(self, transcript: str) -> Event:
+        """The turn's answer, and what it cost, out of the events it wrote.
+
+        Args:
+          transcript: The whole of stdout, already read event by event.
+
+        Returns:
+          The `result` the turn ends on.
+
+        Raises:
+          subprocess.CalledProcessError: If the turn failed. opencode leaves nonzero for the
+            times it could not start at all and says everything else in its events, so a
+            model that refused and a turn that said nothing whatever both come back as an
+            exit of zero -- and a loop fed either as an answer would be running on it as the
+            work of the turn.
+        """
+        said, failed, spent = self._said, self._failed, self._spent
+        if failed is not None:
+            raise Failed(1, [type(self).command], said, failed)
+        if not transcript.strip():
+            raise Failed(
+                1, [type(self).command], "", f"{type(self).command} said nothing at all"
+            )
+        return Event(
+            kind="result",
+            text=said.strip(),
+            tokens={self._agent.config.model: spent} if spent > 0 else {},
+            spent=self._costing,
+        )
+
+    def _read_session_id(self, transcript: str) -> str:
+        """Reads back the session opencode opened, which every event of the turn names.
+
+        Args:
+          transcript: Everything the turn printed.
+
+        Returns:
+          The session's id.
+
+        Raises:
+          ValueError: If nothing the turn wrote names one, which is a turn that landed
+            somewhere nobody can find again.
+        """
+        for line in transcript.splitlines():
+            try:
+                said: object = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(said, dict):
+                continue
+            if named := cast("dict[str, Any]", said).get("sessionID"):
+                return str(named)
+        raise ValueError(f"{type(self).command} named no session")
+
+
+@dataclass(frozen=True, kw_only=True)
+class OpencodeAgentConfig(AgentConfig):
+    """What opencode is configured with: the common model and effort, and nothing else.
+
+    The model is written as opencode writes it, `provider/id`, since a model here belongs to
+    the provider that serves it and opencode is asked for the pair.
+    """
+
+
+class OpencodeAgent(AgentBase):
+    """opencode, driven through its own command line, one run per turn."""
+
+    def new(self, cwd: str | os.PathLike[str] | None = None) -> OpencodeSession:
+        """Opens a new opencode session, in the directory it is given or in this one."""
+        return OpencodeSession(self, cwd)

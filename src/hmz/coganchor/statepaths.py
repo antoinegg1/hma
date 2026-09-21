@@ -1,0 +1,284 @@
+"""Knowing which files belong to the agent rather than to the project.
+
+An agent's own runtime and state directory live on this machine and must keep
+working here: rerouting ``~/.codex`` to the target would lose the session, and
+rerouting one of the agent's runtime executables would make it impossible to
+start or use its tools.  Everything else the agent touches belongs to the target.
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+from dataclasses import dataclass, field
+
+__all__ = ["PROFILES", "AgentProfile", "ResolvedAgent", "profile_for", "resolve"]
+
+
+@dataclass(frozen=True, slots=True)
+class AgentProfile:
+    """What coganchor knows about one coding agent."""
+
+    name: str
+    #: Paths holding the agent's own state; always served from this machine.
+    state_paths: tuple[str, ...] = ()
+
+
+PROFILES: tuple[AgentProfile, ...] = (
+    AgentProfile(
+        name="agy",
+        state_paths=("~/.gemini",),
+    ),
+    AgentProfile(
+        name="claude",
+        state_paths=(
+            "~/.claude",
+            "~/.claude.json",
+            "~/.local/share/claude",
+            "~/.cache/claude-cli-nodejs",
+        ),
+    ),
+    AgentProfile(
+        name="codex",
+        state_paths=("~/.codex",),
+    ),
+    # Cursor Agent keeps its settings, its rules and its login under one directory, and the
+    # versions of the CLI itself under another -- the second being where it re-execs from, so
+    # it stays on this machine like every other agent's own program.
+    AgentProfile(
+        name="cursor-agent",
+        state_paths=("~/.cursor", "~/.local/share/cursor-agent"),
+    ),
+    AgentProfile(
+        name="dsh",
+        state_paths=("~/.dsh",),
+    ),
+    AgentProfile(
+        name="grok",
+        state_paths=("~/.grok",),
+    ),
+    AgentProfile(
+        name="kimi",
+        state_paths=("~/.kimi-code", "~/.kimi"),
+    ),
+    AgentProfile(
+        name="qwen",
+        state_paths=("~/.qwen",),
+    ),
+    AgentProfile(
+        name="pi",
+        state_paths=("~/.pi",),
+    ),
+    # opencode and mimocode are one program under two names, and each keeps its install, its
+    # settings, its cached model catalogue and the database its sessions are rows of in four
+    # directories of its own.
+    AgentProfile(
+        name="opencode",
+        state_paths=(
+            "~/.opencode",
+            "~/.config/opencode",
+            "~/.local/share/opencode",
+            "~/.cache/opencode",
+        ),
+    ),
+    AgentProfile(
+        name="mimo",
+        state_paths=(
+            "~/.mimocode",
+            "~/.config/mimocode",
+            "~/.local/share/mimocode",
+            "~/.cache/mimocode",
+        ),
+    ),
+    # One directory, holding both halves of ZCode: `cli/` is the command line's own settings,
+    # sessions and rollouts, and `v2/` is what it shares with the desktop app, the login among
+    # it. Both stay on this machine, as every other agent's state does.
+    AgentProfile(
+        name="zcode",
+        state_paths=("~/.zcode",),
+    ),
+)
+
+_BY_NAME = {profile.name: profile for profile in PROFILES}
+
+#: Directories that hold per-user state for *any* agent and should never be
+#: mirrored, even when the workspace happens to contain them.  ``~/.humanize``
+#: is humanize's own home, which holds the providers a turn may be run as: those
+#: credentials belong to this machine, never to the one the work lands on.
+COMMON_STATE_PATHS: tuple[str, ...] = (
+    "~/.humanize",
+    "~/.cache/humanize",
+    "~/.config/humanize",
+)
+
+_CODEX_VENDOR_BIN = os.path.join("vendor", "x86_64-unknown-linux-musl", "bin")
+
+
+@dataclass(slots=True)
+class ResolvedAgent:
+    """A launchable agent plus the paths that stay on this machine."""
+
+    profile: AgentProfile
+    program: str
+    argv: list[str]
+    local_paths: list[str] = field(default_factory=list[str])
+    local_programs: list[str] = field(default_factory=list[str])
+
+
+def profile_for(name: str) -> AgentProfile:
+    """Return the known profile for ``name``, or a permissive generic one."""
+    basename = os.path.basename(name)
+    # The Python SDK launches this bundled executable directly rather than through the
+    # `dsh` CLI, but it owns the same durable session state.
+    if basename.startswith("dsh-jsonrpc-agent-"):
+        return _BY_NAME["dsh"]
+    return _BY_NAME.get(basename, AgentProfile(name=basename))
+
+
+def resolve(command: list[str]) -> ResolvedAgent:
+    """Locate the agent named by ``command`` and classify its own files.
+
+    Raises :class:`FileNotFoundError` if the program is not on ``PATH``.
+    """
+    if not command:
+        raise ValueError("no agent command given")
+    name = command[0]
+    found = shutil.which(name) if os.path.sep not in name else name
+    if not found or not os.path.exists(found):
+        raise FileNotFoundError(f"{name}: not found on PATH")
+    located = os.path.abspath(found)
+    program = os.path.realpath(located)
+
+    profile = profile_for(name)
+    local_paths = [
+        _expand(path) for path in (*profile.state_paths, *COMMON_STATE_PATHS)
+    ]
+    # Only the agent's own runtime stays here. Work helpers such as ripgrep
+    # deliberately go to the target: running them against the partly materialised
+    # mirror would return quietly wrong answers, which is worse than a visible failure.
+    # A program the agent keeps in its own state directory is its own runtime, not a helper
+    # for the work: grok installs its native binary under `~/.grok/bin` and re-execs it, and
+    # sending that to the target sends the agent there with it. Those directories are
+    # already answered from this machine as paths; this is the same claim about executing
+    # them.
+    local_programs = [
+        located,
+        program,
+        *(_expand(path) for path in profile.state_paths),
+    ]
+    shebang = _shebang(program)
+    if shebang:
+        local_programs.append(shebang[0])
+        local_programs.extend(_interpreter(shebang))
+    if profile.name == "codex":
+        local_programs.extend(_codex_runtime_programs(program, shebang))
+
+    return ResolvedAgent(
+        profile=profile,
+        program=program,
+        argv=[found, *command[1:]],
+        local_paths=sorted({path for path in local_paths if path}),
+        local_programs=sorted({path for path in local_programs if path}),
+    )
+
+
+def _expand(path: str) -> str:
+    return os.path.normpath(os.path.expanduser(path))
+
+
+def _shebang(program: str) -> tuple[str, ...]:
+    """Return the command naming a script's interpreter."""
+    try:
+        with open(program, "rb") as handle:
+            first = handle.readline(256)
+    except OSError:
+        return ()
+    if not first.startswith(b"#!"):
+        return ()
+    return tuple(first[2:].decode("utf-8", "replace").strip().split())
+
+
+def _interpreter(shebang: tuple[str, ...]) -> list[str]:
+    """Every path an ``#!/usr/bin/env NAME`` line could reach its interpreter at.
+
+    Every agent installed by npm starts with one, and keeping only the ``env`` keeps the
+    wrong program on this machine: ``env`` runs here and then searches ``PATH`` for the
+    interpreter, one ``execve`` per directory. The first of those names a path that does not
+    exist here -- which is not the agent's own by name, so it is sent to the target, where
+    the name resolves and the agent itself ends up running. It then reads the target's copy
+    of its state directory and cannot reach the account it was signed in with. Codex is
+    spared this only because its runtime is listed by hand.
+
+    So the whole search is claimed, not just the directory the interpreter is really in: a
+    candidate kept here fails here, with the ``ENOENT`` that makes ``env`` try the next one.
+
+    Args:
+      shebang: The command the script's first line names.
+
+    Returns:
+      Each path the search may name, or nothing when the line names the interpreter
+      directly -- that one is already kept by its own path.
+    """
+    if not shebang or os.path.basename(shebang[0]) != "env":
+        return []
+    words: list[str] = []
+    for word in shebang[1:]:
+        # `env -S "node --flag"` carries the whole command in one word, and
+        # `env NAME=VALUE prog` sets variables before naming one.
+        words.extend(word.split())
+    name = next(
+        (word for word in words if not word.startswith("-") and "=" not in word), ""
+    )
+    if not name:
+        return []
+    if os.path.sep in name:
+        return [os.path.abspath(name), os.path.realpath(name)]
+    found = [
+        os.path.join(directory, name)
+        for directory in os.environ.get("PATH", os.defpath).split(os.pathsep)
+        if directory
+    ]
+    resolved = shutil.which(name)
+    if resolved:
+        found.extend((os.path.abspath(resolved), os.path.realpath(resolved)))
+    return found
+
+
+def _codex_runtime_programs(program: str, shebang: tuple[str, ...]) -> list[str]:
+    """Return the Node, native CLI and code-mode host that implement Codex."""
+    programs: list[str] = []
+    node = next((part for part in shebang if os.path.basename(part) == "node"), None)
+    if node:
+        found = shutil.which(node) if os.path.sep not in node else node
+        if found and os.path.exists(found):
+            programs.extend((os.path.abspath(found), os.path.realpath(found)))
+
+    package = os.path.dirname(os.path.dirname(program))
+    candidates = [
+        program,
+        os.path.join(package, _CODEX_VENDOR_BIN, "codex"),
+        os.path.join(
+            package,
+            "node_modules",
+            "@openai",
+            "codex-linux-x64",
+            _CODEX_VENDOR_BIN,
+            "codex",
+        ),
+        os.path.join(
+            os.path.dirname(package),
+            "codex-linux-x64",
+            _CODEX_VENDOR_BIN,
+            "codex",
+        ),
+    ]
+    for candidate in candidates:
+        if os.path.basename(candidate) != "codex" or not os.path.isfile(candidate):
+            continue
+        native = os.path.realpath(candidate)
+        programs.extend((os.path.abspath(candidate), native))
+        for directory in {os.path.dirname(candidate), os.path.dirname(native)}:
+            host = os.path.join(directory, "codex-code-mode-host")
+            if os.path.isfile(host):
+                programs.extend((os.path.abspath(host), os.path.realpath(host)))
+    return programs
