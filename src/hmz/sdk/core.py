@@ -34,7 +34,6 @@ if TYPE_CHECKING:
 
 __all__ = ["Hmz"]
 
-
 class Hmz:
     """One workspace, and everything humanize can be asked to do in it."""
 
@@ -234,6 +233,5 @@ class Hmz:
           SystemExit: If the line is not one argparse accepts.
         """
         flow, agents, task, config, container = self.read(argv)
-        # Through a run, which is the one thing a flow being driven is: an SDK user who ran a
-        # line and one who built a run are then holding the same thing.
+
         self.run(flow, agents, task, config, container=container).run()

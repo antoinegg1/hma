@@ -30,26 +30,21 @@ __all__ = [
     "spoken",
 ]
 
-#: A terminal has arrived, and how many columns and rows it has.
 HELLO = b"H"
-#: What was typed at a terminal, on its way to the run.
+
 INPUT = b"I"
-#: What the run has drawn, on its way to every terminal reading it.
+
 OUTPUT = b"O"
-#: A terminal has been resized, and is these many columns and rows now.
+
 RESIZE = b"R"
-#: The run has let go of this terminal, and why.
+
 GONE = b"X"
-#: A question about the run rather than a terminal reading it, answered with one of the same.
+
 CONTROL = b"C"
 
-#: How long a frame may be. A screen is kilobytes and a paste is not much more; a length
-#: longer than this is a socket that is not carrying this protocol.
 _LONGEST = 1 << 22
 
-#: The kind, and then the length: one byte and four, which is what every frame begins with.
 _HEAD = struct.Struct(">cI")
-
 
 def frame(kind: bytes, payload: bytes = b"") -> bytes:
     """One frame, ready to be written.
@@ -63,11 +58,9 @@ def frame(kind: bytes, payload: bytes = b"") -> bytes:
     """
     return _HEAD.pack(kind, len(payload)) + payload
 
-
 def spoken(kind: bytes, said: dict[str, Any]) -> bytes:
     """One frame carrying a mapping, which is how a question and its answer are written."""
     return frame(kind, json.dumps(said).encode())
-
 
 def asked(payload: bytes) -> dict[str, Any]:
     """What one such frame said, and nothing at all for one that is not a mapping."""
@@ -77,7 +70,6 @@ def asked(payload: bytes) -> dict[str, Any]:
         return {}
     return cast("dict[str, Any]", held) if isinstance(held, dict) else {}
 
-
 class Frames:
     """A socket read a piece at a time, and the whole frames that came out of it.
 
@@ -86,9 +78,7 @@ class Frames:
     """
 
     def __init__(self) -> None:
-        #: What has arrived and is not a whole frame yet, which is nothing most of the time:
-        #: a read is usually one whole frame, being a screen on its way to a terminal or a
-        #: keystroke on its way back.
+
         self._held = b""
 
     def feed(self, data: bytes) -> list[tuple[bytes, bytes]]:

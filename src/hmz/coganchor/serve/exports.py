@@ -21,7 +21,6 @@ from hmz.coganchor.proto import rewrite_path_prefix
 
 __all__ = ["Export", "ExportTable"]
 
-
 @dataclass(frozen=True, slots=True)
 class Export:
     """One ``virtual -> real`` directory mapping."""
@@ -38,7 +37,6 @@ class Export:
         if not virtual or not real:
             raise ValueError(f"malformed export {spec!r}; expected VIRTUAL[:REAL]")
         return cls(_normalise(virtual), os.path.abspath(os.path.expanduser(real)))
-
 
 class ExportTable:
     """An ordered set of :class:`Export` mappings, resolved longest-prefix first."""
@@ -83,7 +81,6 @@ class ExportTable:
         for export in self._exports:
             text = rewrite_path_prefix(text, export.virtual, export.real)
         return text
-
 
 def _normalise(path: str) -> str:
     if not path.startswith("/"):

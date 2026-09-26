@@ -14,16 +14,11 @@ if TYPE_CHECKING:
 
     from .profile import Process
 
-#: What a reader of these logs joins the halves of a name with, which is what a track of one
-#: kind of sub-agent is named off the front of.
 _DOT = " · "
 
-#: How many session ids a trace says outright before it says how many there were instead.
-#: Every process of a trace carries this label, so it is read far more often than it is long.
 _NAMEABLE = 4
 
 _LANE_STRIDE = 100
-
 
 def build(
     sessions: list[Session],
@@ -59,9 +54,7 @@ def build(
     if workspace is not None:
         scope["workspace"] = str(workspace)
     if names:
-        # A handful of ids is what somebody asked for, said back to them; a run's worth of
-        # them is a label nobody can read, and how many there were is the whole of what it
-        # would have told them anyway.
+
         scope["selected"] = (
             ", ".join(names) if len(names) <= _NAMEABLE else f"{len(names)} sessions"
         )
@@ -184,16 +177,13 @@ def build(
         "end": _stamp(max(over)),
     }
     if ran:
-        # Said only where there is a profile: an `otherData` that reported nought programs
-        # on every trace would be one more thing to read past on the traces that are only
-        # ever sessions.
+
         held["programs"] = str(len(ran))
     return {
         "traceEvents": events,
         "displayTimeUnit": "ms",
         "otherData": held,
     }
-
 
 def _programs(
     events: list[dict[str, Any]], ran: list[Process], first: int, label: str
@@ -218,8 +208,7 @@ def _programs(
         threads = one.threads or (_Thread(one.pid, one.began, one.ended, 0.0),)
         for at, thread in enumerate(threads):
             tid = (at + 1) * _LANE_STRIDE
-            # The thread that ran `main` is the one the process is named after; the rest are
-            # its own, and are named as the operating system names them.
+
             named = "main" if thread.tid == one.pid else f"thread {thread.tid}"
             events.append(_meta(pid, tid, "thread_name", {"name": named}))
             events.append(_meta(pid, tid, "thread_sort_index", {"sort_index": tid}))
@@ -242,7 +231,6 @@ def _programs(
                 }
             )
 
-
 def _stem(depth: int, row: list[Session]) -> str:
     """What one track of an agent's process is called.
 
@@ -262,16 +250,13 @@ def _stem(depth: int, row: list[Session]) -> str:
     if depth == 0:
         return "main"
     stem = "subagent" if depth == 1 else f"subagent {depth}"
-    # What kind of sub-agent rather than which one: a label says what it was started as and
-    # then what that one was for, and a track is the first half of that -- five explorations
-    # are one track called `explore` rather than five names run together.
+
     kinds = {
         item.label.split(_DOT)[0].strip()
         for item in row
         if item.label and item.label != "main"
     }
     return f"{stem} · {kinds.pop()}" if len(kinds) == 1 else stem
-
 
 def _render(
     events: list[dict[str, Any]],
@@ -325,11 +310,9 @@ def _render(
             _meta(pid, base + lane, "thread_sort_index", {"sort_index": base + lane})
         )
 
-
 def _meta(pid: int, tid: int, name: str, args: dict[str, Any]) -> dict[str, Any]:
     """Builds one Chrome trace metadata event."""
     return {"ph": "M", "pid": pid, "tid": tid, "name": name, "args": args}
-
 
 def _stamp(at: float) -> str:
     """Formats an epoch second value as an ISO 8601 UTC timestamp."""

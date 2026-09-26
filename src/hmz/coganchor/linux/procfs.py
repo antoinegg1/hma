@@ -32,16 +32,12 @@ PATH_MAX: Final = 4096
 _PAGE_SIZE: Final = os.sysconf("SC_PAGESIZE")
 _MAX_ARGV_ENTRIES: Final = 65536
 
-#: The kernel's own ceiling on one ``argv`` or ``envp`` entry, ``MAX_ARG_STRLEN``: thirty-two
-#: pages. What a command may be, as opposed to what a path may be.
 MAX_ARG_STRLEN: Final = 32 * _PAGE_SIZE
 
 _libc = ctypes.CDLL("libc.so.6", use_errno=True)
 
-
 class _Iovec(ctypes.Structure):
     _fields_ = [("base", ctypes.c_void_p), ("len", ctypes.c_size_t)]
-
 
 _libc.process_vm_readv.restype = ctypes.c_ssize_t
 _libc.process_vm_readv.argtypes = [
@@ -56,10 +52,8 @@ _libc.process_vm_writev.restype = ctypes.c_ssize_t
 _libc.process_vm_writev.argtypes = _libc.process_vm_readv.argtypes
 _libc.syscall.restype = ctypes.c_long
 
-
 class TraceeGoneError(OSError):
     """The traced process disappeared mid-inspection."""
-
 
 def read_bytes(pid: int, address: int, size: int) -> bytes:
     """Read ``size`` bytes from a tracee's address space."""
@@ -80,7 +74,6 @@ def read_bytes(pid: int, address: int, size: int) -> bytes:
         )
     return buffer.raw[:count]
 
-
 def write_bytes(pid: int, address: int, data: bytes) -> int:
     """Write ``data`` into a tracee's address space; returns bytes written."""
     if not data:
@@ -98,7 +91,6 @@ def write_bytes(pid: int, address: int, data: bytes) -> int:
             code, os.strerror(code), f"process_vm_writev(pid={pid}, addr={address:#x})"
         )
     return int(count)
-
 
 def read_cstring(pid: int, address: int, limit: int = PATH_MAX) -> str | None:
     """Read a NUL-terminated string, stopping at the first unreadable page.
@@ -126,7 +118,6 @@ def read_cstring(pid: int, address: int, limit: int = PATH_MAX) -> str | None:
         remaining -= span
     return b"".join(parts).decode("utf-8", "surrogateescape")
 
-
 def read_string_array(
     pid: int, address: int, limit: int = _MAX_ARGV_ENTRIES
 ) -> list[str]:
@@ -142,32 +133,25 @@ def read_string_array(
         pointer = int.from_bytes(raw, "little")
         if pointer == 0:
             break
-        # An argv entry is not a path, so PATH_MAX is the wrong ceiling for it: the kernel
-        # lets one be MAX_ARG_STRLEN long, and a shell command is routinely longer than a
-        # path. Truncating one is worse than failing to read it -- what reaches the target
-        # is then a prefix of the command, which runs and means something else.
+
         text = read_cstring(pid, pointer, MAX_ARG_STRLEN)
         values.append("" if text is None else text)
         address += word
     return values
 
-
 def working_directory(pid: int) -> str:
     """Current working directory of a tracee, as the kernel sees it."""
     return _readlink(f"/proc/{pid}/cwd")
 
-
 def fd_target(pid: int, fd: int) -> str:
     """Path a tracee's descriptor refers to (``/proc/<pid>/fd/<n>``)."""
     return _readlink(f"/proc/{pid}/fd/{fd}")
-
 
 def _readlink(path: str) -> str:
     try:
         return os.readlink(path)
     except FileNotFoundError as exc:
         raise TraceeGoneError(exc.errno, "tracee vanished", path) from exc
-
 
 def steal_fd(pid: int, fd: int) -> int:
     """Duplicate a tracee's descriptor into this process.

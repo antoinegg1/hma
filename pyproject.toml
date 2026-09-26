@@ -1,32 +1,29 @@
-[project]
-name = "hma"
-version = "0.1.0"
-description = "The submit3-minimal Flame Chase controller, with the humanize agent runtime vendored alongside it"
-requires-python = ">=3.12"
-license = "Apache-2.0"
-license-files = ["LICENSE", "NOTICE"]
-
-# hmz is vendored under src/ rather than declared as a dependency, so the
-# controller and the runtime it was measured against stay pinned together.
-# Its own third-party requirements are reproduced here.
-dependencies = [
-    "dateparser>=1.4.2",
-    "deepseek-harness-sdk>=0.1.1rc1,<0.2",
-    "docker>=7",
-    "psutil>=7.2.2",
-    "pydantic>=2.13.5",
-    "pyfiglet>=1.0",
-    "python-dotenv>=1.2.3",
-    "pyyaml>=6.0.3",
-    "requests>=2.32",
-    "rich>=15",
-    "sentry-sdk>=2.68.1",
-    "textual>=8.2.8",
-]
-
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
+[project]
+name = "hma"
+version = "1.0.0"
+description = "HMA: capped alternation of native agents for long-horizon machine learning engineering"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0 AND MIT"
+license-files = ["LICENSE"]
+dependencies = ["docker>=7.1,<8", "pydantic>=2.13,<3", "requests>=2.32,<3"]
+
+[project.optional-dependencies]
+runtime = ["dateparser>=1.4.2", "deepseek-harness-sdk>=0.1.1rc1,<0.2", "psutil>=7.2.2", "pyfiglet>=1", "python-dotenv>=1.2.3", "pyyaml>=6.0.3", "rich>=15", "sentry-sdk>=2.68.1", "textual>=8.2.8"]
+test = ["pytest>=8,<10"]
+evaluation = ["pandas>=2.2", "pyyaml>=6"]
+
+[project.scripts]
+hma-run = "hma.supervisor:main"
+hmz = "hmz.__main__:main"
+hma-stage-evaluator = "hma.benchmark.stage:main"
+
 [tool.hatch.build.targets.wheel]
-packages = ["src/hmz"]
+packages = ["src/hma", "src/hmz"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

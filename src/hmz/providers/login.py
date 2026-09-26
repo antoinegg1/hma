@@ -29,7 +29,6 @@ if TYPE_CHECKING:
 
 __all__ = ["asked", "make", "sign_in", "way_of"]
 
-
 def way_of(cli: str, name: str) -> Way | None:
     """The way in one backend offers under a name.
 
@@ -41,7 +40,6 @@ def way_of(cli: str, name: str) -> Way | None:
       It, or None for a name that backend does not offer.
     """
     return next((way for way in ways(cli) if way.name == name), None)
-
 
 def asked(way: Way, given: Mapping[str, str]) -> list[str]:
     """What a way still has to be told before it can be used.
@@ -55,7 +53,6 @@ def asked(way: Way, given: Mapping[str, str]) -> list[str]:
       the way asks them.
     """
     return [one.env for one in way.asks if not given.get(one.env) and not one.fixed]
-
 
 def make(
     cli: str, name: str, way: Way, answers: Mapping[str, str] | None = None
@@ -78,8 +75,7 @@ def make(
       OSError: If the directory cannot be made.
     """
     said = {one.env: one.fixed for one in way.asks if one.fixed} | dict(answers or {})
-    # Only what is kept: a key read off stdin by the CLI's own login ends up inside that
-    # CLI's store, and a second copy of it in an environment would be a second place to leak.
+
     keeping = {one.env for one in way.asks if one.keep}
     env = {
         name_: value
@@ -94,7 +90,6 @@ def make(
         env=env,
         args=tuple(filled(one, said) for one in way.args),
     )
-
 
 def sign_in(
     provider: Provider, way: Way, answers: Mapping[str, str] | None = None
@@ -120,8 +115,7 @@ def sign_in(
     if not way.argv:
         return 0
     said = {one.env: one.fixed for one in way.asks if one.fixed} | dict(answers or {})
-    # Again, in case the provider was made before whatever it is signing into was: a login
-    # writes where it reads, and it reads a path that has to be there to be written to.
+
     ready(provider)
     argv = [filled(one, said) for one in way.argv]
     spawned = redirect.command(provider.swaps(), argv)
@@ -134,7 +128,6 @@ def sign_in(
         check=False,
     )
     return landed.returncode
-
 
 def again(cli: str, name: str) -> Provider | None:
     """The provider of that name, read back as it is now written down.

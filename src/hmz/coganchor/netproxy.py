@@ -33,7 +33,6 @@ __all__ = ["NetProxy"]
 
 log = logging.getLogger(__name__)
 
-
 class NetProxy:
     """Redirects selected outbound TCP through the target machine."""
 
@@ -86,11 +85,10 @@ class NetProxy:
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listener.bind((_loopback(family), 0))
         listener.listen(64)
-        listener.setblocking(False)  # noqa: FBT003  -- the socket module's own signature
+        listener.setblocking(False)  
         local_port = listener.getsockname()[1]
         self._listeners[(host, port)] = listener
-        # The destination rides on the selector key rather than a port lookup:
-        # an IPv4 and an IPv6 listener can hold the same port number.
+
         self._selector.register(listener, selectors.EVENT_READ, (host, port))
         self._wake_write.send(b"\x00")
         log.debug(
@@ -108,7 +106,7 @@ class NetProxy:
                 if key.data is None:
                     self._wake_read.recv(4096)
                     continue
-                self._accept(key.fileobj, key.data)  # pyright: ignore[reportArgumentType]
+                self._accept(key.fileobj, key.data)  
         self._shutdown()
 
     def _accept(self, listener: socket.socket, destination: tuple[str, int]) -> None:
@@ -128,7 +126,6 @@ class NetProxy:
         self._selector.close()
         self._wake_read.close()
         self._wake_write.close()
-
 
 class _Relay:
     """Pumps one accepted loopback connection through a remote TCP tunnel."""
@@ -162,28 +159,25 @@ class _Relay:
             self._closed.wait(timeout=30.0)
             _close(self._socket)
 
-    def _on_data(self, stream: Stream, data: bytes) -> None:  # noqa: ARG002
+    def _on_data(self, stream: Stream, data: bytes) -> None:  
         try:
             self._socket.sendall(data)
         except OSError:
             self._closed.set()
 
-    def _on_close(self, result: dict[str, Any] | None, error: OSError | None) -> None:  # noqa: ARG002
+    def _on_close(self, result: dict[str, Any] | None, error: OSError | None) -> None:  
         if error is not None:
             log.debug("tunnel to %s:%d ended: %s", self._host, self._port, error)
         self._closed.set()
         with contextlib.suppress(OSError):
             self._socket.shutdown(socket.SHUT_RDWR)
 
-
 def _close(sock: socket.socket) -> None:
     with contextlib.suppress(OSError):
         sock.close()
 
-
 def _loopback(family: int) -> str:
     return "::1" if family == socket.AF_INET6 else "127.0.0.1"
-
 
 def _resolve_allow_list(entries: tuple[str, ...]) -> frozenset[str]:
     """Expand ``--net-allow`` entries into the addresses ``connect`` will name.
@@ -202,7 +196,7 @@ def _resolve_allow_list(entries: tuple[str, ...]) -> frozenset[str]:
         except ValueError:
             pass
         else:
-            continue  # already an address; nothing to resolve
+            continue  
         try:
             infos = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
         except OSError:

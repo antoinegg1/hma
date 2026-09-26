@@ -11,13 +11,9 @@ import sys
 
 __all__ = ["anchor"]
 
-#: Addresses a target may be left listening on without a secret, because nothing off this
-#: machine can reach them.
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
-#: The top of the port range, above which a number is not a port at all.
 _MAX_PORT = 65535
-
 
 def anchor(argv: list[str]) -> int:
     """Runs the agent named on the command line, with its work landing on another machine.
@@ -41,7 +37,6 @@ def anchor(argv: list[str]) -> int:
     from hmz.coganchor.anchor import check, connect
     from hmz.coganchor.proto import ProtocolError
 
-    # stderr, the one stream a session never speaks the protocol on.
     logging.basicConfig(
         level=args.log_level.upper(),
         format="%(asctime)s hmz %(levelname)s %(message)s",
@@ -52,8 +47,7 @@ def anchor(argv: list[str]) -> int:
     try:
         config = line.settings(args)
     except ValueError as exc:
-        # Settings a session could not be run under are bad arguments, not failed sessions,
-        # so they exit 2 the way argparse's own rejections do.
+
         parser.error(str(exc))
 
     try:
@@ -73,7 +67,6 @@ def anchor(argv: list[str]) -> int:
         return 1
     else:
         return 0
-
 
 def _serve(argv: list[str]) -> int:
     """Replays on this machine what an `hmz anchor` elsewhere asks of it.
@@ -138,9 +131,7 @@ def _serve(argv: list[str]) -> int:
         return 2
 
     if args.stdio:
-        # The real stdin/stdout are duplicated away and fds 0 and 1 pointed at /dev/null, so
-        # a stray print from this process or any child it spawns cannot corrupt the protocol
-        # stream. fd 2 keeps carrying the log.
+
         read_fd, write_fd = os.dup(0), os.dup(1)
         devnull = os.open(os.devnull, os.O_RDWR)
         os.dup2(devnull, 0)
@@ -168,8 +159,6 @@ def _serve(argv: list[str]) -> int:
         )
         return 2
 
-    # Imported here rather than above: a session over a pipe is the one the bootstrapped
-    # target runs, and it has no use for a listener that serves many.
     from hmz.coganchor.serve.listener import serve_forever
 
     try:

@@ -20,7 +20,6 @@ from typing import IO
 
 __all__ = ["tools"]
 
-
 def tools(argv: list[str]) -> int:
     """Relays this process's stdin and stdout to a flow's toolbox.
 
@@ -55,20 +54,15 @@ def tools(argv: list[str]) -> int:
         """Carries what the CLI says to the flow, and says when the CLI has stopped."""
         with held.makefile("wb") as writing:
             _moves(sys.stdin.buffer, writing)
-        # The CLI has closed its end, so this one has: without saying so the flow would sit
-        # reading a socket nobody is going to write to, and this process would sit reading a
-        # socket that is therefore never closed -- which is a CLI that never exits.
+
         with contextlib.suppress(OSError):
             held.shutdown(socket.SHUT_WR)
 
     with held, held.makefile("rb") as reading:
-        # Both ways at once: a client writes a request and waits, and a server may say
-        # something before it is asked. One thread apiece is what makes neither wait on the
-        # other, and the first of them to end is what ends the relay.
+
         threading.Thread(target=upward, daemon=True).start()
         _moves(reading, sys.stdout.buffer)
     return 0
-
 
 def _moves(source: IO[bytes], sink: IO[bytes]) -> None:
     """Carries one stream into the other a line at a time, until the first of them ends.

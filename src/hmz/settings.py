@@ -42,7 +42,6 @@ if TYPE_CHECKING:
 
 __all__ = ["Settings"]
 
-
 class Settings:
     """What one workspace was last set up to run, read once and written as it changes."""
 
@@ -55,11 +54,7 @@ class Settings:
         self._where = str(Path(workspace or Path.cwd()).resolve())
         self._file = home() / "settings.yaml"
         self._held = self._read()
-        #: What was in the file when this read it: which workspaces, and what every setting
-        #: beside them was. A write merges against this rather than against what it holds, so
-        #: that an instance which has been open all session cannot put back a setting somebody
-        #: has changed since -- and an absence, which is the one thing a merge cannot see for
-        #: itself, is told from a value another instance has written.
+
         self._knew = frozenset(self._workspaces(self._held))
         self._read_as = {
             name: value for name, value in self._held.items() if name != "workspaces"
@@ -152,10 +147,8 @@ class Settings:
         said: list[Runs] = []
         for at, raw in enumerate(agents.values()):
             if not isinstance(raw, dict):
-                return []  # written by hand and not the way this writes it
-            # An anchor is what a workspace that has one has: an entry written before there
-            # were any is a workspace whose agents work here, which is what leaving it out
-            # already meant.
+                return []  
+
             runs = read_back(
                 cast("dict[str, Any]", raw),
                 goals=goal_defaults[at]
@@ -220,7 +213,7 @@ class Settings:
             flow was set up.
         """
         agents: dict[str, dict[str, Any]] = {
-            # By what the flow calls it, or by where it comes in the line when it has no name.
+            
             (names[at] if at < len(names) and names[at] else str(at + 1)): written(runs)
             for at, runs in enumerate(models)
         }
@@ -279,19 +272,14 @@ class Settings:
         """
         held = self._read()
         for name, value in self._held.items():
-            # Only what this instance has actually changed: one that read `enable_sentry` as
-            # true an hour ago and has been remembering flows ever since must not put that
-            # back over the no somebody answered in the meantime.
+
             if name != "workspaces" and value != self._read_as.get(name):
                 held[name] = value
         workspaces = self._workspaces(held)
         held["workspaces"] = workspaces
         mine = self._workspaces(self._held)
         workspaces.update(mine)
-        # And what this one has forgotten goes from the file too, which is the one thing a
-        # merge cannot see for itself: an absence here is either a workspace this instance
-        # took away or one another instance has written since, and only what this instance
-        # read when it opened tells them apart.
+
         for gone in self._knew - set(mine):
             workspaces.pop(gone, None)
         self._held = held
@@ -302,9 +290,7 @@ class Settings:
         try:
             self._file.parent.mkdir(parents=True, exist_ok=True)
             said = yaml.safe_dump(held, sort_keys=False, allow_unicode=True)
-            # Beside it under a name nothing else will pick: two `hmz` running at once both
-            # write this file, and a fixed `.new` between them is one of them finding its own
-            # half-written file moved away underneath it.
+
             handle, beside = tempfile.mkstemp(
                 dir=self._file.parent, prefix=f".{self._file.name}.", suffix=".new"
             )

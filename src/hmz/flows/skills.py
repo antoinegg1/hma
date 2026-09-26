@@ -7,7 +7,7 @@ one, which is the whole point of a flow being a directory rather than a file.
 
 A flow may also name skills that live somewhere else, by writing them where it is declared::
 
-    @flow(skills=("https://github.com/humanfia/flowverse#deep-research",))
+    @flow(skills=("/path/to/local/flows#example",))
 
 which is a git repository anything can clone and, after the `#`, which of the skills in it is
 wanted -- matched against the `skills/*` that repository holds, by the directory each is in.
@@ -37,14 +37,11 @@ if TYPE_CHECKING:
 
 __all__ = ["CARD", "SKILLS", "brought", "cached", "fetched", "under"]
 
-#: What separates the repository from the skill wanted out of it.
 _WANTED = "#"
-
 
 def under() -> Path:
     """Where the skills fetched from somewhere else are kept, under humanize's own home."""
     return home() / SKILLS
-
 
 def brought(at: Path | str, declared: Iterable[str] = ()) -> list[Loaded]:
     """Every skill one flow brings: its own first, then whatever it named.
@@ -68,8 +65,7 @@ def brought(at: Path | str, declared: Iterable[str] = ()) -> list[Loaded]:
     """
     found: list[Loaded] = []
     seen: set[str] = set()
-    # "" for a flow that is one file, which has no directory of its own and so has no skills
-    # of its own: what is beside such a flow is the other flows, and none of it came with it.
+
     for one in _inside(Path(at) / SKILLS) if at else []:
         seen.add(one.name)
         found.append(Loaded(one.name, one, "this flow"))
@@ -81,11 +77,7 @@ def brought(at: Path | str, declared: Iterable[str] = ()) -> list[Loaded]:
         inside = _inside(where / SKILLS)
         wanted = wanted.strip()
         if wanted and not any(one.name == wanted for one in inside):
-            # Named and not there: a typo, or a skill that has been renamed upstream. Said
-            # here for the reason a repository that cannot be fetched is said here -- a flow
-            # working by a skill it has not got is not a flow to start and find out about an
-            # hour in -- and it names what the repository does hold, since the answer is
-            # usually one of them.
+
             raise OSError(
                 f"{url.strip()} holds no skill called {wanted!r}"
                 + (
@@ -100,7 +92,6 @@ def brought(at: Path | str, declared: Iterable[str] = ()) -> list[Loaded]:
             seen.add(one.name)
             found.append(Loaded(one.name, one, said))
     return found
-
 
 def _inside(at: Path) -> list[Path]:
     """Every skill directory inside one, alphabetically.
@@ -118,7 +109,6 @@ def _inside(at: Path) -> list[Path]:
     except OSError:
         return []
 
-
 def cached(url: str) -> Path:
     """Where the repository at this URL is kept once it has been fetched.
 
@@ -135,16 +125,14 @@ def cached(url: str) -> Path:
     said = PurePosixPath(url.rstrip("/"))
     name = said.name.removesuffix(".git") or "skills"
     whose = said.parent.name
-    # Kept to what a directory name may be, since a URL holds whatever somebody put in it.
+    
     plain = [one for one in (_safe(whose), _safe(name)) if one]
     digest = hashlib.sha256(url.strip().encode("utf-8")).hexdigest()[:12]
     return under() / "-".join([*plain, digest])
 
-
 def _safe(said: str) -> str:
     """One part of a URL, as much of it as may be a directory name."""
     return "".join(one for one in said if one.isalnum() or one in "._-").strip(".-")
-
 
 def fetched(url: str) -> Path:
     """Clones a repository of skills, or brings the clone of it up to date.
@@ -166,26 +154,20 @@ def fetched(url: str) -> Path:
         try:
             refresh(at)
         except OSError:
-            # Fetched before and unreachable now: a network that is down is not a reason to
-            # refuse to run a flow whose skills are already on this machine. A fetch another
-            # run is doing at the same moment fails the same way, on git's own lock, and this
-            # is the same answer to it: what is here already is what this run works by.
+
             return at
         return at
     at.parent.mkdir(parents=True, exist_ok=True)
-    shutil.rmtree(at, ignore_errors=True)  # half a clone from a run that was killed
-    # Cloned beside and then moved into place, so that what is at `at` is either nothing or a
-    # whole repository: a flow's agents fetch as they are got ready, several at once and often
-    # the same repository, and two clones into one directory make one broken one. The move is
-    # what settles who won, and whoever lost throws their own copy away.
+    shutil.rmtree(at, ignore_errors=True)  
+
     beside = Path(tempfile.mkdtemp(dir=at.parent, prefix=f".{at.name}."))
-    beside.rmdir()  # git clones into a directory it makes; this was only to take the name
+    beside.rmdir()  
     try:
         clone(url, beside)
         try:
             beside.rename(at)
         except OSError:
-            # Somebody else got there first, which is a fetched repository either way.
+            
             shutil.rmtree(beside, ignore_errors=True)
     except BaseException:
         shutil.rmtree(beside, ignore_errors=True)

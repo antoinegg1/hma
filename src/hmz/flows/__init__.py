@@ -249,17 +249,8 @@ __all__ = [
     "wanted",
 ]
 
-#: The two modules of humanize's own that a flow reaches through here whole: what each CLI
-#: is, and what each of them runs. A loop that turns the effort down when a model starts
-#: writing less asks the second of them what rungs there are, which is a question about a
-#: backend rather than about any agent -- so it is handed through as it stands rather than
-#: flattened into a name apiece.
 _MODULES = ("backends", "models")
 
-#: And the names a flow imports from here that are written down elsewhere: the vocabulary a
-#: turn is described in, where humanize keeps what outlives a run, and the two readings of a
-#: flow -- which are thousands of lines of `ast` apiece and are asked for by the one command
-#: that checks a flow rather than by anything that lists, finds or runs one.
 _ELSEWHERE = {
     "ALWAYS_DONE": "hmz.flows.proving",
     "Capability": "hmz.flows.checking",
@@ -308,7 +299,6 @@ _ELSEWHERE = {
     "home": "hmz",
 }
 
-
 def __getattr__(name: str) -> object:
     """Hands through what a flow imports from here that is written down elsewhere.
 
@@ -336,26 +326,13 @@ def __getattr__(name: str) -> object:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     return getattr(import_module(where_), name)
 
-
-#: Where the flows humanize itself ships are: a directory of them, rather than beside this
-#: file -- what is beside this file is how a flow is found, which is not one. They are the
-#: whole of what is there, so there is no `flows/` in it to tell them from the rest.
 BUILTIN_AT = Path(__file__).parent / "builtin"
 
-#: What a flow's directory holds the flow itself in. The rest of the directory is what it
-#: imports and the `skills/` it brings, so the entry point is named rather than guessed.
 ENTRY = "__init__.py"
 
-#: And what an atlas's directory may hold the prophecy it was already compiled to in. A
-#: flowverse that ships one ships the graph its flow was checked into, and that graph is
-#: what runs: the compiling is where an atlas is refused, and a repository which has been
-#: through it once has an answer worth carrying rather than working out again.
 PROPHECY = "prophecy.pkl"
 
-#: What a flow's own name is separated from the one inside it by. A flow that holds one flow
-#: is named by itself; one that holds three names each of them after it.
 _INSIDE = ":"
-
 
 @dataclass(frozen=True, slots=True)
 class Flow:
@@ -385,16 +362,10 @@ class Flow:
     resumable: bool = False
     selectable: bool = True
 
-
-#: Where a decorated function keeps what it said about itself. On the function rather than in
-#: a table, because a file is read by running it: a table would be one more thing to find,
-#: and this travels with the thing it describes.
 _SAID = "__humanize_flow__"
-
 
 @overload
 def flow[**P, T](call: Callable[P, T], /) -> Callable[P, T]: ...
-
 
 @overload
 def flow[**P, T](
@@ -405,7 +376,6 @@ def flow[**P, T](
     resumable: bool = False,
     selectable: bool = True,
 ) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
-
 
 def flow[**P, T](
     call: Callable[P, T] | None = None,
@@ -439,7 +409,7 @@ def flow[**P, T](
     A flow may also name skills that live somewhere else, which are mounted onto every session
     its agents open alongside the ones in its own `skills/`::
 
-        @flow(skills=("https://github.com/humanfia/flowverse#deep-research",))
+        @flow(skills=("/path/to/local/flows#example",))
 
     And a flow may say that it can be picked up where the last run of it left off, which is
     what a loop that is meant to run for a week is::
@@ -493,7 +463,6 @@ def flow[**P, T](
 
     return marks if call is None else marks(call)
 
-
 def loaded(where_: str | os.PathLike[str]) -> dict[str, Any]:
     """Runs a flow's entry point and answers with what it left behind.
 
@@ -524,7 +493,6 @@ def loaded(where_: str | os.PathLike[str]) -> dict[str, Any]:
                 sys.path.remove(one)
         _forgotten(beside, among)
 
-
 def _forgotten(*under: str) -> None:
     """Forgets what was imported from beside a flow, so nothing of it outlives the run.
 
@@ -550,7 +518,6 @@ def _forgotten(*under: str) -> None:
         if at and os.path.abspath(at).startswith(roots):
             del sys.modules[name]
 
-
 def held(where_: str | os.PathLike[str]) -> list[Flow]:
     """Every flow one file holds: its own first, and the rest as it declares them.
 
@@ -566,10 +533,9 @@ def held(where_: str | os.PathLike[str]) -> list[Flow]:
     """
     try:
         inside = loaded(where_)
-    except Exception:  # noqa: BLE001 -- a file that will not run holds no flows to list
+    except Exception:  
         return []
     return _flows_of(inside)
-
 
 def _flows_of(inside: dict[str, Any]) -> list[Flow]:
     """Every flow in what running one file left behind.
@@ -594,8 +560,7 @@ def _flows_of(inside: dict[str, Any]) -> list[Flow]:
             marked.name == already.name for already in said
         ):
             continue
-        # The file's own docstring where the flow it holds says nothing: a file that is one
-        # flow is documented as that flow, and its first line is what it does.
+
         if not marked.name and not marked.about:
             marked = Flow(
                 name="",
@@ -606,7 +571,6 @@ def _flows_of(inside: dict[str, Any]) -> list[Flow]:
             )
         said.append(marked)
     return [one for one in said if not one.name] + [one for one in said if one.name]
-
 
 class Offer(NamedTuple):
     """One flow there is to run, as whatever is offering them lists it.
@@ -621,7 +585,6 @@ class Offer(NamedTuple):
     whose: str
     name: str
     about: str = ""
-
 
 def found() -> list[Offer]:
     """Every flow there is to run, and where each came from.
@@ -640,7 +603,6 @@ def found() -> list[Offer]:
       its own. A file that holds several says so, `<name>:<inside>` apiece.
     """
     return [one for verse in flowverses() for one in offers(verse)]
-
 
 def entry(under: Path, name: str) -> Path | None:
     """The file to run for the flow of that name in one directory of flows.
@@ -662,7 +624,6 @@ def entry(under: Path, name: str) -> Path | None:
         return beside
     alone = under / f"{name}.py"
     return alone if alone.is_file() else None
-
 
 def offered(under: Path) -> list[str]:
     """Every flow in one directory of flows, by the name each is offered under.
@@ -688,7 +649,6 @@ def offered(under: Path) -> list[str]:
         if (path / ENTRY).is_file() or (path.is_file() and path.suffix == ".py"):
             found_.append(name)
     return found_
-
 
 def offers(one: Flowverse) -> list[Offer]:
     """Every flow one flowverse offers, and the name each is offered by.
@@ -727,7 +687,6 @@ def offers(one: Flowverse) -> list[Offer]:
         for name, said in _named(at_, base)
     ]
 
-
 def _named(at: Path, called: str) -> list[tuple[str, str]]:
     """What each flow in one file is called, given what the file itself is called.
 
@@ -745,14 +704,13 @@ def _named(at: Path, called: str) -> list[tuple[str, str]]:
     """
     try:
         inside = loaded(at)
-    except Exception:  # noqa: BLE001 -- named as a flow, and not readable to be sure it is
+    except Exception:  
         return [(called, "")]
     return [
         (called if not one.name else f"{called}{_INSIDE}{one.name}", one.about)
         for one in _flows_of(inside)
         if one.selectable
     ]
-
 
 def about(named_: str) -> str:
     """The line one flow says about itself, for whoever is choosing between them.
@@ -769,7 +727,6 @@ def about(named_: str) -> str:
             return one.about
     return ""
 
-
 def _split(named_: str) -> tuple[str, str]:
     """One flow's name, split into the file and the flow inside it.
 
@@ -785,7 +742,6 @@ def _split(named_: str) -> tuple[str, str]:
     if not sep or os.sep in inside or "/" in inside:
         return named_, ""
     return at, inside
-
 
 def find(named_: str) -> str:
     """Where the entry point of the flow called this is.
@@ -804,29 +760,23 @@ def find(named_: str) -> str:
     at_, _ = _split(named_)
     whose, _, rest = at_.partition("/")
     if rest:
-        # Named outright -- `official/rlar`, `local/scheduler` -- which is the one spelling
-        # that says which place it came from, and so the one that cannot be stood in for.
+
         for verse in flowverses():
             beside = entry(holds(verse), rest)
             if whose == verse.name and beside is not None:
                 return str(beside.resolve())
     else:
-        # Nearest wins: this project, then yours, then whatever there is to run -- so a flow
-        # of your own may stand in for one of humanize's by taking its name.
+
         for verse in nearest():
             beside = entry(holds(verse), at_)
             if beside is not None:
                 return str(beside.resolve())
-    # A path taken as given, in both the shapes a flow is: the directory it is, the file it is
-    # for whoever points at one outright -- a flow being written, a file a test wrote out --
-    # and the `.py` beside a path with the extension left off, which is how a single-file flow
-    # is written down anywhere its name is not what it is called by.
+
     said = os.path.expanduser(at_)
     for shape in (os.path.join(said, ENTRY), said, f"{said}.py"):
         if os.path.isfile(shape):
             return os.path.realpath(shape)
     return at_
-
 
 def reading(named_: str) -> str:
     """What to point a reading of one flow at, which is not always what runs it.
@@ -848,7 +798,6 @@ def reading(named_: str) -> str:
     if os.path.isfile(found_) and os.path.basename(found_) == ENTRY:
         return os.path.dirname(found_)
     return found_
-
 
 def foretold(named_: str) -> str:
     """Where the prophecy one flow ships is, for a flow that ships one.
@@ -875,7 +824,6 @@ def foretold(named_: str) -> str:
     held = shipped(beside) if beside else None
     return "" if held is None else str(held.at)
 
-
 def at(named_: str) -> str:
     """The flow's own directory, which is where what it brings with it lives.
 
@@ -892,7 +840,6 @@ def at(named_: str) -> str:
         return ""
     return os.path.dirname(found_)
 
-
 def inside(named_: str) -> str:
     """Which of the flows in a file this name asks for.
 
@@ -904,7 +851,6 @@ def inside(named_: str) -> str:
     """
     return _split(named_)[1]
 
-
 def _first(said: str | None) -> str:
     """The first line of a docstring, which is what a flow says about itself in a list.
 
@@ -913,7 +859,6 @@ def _first(said: str | None) -> str:
     """
     lines = (said or "").strip().splitlines()
     return lines[0].strip() if lines else ""
-
 
 def fork(named_: str, into: str | os.PathLike[str] | None = None) -> str:
     """Copies one flow into this project's own, to be changed however you like.
@@ -950,26 +895,20 @@ def fork(named_: str, into: str | os.PathLike[str] | None = None) -> str:
     name = os.path.basename(beside) if whole else os.path.basename(found_)
     mine = os.path.expanduser(str(into) if into is not None else MINE[LOCAL])
     at_ = os.path.join(mine, name)
-    # Both shapes of the name, whichever this one is: a flow is a directory or a file, the
-    # directory wins the name where there is one of each, and a copy that landed beside a
-    # flow of yours would take that flow's name away without touching the file it is in.
+
     stem = at_.removesuffix(".py")
     if os.path.exists(stem) or os.path.exists(stem + ".py"):
         raise ValueError(f"there is already a flow of your own at {at_}")
     os.makedirs(mine, exist_ok=True)
-    # Copied beside and then moved into place: a copy that fails partway -- a disk that filled,
-    # a file that could not be read -- would otherwise leave half a flow under the name, which
-    # is a flow that will not run, cannot be forked again, and hides the one it was copied from.
+
     holding = tempfile.mkdtemp(dir=mine, prefix=f".{name}.")
     try:
         held = os.path.join(holding, name)
         if whole:
-            # The whole directory: what a flow is made of travels with it, which is what makes
-            # a copy of one a flow rather than half of one.
+
             shutil.copytree(beside, held)
         else:
-            # A flow that is one file is copied as one: a flow is a module, and this is the
-            # shape that module has.
+
             shutil.copy2(found_, held)
         os.replace(held, at_)
     finally:

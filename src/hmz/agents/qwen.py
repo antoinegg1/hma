@@ -28,16 +28,9 @@ if TYPE_CHECKING:
     import os
     from collections.abc import Iterator
 
-#: What the CLI is installed as, and the variable that points one run at a settings file of
-#: ours. The system layer rather than the user's own: it is read for this process only, and
-#: what it says outranks the file the person who started the flow has configured.
 _COMMAND = "qwen"
 _SETTINGS = "QWEN_CODE_SYSTEM_SETTINGS_PATH"
 
-#: The tools a turn is not given at each rung of the ladder, by the names Qwen Code calls
-#: them. A rung is said as refusals because the flag that carries the rest is the approval
-#: mode: what the agent may not do is taken away, and everything left is approved without
-#: being asked -- a run per turn has nobody to answer it.
 _WITHHELD = {
     "read-only": ("edit", "write_file", "notebook_edit", "run_shell_command"),
     "workspace-write": ("web_fetch",),
@@ -45,21 +38,11 @@ _WITHHELD = {
     "bypass": (),
 }
 
-#: The two that reach the web, by the names Qwen Code calls them, taken away at every rung
-#: for an agent told not to search it rather than only at the one that already refuses them.
 _WEB_TOOLS = ("web_search", "web_fetch")
 
-#: What each kind of thing said reads as. `assistant` carries the agent talking and the tools
-#: it reached for in the one message; `result` is the turn's own answer and is read for what
-#: it cost rather than shown twice.
 _SAYS = {"text": "text", "thinking": "reasoning"}
 
-#: Where the settings files that say how hard to think are kept, one per effort there is.
-#: One directory for the process rather than one per session: a flow that opens a session a
-#: turn would otherwise leave a directory behind for every turn it ran, and what is in these
-#: files is the effort and nothing else -- so two sessions at one effort are one file.
 _EFFORTS: dict[str, Path] = {}
-
 
 def _thinking(effort: str) -> Path:
     """The settings file a turn at one effort is run against, written once.
@@ -76,8 +59,7 @@ def _thinking(effort: str) -> Path:
     """
     held = _EFFORTS.get(effort)
     if held is None:
-        # Kept for as long as the process runs: a turn reads it as it starts, and every later
-        # turn at this effort reads the same one.
+
         where = Path(tempfile.mkdtemp(prefix="hmz-qwen-"))
         held = where / "settings.json"
         held.write_text(
@@ -85,7 +67,6 @@ def _thinking(effort: str) -> Path:
         )
         _EFFORTS[effort] = held
     return held
-
 
 class QwenCodeSession(CommandSessionBase):
     """A Qwen Code conversation, resumed by the id its first turn reported.
@@ -97,11 +78,8 @@ class QwenCodeSession(CommandSessionBase):
     it has already run is a flow that would fail on the second turn.
     """
 
-    #: What it writes on stdout is the turn as events rather than the agent talking.
     protocol: ClassVar[bool] = True
 
-    #: `--json-schema` is a setting of the run: the turn is held to the shape by a tool of the
-    #: CLI's own making rather than by being asked for it in the prompt.
     shapes: ClassVar[bool] = True
 
     def __init__(
@@ -114,13 +92,10 @@ class QwenCodeSession(CommandSessionBase):
           cwd: The directory this conversation works in, as for `SessionBase`.
         """
         super().__init__(agent, cwd)
-        #: What the agent has said so far in the turn now running, and what it answered with.
-        #: The answer is the `result` record rather than the last thing said: a turn that ends
-        #: on a tool has still answered.
+
         self._said = ""
         self._failed: str | None = None
-        #: What the turn now running has cost, and which parts of it have been shown -- one
-        #: message is said once, and a stream that repeats it would show it twice.
+
         self._costing = Usage()
         self._shown: set[str] = set()
 
@@ -145,9 +120,7 @@ class QwenCodeSession(CommandSessionBase):
             "stream-json",
             "--model",
             self._agent.config.model,
-            # Everything the rung leaves is approved without being asked: a flow watches its
-            # agent rather than gating it, and a turn waiting on an approval nobody is there
-            # to give is a flow that has stopped.
+
             "--approval-mode",
             "yolo",
         ]
@@ -157,11 +130,9 @@ class QwenCodeSession(CommandSessionBase):
         if withheld:
             argv += ["--exclude-tools", ",".join(withheld)]
         if (schema := self._shaping) is not None:
-            # The shape as the CLI takes it: a JSON literal on the command line, which it
-            # holds the last message to rather than asking the model to keep to.
+
             argv += ["--json-schema", json.dumps(schema.model_json_schema())]
-        # The first turn opens the conversation and every later one resumes it by the id that
-        # first turn reported.
+
         argv += ["--resume", self._id] if self._id is not None else []
         return argv, prompt
 
@@ -191,13 +162,12 @@ class QwenCodeSession(CommandSessionBase):
         try:
             said: dict[str, Any] = json.loads(line)
         except json.JSONDecodeError:
-            return  # not ours: the odd plain line among the JSON
+            return  
         kind = str(said.get("type") or "")
         if kind == "assistant":
             yield from self._message(cast("dict[str, Any]", said.get("message") or {}))
         elif kind == "result":
-            # The turn's own answer, which is what it ends on. Held rather than shown: the
-            # agent already said these words as it said them.
+
             self._said = str(said.get("result") or "")
             self._costing = self._costing + self._cost(
                 cast("dict[str, Any]", said.get("usage") or {})
@@ -216,14 +186,11 @@ class QwenCodeSession(CommandSessionBase):
           What it said and what it reached for, each part once.
         """
         marked = str(message.get("id") or "")
-        # Counted where it is reported: a message carries the usage of the request that
-        # produced it, so a turn of several is the sum of them rather than the last one.
+
         self._costing = self._costing + self._cost(
             cast("dict[str, Any]", message.get("usage") or {})
         )
-        # A message said twice is the stream repeating itself rather than the agent saying it
-        # again -- but only an id tells them apart, so one that names itself with nothing is
-        # shown rather than taken for the last one.
+
         if marked:
             if marked in self._shown:
                 return
@@ -317,7 +284,6 @@ class QwenCodeSession(CommandSessionBase):
                 return str(named)
         raise ValueError(f"{_COMMAND} named no session")
 
-
 def _called(part: dict[str, Any]) -> str:
     """One tool call as the one line a row of a transcript has room for.
 
@@ -338,7 +304,6 @@ def _called(part: dict[str, Any]) -> str:
     )
     return f"{part.get('name') or 'tool'} {about}".strip()[:120]
 
-
 @dataclass(frozen=True, kw_only=True)
 class QwenCodeAgentConfig(AgentConfig):
     """What Qwen Code is configured with: the common model and effort, and nothing else.
@@ -346,7 +311,6 @@ class QwenCodeAgentConfig(AgentConfig):
     The model is written as Qwen Code writes it, which is the id its endpoint serves -- it is
     an OpenAI-compatible client, so what it runs is what the account behind it offers.
     """
-
 
 class QwenCodeAgent(AgentBase):
     """Qwen Code, driven through its own command line, one run per turn."""

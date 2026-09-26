@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 
 __all__ = ["Run"]
 
-
 class Run:
     """One run of one flow: the agents driving it, and how it ends."""
 
@@ -87,7 +86,7 @@ class Run:
         """Runs the flow, keeping whatever it raised for whoever asks afterwards."""
         try:
             self._runner.run(self._task)
-        except BaseException as why:  # noqa: BLE001 -- kept rather than swallowed
+        except BaseException as why:  
             self._raised = why
 
     def wait(self, timeout: float | None = None) -> bool:

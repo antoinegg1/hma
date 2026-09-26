@@ -40,22 +40,13 @@ __all__ = ["ShadowTree", "prepare_shadow_root"]
 
 log = logging.getLogger(__name__)
 
-#: Shadow roots are recorded here rather than marked in place, so the mirror
-#: stays byte-for-byte what the target has -- an agent listing the workspace
-#: must not see coganchor's own bookkeeping.
 REGISTRY_DIR = "~/.cache/humanize/shadows"
 
-#: What points that somewhere else for one process and everything it starts. For a machine
-#: that keeps its caches elsewhere, and for a test suite: these records outlive the mirrors
-#: they are about, so a suite writing them into somebody's own cache is a suite that leaves
-#: thousands of them there and then reads one back as a mirror it never made.
 SHADOWS = "HUMANIZE_SHADOWS"
 
 _FETCH_SUFFIX = ".humanize-fetch"
 
-#: Bound on symlink chasing, matching the kernel's own ``ELOOP`` limit.
 _MAX_LINK_HOPS = 40
-
 
 @dataclass(slots=True)
 class FileRecord:
@@ -76,7 +67,6 @@ class FileRecord:
             and self.remote_mtime_ns == entry["mtime_ns"]
         )
 
-
 class ShadowTree:
     """Keeps the local mirror consistent with the target."""
 
@@ -88,13 +78,9 @@ class ShadowTree:
         self._dirty_candidates: set[str] = set()
         self._generation = 0
 
-    # ------------------------------------------------------------------ queries
-
     def invalidate(self) -> None:
         """Forget every cached listing, because the target may have changed."""
         self._generation += 1
-
-    # ------------------------------------------------------------ materialising
 
     def ensure_path(self, local_path: str) -> None:
         """Make ``local_path`` resolvable: materialise the directory holding it."""
@@ -124,8 +110,7 @@ class ShadowTree:
         if not self._router.is_remote_path(local_path):
             return
         self.ensure_path(local_path)
-        # Opening a symlink reads whatever it points at, so that is the file
-        # whose content has to be here.
+
         path = self._follow_links(local_path)
         layout = self._router.layout_for(path)
         record = self._files.get(path)
@@ -213,8 +198,6 @@ class ShadowTree:
             rebase(path) if covers(path) else path for path in self._dirty_candidates
         }
 
-    # -------------------------------------------------------------- write-back
-
     def flush(self) -> int:
         """Push every locally modified file to the target.
 
@@ -230,7 +213,7 @@ class ShadowTree:
             try:
                 info = os.lstat(local_path)
             except OSError:
-                continue  # removed locally; the unlink was replayed already
+                continue  
             if not stat_module.S_ISREG(info.st_mode):
                 continue
             record = self._files.get(local_path)
@@ -259,11 +242,9 @@ class ShadowTree:
         self._record_local_state(local_path, record)
         log.debug("pushed %s -> %s (%d bytes)", local_path, virtual, info.st_size)
 
-    # ---------------------------------------------------------------- internals
-
     def _apply_listing(
         self,
-        layout: Layout,  # noqa: ARG002  -- the caller resolved against it already
+        layout: Layout,  
         local_dir: str,
         listing: dict[str, Any],
     ) -> None:
@@ -332,8 +313,7 @@ class ShadowTree:
             remote_mtime_ns=entry["mtime_ns"],
             content_present=entry["size"] == 0 and entry["kind"] == "file",
         )
-        # A sparse placeholder of the right size, mode and mtime makes local
-        # stat(), getdents64() and ls() report the target's truth for free.
+
         with open(local_path, "wb") as handle:
             if entry["size"] and entry["kind"] == "file":
                 handle.truncate(entry["size"])
@@ -348,9 +328,7 @@ class ShadowTree:
         except OSError:
             return
         for name in present - expected:
-            # Scratch files from an interrupted fetch are swept too: nothing
-            # else ever removes them, and a fetch can never be in flight here
-            # because both run on the supervisor's single thread.
+
             path = os.path.join(local_dir, name)
             log.debug("dropping %s: gone on the target", path)
             _remove_any(path)
@@ -370,17 +348,14 @@ class ShadowTree:
         record.local_size = info.st_size
         record.local_mtime_ns = info.st_mtime_ns
 
-
 def _subtree_test(root: str) -> Callable[[str], bool]:
     """Predicate matching ``root`` and everything beneath it."""
     prefix = root.rstrip("/") + "/"
     return lambda path: path == root or path.startswith(prefix)
 
-
 def _subtree_rebase(source: str, target: str) -> Callable[[str], str]:
     """Move a path from under ``source`` to the same place under ``target``."""
     return lambda path: target + path[len(source) :]
-
 
 def _is_intact(local_path: str, record: FileRecord) -> bool:
     """True when the local copy still matches what we last wrote there."""
@@ -392,7 +367,6 @@ def _is_intact(local_path: str, record: FileRecord) -> bool:
         info.st_size == record.local_size and info.st_mtime_ns == record.local_mtime_ns
     )
 
-
 def _remove_any(path: str) -> None:
     try:
         if os.path.isdir(path) and not os.path.islink(path):
@@ -402,11 +376,9 @@ def _remove_any(path: str) -> None:
     except OSError:
         log.debug("could not remove %s", path, exc_info=True)
 
-
 def _unlink_quietly(path: str) -> None:
     with contextlib.suppress(OSError):
         os.unlink(path)
-
 
 def prepare_shadow_root(path: str, *, force: bool = False, target: str = "") -> None:
     """Create or validate the local directory that mirrors the target.
@@ -444,7 +416,6 @@ def prepare_shadow_root(path: str, *, force: bool = False, target: str = "") -> 
     with open(record, "w", encoding="utf-8") as handle:
         json.dump({"shadow": path, "target": target}, handle)
 
-
 def _recorded_target(record: str) -> str | None:
     """The target this mirror was last used against, or ``None`` if it is new."""
     try:
@@ -452,7 +423,6 @@ def _recorded_target(record: str) -> str | None:
             return str(json.load(handle).get("target", ""))
     except (OSError, ValueError):
         return None
-
 
 def _registry_entry(path: str) -> str:
     digest = hashlib.sha256(os.path.abspath(path).encode()).hexdigest()[:16]

@@ -17,7 +17,6 @@ from typing import Protocol, runtime_checkable
 
 __all__ = ["Session"]
 
-
 @runtime_checkable
 class Session(Protocol):
     """What a run that outlives its terminal offers whatever is drawing it."""

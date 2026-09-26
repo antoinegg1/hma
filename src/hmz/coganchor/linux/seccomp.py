@@ -30,25 +30,20 @@ _SECCOMP_SET_MODE_FILTER: Final = 1
 _RET_ALLOW: Final = 0x7FFF0000
 _RET_TRACE: Final = 0x7FF00000
 
-# BPF instruction classes and modes, from <linux/filter.h>.
 _LD_W_ABS: Final = 0x20
 _JMP_JEQ_K: Final = 0x15
 _RET_K: Final = 0x06
 
-# Offsets into ``struct seccomp_data``.
 _OFFSET_NR: Final = 0
 _OFFSET_ARCH: Final = 4
 
 _MAX_JUMP: Final = 255
 
-
 class _SockFprog(ctypes.Structure):
     _fields_ = [("length", ctypes.c_ushort), ("filter", ctypes.c_void_p)]
 
-
 def _insn(code: int, jt: int, jf: int, k: int) -> bytes:
     return struct.pack("HBBI", code, jt, jf, k)
-
 
 def build_program(numbers: Iterable[int]) -> bytes:
     """Assemble the BPF program that traps ``numbers``.
@@ -71,7 +66,6 @@ def build_program(numbers: Iterable[int]) -> bytes:
         program.append(_insn(_RET_K, 0, 0, _RET_TRACE))
     program.append(_insn(_RET_K, 0, 0, _RET_ALLOW))
     return b"".join(program)
-
 
 def install(numbers: Iterable[int]) -> None:
     """Install the filter on the current thread.

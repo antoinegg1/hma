@@ -38,12 +38,7 @@ __all__ = [
     "utime",
 ]
 
-
-#: Distinguishes concurrent writers within one process.  ``--listen`` serves
-#: every connection from the same process, so a name built only from the pid
-#: would be shared by two sessions writing the same path.
 _WRITER_SEQUENCE = itertools.count()
-
 
 def _kind(mode: int) -> str:
     if stat_module.S_ISDIR(mode):
@@ -53,7 +48,6 @@ def _kind(mode: int) -> str:
     if stat_module.S_ISREG(mode):
         return "file"
     return "other"
-
 
 def describe(real: str, *, name: str | None = None) -> dict[str, Any]:
     """Return the wire representation of one directory entry or path."""
@@ -70,11 +64,9 @@ def describe(real: str, *, name: str | None = None) -> dict[str, Any]:
         entry["target"] = os.readlink(real)
     return entry
 
-
 def stat(table: ExportTable, path: str) -> dict[str, Any]:
     """Metadata for one exported path."""
     return describe(table.resolve(path))
-
 
 def listdir(table: ExportTable, path: str) -> dict[str, Any]:
     """List a directory, returning full metadata for every entry.
@@ -89,11 +81,10 @@ def listdir(table: ExportTable, path: str) -> dict[str, Any]:
             try:
                 entries.append(describe(item.path, name=item.name))
             except OSError:
-                # The entry vanished between scandir and lstat; skip it.
+                
                 continue
     info = os.stat(real)
     return {"entries": entries, "mode": info.st_mode, "mtime_ns": info.st_mtime_ns}
-
 
 def read(
     table: ExportTable, path: str, emit: Callable[[bytes], None]
@@ -105,7 +96,6 @@ def read(
         while chunk := handle.read(CHUNK_SIZE):
             emit(chunk)
     return {"size": info.st_size, "mode": info.st_mode, "mtime_ns": info.st_mtime_ns}
-
 
 class FileWriter:
     """Streaming, atomic replacement of a single file.
@@ -124,7 +114,7 @@ class FileWriter:
         self._real = real
         self._mode = mode
         self._temp = f"{real}.humanize-{os.getpid()}-{next(_WRITER_SEQUENCE)}.tmp"
-        self._handle = open(self._temp, "wb")  # noqa: SIM115 - closed by finish/abort
+        self._handle = open(self._temp, "wb")  
 
     def feed(self, data: bytes) -> None:
         self._handle.write(data)
@@ -153,7 +143,6 @@ class FileWriter:
         except OSError:
             return None
 
-
 def mkdir(table: ExportTable, path: str, mode: int, *, parents: bool) -> dict[str, Any]:
     """Make a directory, and the ones above it when asked for."""
     real = table.resolve(path)
@@ -163,18 +152,15 @@ def mkdir(table: ExportTable, path: str, mode: int, *, parents: bool) -> dict[st
         os.mkdir(real, mode)
     return {}
 
-
 def rmdir(table: ExportTable, path: str) -> dict[str, Any]:
     """Remove a directory, which has to be empty."""
     os.rmdir(table.resolve(path))
     return {}
 
-
 def unlink(table: ExportTable, path: str) -> dict[str, Any]:
     """Remove a file."""
     os.unlink(table.resolve(path))
     return {}
-
 
 def rename(table: ExportTable, src: str, dst: str, *, replace: bool) -> dict[str, Any]:
     """Move a path, over whatever is already at the destination unless told not to."""
@@ -185,35 +171,29 @@ def rename(table: ExportTable, src: str, dst: str, *, replace: bool) -> dict[str
         os.rename(real_src, real_dst)
     return {}
 
-
 def symlink(table: ExportTable, target: str, path: str) -> dict[str, Any]:
     """Make a symbolic link at ``path`` naming ``target``, which is not resolved here."""
     os.symlink(target, table.resolve(path))
     return {}
-
 
 def link(table: ExportTable, src: str, dst: str) -> dict[str, Any]:
     """Make a second name for one file."""
     os.link(table.resolve(src), table.resolve(dst))
     return {}
 
-
 def readlink(table: ExportTable, path: str) -> dict[str, Any]:
     """What a symbolic link names, as it names it."""
     return {"target": os.readlink(table.resolve(path))}
-
 
 def chmod(table: ExportTable, path: str, mode: int) -> dict[str, Any]:
     """Set a path's permission bits, and only those."""
     os.chmod(table.resolve(path), stat_module.S_IMODE(mode))
     return {}
 
-
 def truncate(table: ExportTable, path: str, size: int) -> dict[str, Any]:
     """Cut a file down to a size, or extend it out to one."""
     os.truncate(table.resolve(path), size)
     return {}
-
 
 def utime(
     table: ExportTable, path: str, atime_ns: int | None, mtime_ns: int | None

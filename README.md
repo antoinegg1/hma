@@ -1,60 +1,59 @@
-# hma
+# HMA
 
-The **submit3-minimal** Flame Chase controller, with the **humanize** agent runtime
-(`hmz`) vendored alongside it, so that the protocol and the runtime it was measured
-against stay pinned to one another.
+HMA alternates Claude Opus 5 and GPT-5.6-sol in fresh agent sessions while
+preserving one shared task workspace. Each option ends on natural completion,
+five accepted experiments, or the exploration deadline. Final Review selects
+among accepted candidates within the same six-hour budget.
 
+## Contents
+
+- `configs/hma-opus-gpt.json`: the sole experiment and evaluator configuration.
+- `src/hma/`: controller, evaluation bridge, and provider adapter.
+- `src/hmz/`: supporting native-agent runtime.
+- `docker/`: overlays for externally prepared agent and evaluator images.
+- `tests/`: offline protocol tests with temporary synthetic inputs.
+- `LICENSE`: license terms and component notices.
+
+## Install and test
+
+Use Python 3.12 or later:
+
+```sh
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install -r requirements-core.lock
+python -m pip install --no-deps -e .
+python -m pytest -q
 ```
-flows/flame_chase_submit3_minimal/   the controller  (~120 KB, 10 files)
-src/hmz/                             the agent runtime, vendored verbatim
+
+The tests exercise controller transitions, session isolation, evaluator
+admission, and Review handling without model inference or benchmark data.
+
+## Run
+
+Prepare the MLE-bench task, upstream grader, public input, private evaluator
+data, native-agent CLIs, and provider credentials separately. The agent image
+needs `requirements-runtime.lock` and this package; the evaluator image needs
+the task's grader dependencies. The Dockerfiles add HMA to these base images.
+
+Edit `configs/hma-opus-gpt.json`: replace `/REPRO_ROOT/...`, image names, and
+credential-file paths; set non-root `uid`/`gid` to match file ownership. Fill in
+the nested `evaluator` block with the task slug, metric direction, and paths as
+seen inside the evaluator container. Then run on the Docker host:
+
+```sh
+hma-stage-evaluator --config configs/hma-opus-gpt.json
+hma-run --config configs/hma-opus-gpt.json --validate-only
+hma-run --config configs/hma-opus-gpt.json
 ```
 
-## What the protocol is
+Both the run directory and evaluator home must be new. The controller uses a
+21,600-second budget with 900 seconds reserved for Review; the Review call is
+limited to 600 seconds to leave time for teardown and finalization. A missing
+or invalid nomination keeps the standing candidate. Agents cannot access
+private evaluator data or hidden test scores.
 
-Two actors alternate, each in a **fresh Docker container and a fresh HOME**, sharing
-**one working tree** for the whole cell. It is ordinary Flame Chase transfer plus
-exactly two additions:
-
-1. An **undisclosed cap** on accepted submissions per session. The controller ends the
-   session after the cap-th accepted submission; no sentence of the prompt says a cap
-   exists.
-2. One **closing ballot**, cast by the model that did *not* write the standing
-   submission, which may re-point the cell's result at another accepted submission.
-   The ballot is paid for **out of** the cell budget, not added to it.
-
-`flows/flame_chase_submit3_minimal/README.md` is the authoritative description,
-including what this variant deliberately does *not* do — the ancestor's artifacts-only
-handoff machinery is still present in `handoff.py` but is dead code here.
-
-> The `submit3` in the name is historical: the 2026-09-12 ancestor's cap was three.
-> Here the cap is a config value, and the production arm used five.
-
-## What this repository is not
-
-**It is not a one-command reproduction.** Running a cell end to end additionally needs,
-none of which lives here:
-
-- pinned local **agent and evaluator images** (`agent_image`, `evaluator_image`)
-- prepared **MLE-bench task data** for the agent and evaluator mounts
-- **credentials** for whichever CLIs the actors are configured with
-- a **gateway proxy module**, supplied through the `kimi_proxy_module` config key
-
-`flows/flame_chase_submit3_minimal/example.json` shows the shape of a config with those
-slots marked. Read it before assuming a missing file is a bug.
-
-## Relationship to upstream
-
-`src/hmz/` is a **verbatim vendored copy** of
-[humanfia/humanize2](https://github.com/humanfia/humanize2) at commit
-`413d02e44d0cc0514b9f5bd3fcefea156b047a49`, excluding only `__pycache__`. It is vendored
-rather than depended on so that this repository is a fixed pair of controller and
-runtime. **Upstream fixes do not reach this copy on their own** — re-vendoring is a
-deliberate act. See `NOTICE`.
-
-The controller itself is maintained in
-[antoinegg1/flowverse](https://github.com/antoinegg1/flowverse) under
-`flows/flame_chase_submit3_minimal/`.
-
-## Licence
-
-Apache-2.0. See `LICENSE` and `NOTICE`.
+This anonymous code supplement contains no experimental results, datasets,
+trajectories, transcripts, or Git metadata. Telemetry is disabled. The dependency
+lists describe the supplementary code's validation environment; external model
+CLIs and grader images are supplied by the reproducer.

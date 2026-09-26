@@ -32,28 +32,21 @@ import threading
 
 __all__ = ["codename"]
 
-#: The twelve codes the story spells out: what the heir was made to be, and the number they
-#: carry. Ordered as the heirs are introduced rather than alphabetically, since this is a
-#: cast list before it is a table.
 HEIRS: tuple[tuple[str, str], ...] = (
-    ("NeiKos", "496"),  # Phainon -- strife, and the third perfect number
-    ("PoleMos", "600"),  # Mydei -- war
-    ("SkeMma", "720"),  # Anaxa -- inquiry, and 6!
-    ("EpieiKeia", "216"),  # Castorice -- clemency, and 6**3
-    ("HapLotes", "405"),  # Tribbie -- singleness, of the three who are one
-    ("KaLos", "618"),  # Aglaea -- beauty, and the golden ratio
-    ("EleOs", "252"),  # Hyacine -- mercy, and the middle of Pascal's tenth row
-    ("HubRis", "504"),  # Cerydra -- pride, and 7 * 8 * 9
-    ("PhiLia", "093"),  # Cyrene -- love
-    ("ApoRia", "432"),  # Hysilens -- impasse
-    ("OreXis", "945"),  # Cipher -- appetite, and the smallest odd abundant number
-    ("SkoPeo", "365"),  # Terravox -- watching, and a year of it
+    ("NeiKos", "496"),  
+    ("PoleMos", "600"),  
+    ("SkeMma", "720"),  
+    ("EpieiKeia", "216"),  
+    ("HapLotes", "405"),  
+    ("KaLos", "618"),  
+    ("EleOs", "252"),  
+    ("HubRis", "504"),  
+    ("PhiLia", "093"),  
+    ("ApoRia", "432"),  
+    ("OreXis", "945"),  
+    ("SkoPeo", "365"),  
 )
 
-#: Everything else a code may be drawn from: Greek for a thing a person can be made to be,
-#: spelled as the heirs' own are -- a capital at the front and one more inside, falling where
-#: the word breaks. No heir was ever issued one of these, which is the point: an agent called
-#: `KykLos204` reads as somebody out of an era this one has not been told about.
 WORDS: tuple[str, ...] = (
     "AgaPe",
     "AiDos",
@@ -177,11 +170,6 @@ WORDS: tuple[str, ...] = (
     "XeNos",
 )
 
-#: The morphemes a word may lead with, and the ones it may end on. A word is one of each
-#: joined at the capital -- `MetaKratos`, `PolyMorphe` -- which is how `ApoRia` is spelled and
-#: so how anything the story never needed is spelled too. Split in two rather than drawn from
-#: one bag because `KratosMeta` reads backwards and `MetaKratos` does not. Two of these at
-#: the least: a count is spelled in them, and one alone is a place notation that never carries.
 JOINS: tuple[str, ...] = (
     "Amphi",
     "Ana",
@@ -226,7 +214,6 @@ JOINS: tuple[str, ...] = (
     "Tri",
 )
 
-#: What one of those leads to.
 STEMS: tuple[str, ...] = (
     "Aion",
     "Arche",
@@ -275,38 +262,20 @@ STEMS: tuple[str, ...] = (
     "Tyche",
 )
 
-#: The fewest morphemes a word is made of. One alone has no capital inside it and would not
-#: read as a code at all, so a word is two and grows from there.
 JOINED = 2
 
-#: How often a code is one of the twelve exactly as the story spells it, while any of the
-#: twelve is still free. Half, which is nothing like the one in eleven thousand the words
-#: written down here would give them by chance, let alone the ones built: the heirs are what
-#: somebody would recognise, so they are what somebody mostly gets.
 CANON = 0.5
 
-#: And how often the rest of the time is an heir's own word under a different number -- the
-#: same role out of another era -- rather than some other word.
 AGAIN = 0.5
 
-#: How often that other word is one Greek already had rather than one built out of morphemes.
-#: Both are the same rule; a word with a meaning behind it is just the better joke.
 KNOWN = 0.5
 
-#: The codes handed out in this process, which no second agent may be given: two agents left
-#: unnamed are two agents, and a trace that read them as one would read a flow reviewing its
-#: own work as a flow arguing with itself.
 _CALLED: set[str] = set()
 _CALLING = threading.Lock()
 
-#: How far the counted codes have got. Only a process that has drawn most of what luck can
-#: find reaches them, and it goes on from where it left off rather than counting again.
 _COUNTING = itertools.count(1)
 
-#: How many draws before the space is treated as crowded and codes are counted out instead.
-#: Well past what luck needs when most of it is free.
 _TRIES = 64
-
 
 def codename() -> str:
     """Draws a codename no agent in this process has been given.
@@ -322,7 +291,6 @@ def codename() -> str:
                 return drawn
         return _counted()
 
-
 def _drawn() -> str:
     """One draw, canon-heavy, which may be a code already given out.
 
@@ -334,12 +302,11 @@ def _drawn() -> str:
     Returns:
       A code, canon or otherwise.
     """
-    if random.random() < CANON:  # noqa: S311 -- a joke, not a key
+    if random.random() < CANON:  
         canon = (f"{word}{number}" for word, number in HEIRS)
         if free := [one for one in canon if one not in _CALLED]:
-            return random.choice(free)  # noqa: S311
-    return f"{_word()}{random.randrange(1000):03d}"  # noqa: S311
-
+            return random.choice(free)  
+    return f"{_word()}{random.randrange(1000):03d}"  
 
 def _word() -> str:
     """A word to hang three digits off: an heir's, one Greek keeps, or one built to order.
@@ -347,12 +314,11 @@ def _word() -> str:
     Returns:
       The word, capitalised at the front and where it breaks.
     """
-    if random.random() < AGAIN:  # noqa: S311
-        return random.choice(HEIRS)[0]  # noqa: S311
-    if random.random() < KNOWN:  # noqa: S311
-        return random.choice(WORDS)  # noqa: S311
-    return random.choice(JOINS) + random.choice(STEMS)  # noqa: S311
-
+    if random.random() < AGAIN:  
+        return random.choice(HEIRS)[0]  
+    if random.random() < KNOWN:  
+        return random.choice(WORDS)  
+    return random.choice(JOINS) + random.choice(STEMS)  
 
 def _counted() -> str:
     """A code built to order, for a process that has drawn most of what luck can find.

@@ -18,11 +18,7 @@ if TYPE_CHECKING:
 
 __all__ = ["Event", "Failed", "Question", "Stopped", "Unrecoverable", "Usage", "say"]
 
-#: The kinds every backend here counts, and which of them each also counts beside those. A
-#: kind is named the same thing wherever it is counted, so that one flow reading two backends
-#: reads one word for one thing.
 COMMON = ("input", "output")
-
 
 class Usage(Mapping[str, float]):
     """Tokens, by the kind each of them went on.
@@ -97,7 +93,6 @@ class Usage(Mapping[str, float]):
         said = ", ".join(f"{kind}={tokens:g}" for kind, tokens in self._kinds.items())
         return f"Usage({said})"
 
-
 class Failed(subprocess.CalledProcessError):
     """A turn that failed, saying why where whoever it happened to can read it.
 
@@ -123,7 +118,6 @@ class Failed(subprocess.CalledProcessError):
         said = [super().__str__(), _words(self.stderr), _plainly(self.output)]
         return " ".join(one for one in said if one)
 
-
 class Unrecoverable(Failed):
     """A turn that failed for a reason no other try could come out differently on.
 
@@ -142,11 +136,7 @@ class Unrecoverable(Failed):
     reasons they went wrong, and every loop written against one goes on working.
     """
 
-
-#: How much of what a failed turn said is worth putting in the message. Enough for the
-#: sentence a CLI fails with, and not the transcript it failed part way through.
 _ENOUGH = 400
-
 
 def _words(said: str | bytes | None) -> str:
     """One stream of a failed turn, as one line of a message.
@@ -162,7 +152,6 @@ def _words(said: str | bytes | None) -> str:
         return ""
     line = " ".join(held.split())
     return line if len(line) <= _ENOUGH else f"{line[: _ENOUGH - 1]}…"
-
 
 def _plainly(said: str | bytes | None) -> str:
     """The last thing a failed turn said in words rather than in its protocol.
@@ -186,15 +175,13 @@ def _plainly(said: str | bytes | None) -> str:
             return _words(one)
     return ""
 
-
-class Stopped(Exception):  # noqa: N818  -- not an error: an agent asked to stop has stopped
+class Stopped(Exception):  
     """Raised in place of a turn, once the agent has been told to stop.
 
     A flow is a loop, and a loop that catches a failed turn goes round again -- so stopping
     one cannot be a failed turn. This is not a `CalledProcessError`, so the loops that carry
     on past a turn that failed do not carry on past this.
     """
-
 
 @dataclass(frozen=True, slots=True)
 class Event:
@@ -231,7 +218,6 @@ class Event:
     tokens: Mapping[str, int] = field(default_factory=dict[str, int])
     spent: Usage = field(default_factory=Usage)
 
-
 @dataclass(frozen=True, slots=True)
 class Question:
     """Something an agent stopped mid-turn to ask its user.
@@ -245,7 +231,6 @@ class Question:
 
     text: str
     options: tuple[str, ...] = ()
-
 
 def say(text: str, sink: IO[str], *, end: str = "\n") -> None:
     """Puts something an agent said where the flow driving it can be watched.

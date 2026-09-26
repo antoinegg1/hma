@@ -43,14 +43,10 @@ __all__ = ["Launch", "Supervisor", "Tracee"]
 
 log = logging.getLogger(__name__)
 
-#: How long the loop sleeps before re-checking stalled tracees for signals.
 _IDLE_SECONDS = 0.2
 
-#: Signals an agent uses to cancel a command; relayed to the remote process.
 _CANCEL_SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGQUIT, signal.SIGHUP)
 
-#: Signals whose default action terminates, so they can be replayed onto the
-#: stand-in process instead of being flattened into an exit code.
 _FATAL_SIGNALS = frozenset(
     {
         signal.SIGHUP,
@@ -70,7 +66,6 @@ _FATAL_SIGNALS = frozenset(
     }
 )
 
-
 @dataclass(slots=True)
 class Launch:
     """The agent invocation coganchor is wrapping."""
@@ -80,7 +75,6 @@ class Launch:
     env: dict[str, str]
     cwd: str
 
-
 @dataclass(slots=True)
 class Tracee:
     """Per-process state for one traced task."""
@@ -88,11 +82,10 @@ class Tracee:
     pid: int
     attached: bool = False
     exec_count: int = 0
-    #: Set while this process stands in for a command running on the target.
+    
     proxy: ExecProxy | None = None
-    #: Errno to plant at the next syscall-exit stop, for a cancelled syscall.
+    
     pending_errno: int | None = None
-
 
 class Supervisor:
     """Runs the agent under interception and returns its exit status."""
@@ -112,9 +105,7 @@ class Supervisor:
         self.router = router
         self.shadow = shadow
         self.netproxy = netproxy
-        #: What the agent was given that the target is not to be given: the credentials it
-        #: reaches its own model provider with. Everything else it exports is inherited by
-        #: every command it runs there, which is what makes these worth naming.
+
         self.private = frozenset(private)
         self._launch = launch
         self._token = token
@@ -130,23 +121,17 @@ class Supervisor:
         self._root_pid = 0
         self._exit_status = 1
 
-    # --------------------------------------------------------------- lifecycle
-
     def run(self) -> int:
         """Launch the agent, service its syscalls, and return its exit code."""
         self._open_wakeup_pipes()
         try:
             self._root_pid = self._fork_tracee()
             self._await_initial_stop()
-            # The tracee is parked at SIGSTOP, so it is safe to start threads
-            # now; forking a multi-threaded process is not.
+
             try:
                 self.client.start(self._token)
             except BaseException:
-                # The agent exists but is not yet traced, so letting it run
-                # would leave it seccomp-filtered with nobody servicing the
-                # traps -- every execve would fail ENOSYS and report a second,
-                # baffling error on top of the real one.
+
                 os.kill(self._root_pid, signal.SIGKILL)
                 raise
             log.info(
@@ -186,9 +171,7 @@ class Supervisor:
             self._signal_write,
         ):
             os.set_blocking(fd, False)
-        # A Python-level handler (rather than SIG_IGN) is required for
-        # set_wakeup_fd to fire, and handlers reset to default across execve so
-        # the agent keeps its own signal behaviour.
+
         signal.signal(signal.SIGCHLD, _ignore)
         signal.signal(signal.SIGINT, _ignore)
         signal.set_wakeup_fd(self._signal_write, warn_on_full_buffer=False)
@@ -208,8 +191,6 @@ class Supervisor:
                 with contextlib.suppress(OSError):
                     os.close(fd)
 
-    # ------------------------------------------------------------------- start
-
     def _fork_tracee(self) -> int:
         """Fork the agent under ``PTRACE_TRACEME`` and a seccomp filter.
 
@@ -226,12 +207,10 @@ class Supervisor:
             ptrace.traceme()
             seccomp.install(TRAPPED_SYSCALLS)
             os.kill(os.getpid(), signal.SIGSTOP)
-            # Becoming the traced program is the whole errand of this fork, and it is an
-            # argv rather than a command line, so there is no shell for one to go through.
-            os.execve(launch.program, launch.argv, launch.env)  # noqa: S606
-        # Everything, deliberately: this is the forked child, and anything that escapes here
-        # would run the parent's code a second time rather than report a failed launch.
-        except BaseException as exc:  # noqa: BLE001
+
+            os.execve(launch.program, launch.argv, launch.env)  
+
+        except BaseException as exc:  
             os.write(2, f"hmz: cannot launch {launch.program}: {exc}\n".encode())
         os._exit(127)
 
@@ -241,8 +220,6 @@ class Supervisor:
             raise RuntimeError(
                 f"agent exited before it could be traced (status {status})"
             )
-
-    # -------------------------------------------------------------- event loop
 
     def _loop(self) -> None:
         while self._root_pid in self._tracees:
@@ -257,7 +234,7 @@ class Supervisor:
             readable, _, _ = select.select(
                 [self._signal_read, self._wake_read], [], [], _IDLE_SECONDS
             )
-        except InterruptedError:  # pragma: no cover - retried by the loop
+        except InterruptedError:  
             return
         for fd in readable:
             _drain(fd)
@@ -281,7 +258,7 @@ class Supervisor:
             return
         tracee = self._tracees.get(pid)
         if tracee is None:
-            # A new child reported before its parent's fork event; adopt it.
+            
             tracee = self._tracees.setdefault(pid, Tracee(pid))
         if not tracee.attached:
             tracee.attached = True
@@ -335,8 +312,6 @@ class Supervisor:
         """
         _try(ptrace.cont, tracee.pid, stop_signal)
 
-    # ------------------------------------------------------------ syscall stops
-
     def _on_seccomp(self, tracee: Tracee) -> None:
         try:
             registers = ptrace.getregs(tracee.pid)
@@ -386,8 +361,6 @@ class Supervisor:
             ptrace.cont(tracee.pid)
         except OSError:
             pass
-
-    # -------------------------------------------------------------- exec bridge
 
     def is_agent_launch(self, tracee: Tracee, program: str) -> bool:
         """True when a program belongs to this machine rather than the target."""
@@ -464,13 +437,11 @@ class Supervisor:
         if tracee is None or tracee.proxy is None:
             return
         tracee.proxy = None
-        # Anything the command did on the target invalidates our mirror.
+        
         self.shadow.invalidate()
         try:
             if result.signal in _FATAL_SIGNALS:
-                # Let the stand-in die from the very signal that killed the
-                # command, so the agent's wait() reports it as a signal death
-                # rather than an exit code -- what a local child would do.
+
                 ptrace.cont(pid, result.signal or 0)
                 return
             registers = ptrace.getregs(pid)
@@ -480,8 +451,6 @@ class Supervisor:
             ptrace.cont(pid)
         except OSError:
             log.debug("pid %d vanished before it could be released", pid)
-
-    # ------------------------------------------------------- signal relaying
 
     def _relay_pending_signals(self) -> None:
         """Forward cancellation signals queued against a parked tracee.
@@ -498,10 +467,8 @@ class Supervisor:
                 if pending & (1 << (signum - 1)):
                     tracee.proxy.forward_signal(int(signum))
 
-
 def _ignore(*_: object) -> None:
     """Wake the event loop without doing anything else."""
-
 
 def _drain(fd: int) -> None:
     try:
@@ -509,7 +476,6 @@ def _drain(fd: int) -> None:
             pass
     except (BlockingIOError, OSError):
         pass
-
 
 def _try(function: Any, *args: Any) -> None:
     """Run a ptrace call, tolerating a tracee that has already exited."""
@@ -520,7 +486,6 @@ def _try(function: Any, *args: Any) -> None:
             log.debug(
                 "%s%r failed: %s", getattr(function, "__name__", function), args, exc
             )
-
 
 def _steal(pid: int, fd: int) -> int:
     """Duplicate one of the tracee's standard descriptors, or ``-1``.
@@ -534,7 +499,6 @@ def _steal(pid: int, fd: int) -> int:
     except OSError as exc:
         log.warning("could not borrow fd %d from pid %d: %s", fd, pid, exc)
         return -1
-
 
 def _pending_signals(pid: int) -> int:
     try:

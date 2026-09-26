@@ -25,29 +25,21 @@ from typing import NamedTuple
 
 from hmz.flows import Agent, Person, flow
 
-
 class Chat(NamedTuple):
     """The two sides of a conversation."""
 
     assistant: Agent
     human: Person
 
-
 @flow
 def run(agents: Chat, task: str) -> None:
-    # One session, so the turns are a conversation rather than a series of first turns.
+    
     conversation = agents.assistant.new()
     said = task
     opening = True
     while said:
-        # The opening turn is not suppressed. A conversation whose first turn cannot run at
-        # all -- an account the backend refused, a model this one is not entitled to -- is a
-        # run to fail loudly; suppressed, it answers with nothing, which reads below as a
-        # conversation that is over, so the flow would end without a word and exit as though
-        # it had done what it was asked. Once a turn has landed the rest are forgiving, which
-        # is what a conversation is.
+
         answered = conversation(said, suppress=not opening)
         opening = False
-        # Saying that to the person is asking what to say next, and what they answer with is
-        # what they typed -- or nothing, which is a conversation that is over.
+
         said = agents.human(answered)

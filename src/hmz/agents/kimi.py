@@ -7,10 +7,6 @@ is configured with has nowhere to go, and a turn already running has nowhere to 
 all four are things done to the session a turn is submitted to.
 """
 
-# A session and the agent holding it are two halves of one object declared in one
-# file, which is what the underscore keeps out of the package rather than out of them.
-# pyright: reportPrivateUsage=false
-
 from __future__ import annotations
 
 import collections
@@ -39,14 +35,9 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-#: The one line `kimi web` prints once it is listening, and the only place the port it took --
-#: asked for as 0, so that two flows on one machine cannot collide -- and its token are said.
 _LISTENING = re.compile(r"^Kimi server: (\S+)/#token=(\S+)$")
 
-#: What an effort is prefixed with to ask for swarm mode: `max` and `swarmmax` are the same
-#: thinking, run as one agent and as a fleet of them.
 SWARM = "swarm"
-
 
 @dataclass
 class _Running:
@@ -60,16 +51,10 @@ class _Running:
     session: str | None = None
     config: dict[str, Any] = field(default_factory=dict[str, Any])
 
-
-#: How often a running turn is asked whether it is still running, how long one call may take,
-#: and how long a daemon being taken down is given to go before it is left to the system.
 _POLL_SECONDS = 1.0
 _CALL_SECONDS = 60.0
 _STOP_SECONDS = 5.0
 
-#: What the daemon counts a session's spending in, and what each of those is here. Every kind
-#: of token counts: what a rate is measuring is the traffic, and a cache read crosses the wire
-#: like anything else.
 _KINDS = {
     "input": "input_tokens",
     "output": "output_tokens",
@@ -77,23 +62,14 @@ _KINDS = {
     "cache_write": "cache_creation_tokens",
 }
 
-#: What each kind of block a message is written in reads as. A block of a kind that is not here
-#: is not shown: an image is not a line of a transcript.
 _BLOCKS = {"text": "text", "thinking": "reasoning", "tool_use": "tool"}
 
-#: How each rung of the ladder is set on a Kimi session. The daemon takes one of `yolo`,
-#: `manual` and `auto`, and plan mode beside it. `manual` is the one that is never used: it
-#: asks, and a flow running unattended has nobody to answer -- so an agent that is to change
-#: nothing is put in plan mode instead, which is Kimi's own way of saying work it out and do
-#: none of it. There is no sandbox here, so `workspace-write` and `auto` are the same setting: it
-#: is told to answer its own approvals, and nothing confines where it answers them.
 _PERMITTED = {
     "read-only": {"permission_mode": "auto", "plan_mode": True},
     "workspace-write": {"permission_mode": "auto", "plan_mode": False},
     "auto": {"permission_mode": "auto", "plan_mode": False},
     "bypass": {"permission_mode": "yolo", "plan_mode": False},
 }
-
 
 class _AppServer:
     """A `kimi web` daemon of our own, and the calls one turn of a session is made of."""
@@ -117,7 +93,7 @@ class _AppServer:
         self._stopped = False
         self._proc = subprocess.Popen(
             argv,
-            # Its log is nobody's to read; what is wanted from it is the one line below.
+            
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -126,7 +102,7 @@ class _AppServer:
             env=dict(env) if env else None,
             start_new_session=os.name != "nt",
         )
-        assert self._proc.stdout is not None  # noqa: S101
+        assert self._proc.stdout is not None  
         for line in self._proc.stdout:
             if (listening := _LISTENING.match(line.strip())) is not None:
                 self._base = f"{listening[1]}/api/v1"
@@ -136,8 +112,7 @@ class _AppServer:
             raise Failed(
                 self._proc.wait(), argv, "", f"{argv[0]} stopped without listening"
             )
-        # A pipe nobody drains stops the daemon writing to it, so the rest of the log is read
-        # and dropped rather than left to fill.
+
         threading.Thread(
             target=collections.deque, args=(self._proc.stdout, 0), daemon=True
         ).start()
@@ -158,9 +133,8 @@ class _AppServer:
             a failed turn however it failed -- reported the way every other backend reports one,
             so that a flow catches turns rather than transports.
         """
-        # The address is the one this process just watched its own server announce, so the
-        # scheme is http and the host is loopback whatever the audit rule fears.
-        request = urllib.request.Request(  # noqa: S310
+
+        request = urllib.request.Request(  
             self._base + path,
             data=None if body is None else json.dumps(body).encode(),
             method=method,
@@ -170,17 +144,15 @@ class _AppServer:
             },
         )
         try:
-            with urllib.request.urlopen(request, timeout=_CALL_SECONDS) as response:  # noqa: S310
+            with urllib.request.urlopen(request, timeout=_CALL_SECONDS) as response:  
                 said: dict[str, Any] = json.load(response)
         except urllib.error.HTTPError as refused:
             raise Failed(
                 refused.code, self._argv, "", refused.read().decode(errors="replace")
             ) from refused
-        except OSError as unreachable:  # a daemon that died, or a call that timed out
+        except OSError as unreachable:  
             raise Failed(1, self._argv, "", str(unreachable)) from unreachable
-        # A refusal arrives inside a 200: a word steered into a turn that has already ended
-        # comes back as `{"code": 40402, "msg": ...}` with the status still OK. Read as an
-        # answer, that is a word which never landed reading as one that did.
+
         if said.get("code"):
             raise Failed(
                 1, self._argv, "", f"{path}: {said.get('msg') or said['code']}"
@@ -203,8 +175,6 @@ class _AppServer:
                 self._proc.wait()
                 return
 
-            # Provider wrappers and Kimi share this dedicated group. Taking down the group
-            # prevents a stopped flow from leaving either wrapper or daemon behind.
             with contextlib.suppress(ProcessLookupError):
                 os.killpg(self._proc.pid, signal.SIGTERM)
             with contextlib.suppress(subprocess.TimeoutExpired):
@@ -212,7 +182,6 @@ class _AppServer:
             with contextlib.suppress(ProcessLookupError):
                 os.killpg(self._proc.pid, signal.SIGKILL)
             self._proc.wait()
-
 
 @dataclass(frozen=True, kw_only=True)
 class KimiCodeCLIAgentConfig(AgentConfig):
@@ -224,7 +193,6 @@ class KimiCodeCLIAgentConfig(AgentConfig):
         the same thinking at either width.
     """
 
-
 class KimiCodeCLISession(SessionBase):
     """A Kimi Code conversation, held by the app server and named by it as it opens.
 
@@ -232,7 +200,7 @@ class KimiCodeCLISession(SessionBase):
     hint, so a second agent working alongside cannot be resumed by mistake.
     """
 
-    _agent: KimiCodeCLIAgent  # every turn is submitted to the server this agent holds
+    _agent: KimiCodeCLIAgent  
 
     def __init__(
         self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
@@ -244,10 +212,9 @@ class KimiCodeCLISession(SessionBase):
           cwd: The directory this conversation works in, as for `SessionBase`.
         """
         super().__init__(agent, cwd)
-        #: The turn under way, which is what a word put in is steered into.
+        
         self._running = _Running()
-        #: What this session has cost so far, by kind, as the daemon counts it: a running
-        #: total for the whole conversation, so what one turn cost is the rise across it.
+
         self._counted: Counter[str] = Counter()
 
     @property
@@ -272,8 +239,7 @@ class KimiCodeCLISession(SessionBase):
         running = self._running
         if running.session is None:
             raise RuntimeError("no turn is running to be talked to")
-        # Named by its own words: Kimi mints a fresh id for a steered prompt, so the id it
-        # answers with is not the one it took, and the words are what both ends have.
+
         self.steering(text, ticket=text)
         server = self._agent.server
         queued = server.call(
@@ -288,14 +254,14 @@ class KimiCodeCLISession(SessionBase):
                 {"prompt_ids": [queued["prompt_id"]]},
             )
         except BaseException:
-            self.unsteered(text)  # nothing is coming back for a word that never went in
+            self.unsteered(text)  
             raise
 
     def _stream(
         self,
         prompt: str,
         *,
-        schema: type[BaseModel] | None = None,  # noqa: ARG002
+        schema: type[BaseModel] | None = None,  
     ) -> Iterator[Event]:
         """Sends one turn, opening the session on the first call and resuming it after.
 
@@ -322,8 +288,7 @@ class KimiCodeCLISession(SessionBase):
         """
         server = self._agent.server
         held = server.call("GET", f"/sessions/{session}/questions")
-        # A list or a list under `items`, depending on the daemon: what is wanted is the
-        # questions, and a daemon that has none of them has nothing to answer either.
+
         waiting: list[Any] = (
             cast("dict[str, Any]", held).get("items") or []
             if isinstance(held, dict)
@@ -332,7 +297,7 @@ class KimiCodeCLISession(SessionBase):
         for raw in waiting:
             pending = cast("dict[str, Any]", raw)
             if not pending.get("question_id"):
-                continue  # not a question, whatever else the daemon answered with
+                continue  
             answers: dict[str, dict[str, Any]] = {}
             for asked in cast("list[Any]", pending.get("questions") or []):
                 question = cast("dict[str, Any]", asked)
@@ -426,8 +391,7 @@ class KimiCodeCLISession(SessionBase):
         """
         said = ""
         for event in self._submit(objective, goal=True):
-            # Told to whoever is watching, since a goal does not run through `stream`: it is
-            # one prompt and as many turns of the model as the objective takes.
+
             self._agent._heard(event)
             if event.kind == "result":
                 said = event.text
@@ -457,18 +421,14 @@ class KimiCodeCLISession(SessionBase):
             "model": self._agent.config.model,
             "thinking": effort.removeprefix(SWARM),
             "swarm_mode": effort.startswith(SWARM),
-            # What it may do without being asked, which for an unattended flow is everything:
-            # a flow watches its agent rather than answering it, as humanize' own flows do.
+
             **_PERMITTED.get(self._agent.config.permission, _PERMITTED["bypass"]),
         }
-        with self._lock:  # a conversation is a sequence: one turn at a time
-            # A turn that failed is as over as one that landed: neither leaves
-            # anything for a word to be steered into.
+        with self._lock:  
+
             try:
                 server = self._agent.server
-                # A session of its own per attempt while this one is unopened: an opening turn that
-                # failed leaves the daemon holding a conversation nothing landed in, and resuming
-                # that one would be resuming a turn that never happened.
+
                 if (session := self._id) is None:
                     session = server.call(
                         "POST", "/sessions", {"metadata": {"cwd": self._workspace()}}
@@ -481,8 +441,7 @@ class KimiCodeCLISession(SessionBase):
                         | ({"goal_objective": prompt} if goal else {})
                     },
                 )
-                # Said before the prompt goes in, so that a word put in has a session to be
-                # steered into from the moment there is a turn to interrupt.
+
                 self._running = _Running(session=session, config=turn)
                 since = server.call(
                     "POST",
@@ -492,42 +451,28 @@ class KimiCodeCLISession(SessionBase):
                 answer = ""
                 shown: dict[
                     str, int
-                ] = {}  # how much of each message has been passed on
+                ] = {}  
                 settled = False
-                costing = Usage()  # what this turn has come to, added up as it goes
+                costing = Usage()  
                 while True:
-                    # First of all: a turn that has stopped to ask waits on the answer, so a
-                    # poll that only read messages would be reading a session that has
-                    # stopped moving. A daemon that cannot be asked is not a failed turn.
+
                     with contextlib.suppress(subprocess.CalledProcessError):
                         self._asked(session)
                     busy = server.call("GET", f"/sessions/{session}/status")["busy"]
-                    # What it has come to so far, asked for each time round rather than once
-                    # at the end: a turn is minutes long, and a rate that only moved when one
-                    # ended would stand still for all of them. A daemon that will not say is
-                    # not a failed turn.
+
                     with contextlib.suppress(subprocess.CalledProcessError):
                         costing = costing + self._counting(server, session)
                     if goal and not busy:
-                        # A goal runs through the quiet between its turns: Kimi starts the next one
-                        # itself once the session falls still, so a session that has stopped is a
-                        # goal that has stopped only when the goal is no longer being pursued.
+
                         pursued = server.call("GET", f"/sessions/{session}/goal")
                         busy = pursued is not None and pursued["status"] == "active"
                     said = server.call(
                         "GET", f"/sessions/{session}/messages?after_id={since}"
                     )["items"]
-                    # A message is readable while it is still being written, so the turn is read
-                    # again from its own first message every poll rather than once: a message put
-                    # aside as seen would be the one the agent had only started saying. Newest
-                    # first, and a turn reads forwards; what has been passed on is not passed on
-                    # twice.
+
                     for message in reversed(said):
                         if message["role"] != "assistant":
-                            # A word put into the turn, spliced into the conversation at the
-                            # step that takes it in: that splice is the agent saying it has
-                            # it, and is the only thing here that is not the agent talking.
-                            # Read as one, it would show your own words back as the agent's.
+
                             if message["id"] not in shown:
                                 shown[message["id"]] = len(message["content"])
                                 words = "".join(
@@ -540,8 +485,7 @@ class KimiCodeCLISession(SessionBase):
                             continue
                         for block in message["content"][shown.get(message["id"], 0) :]:
                             kind = _BLOCKS.get(str(block.get("type")))
-                            # A tool is named by what it is; everything else is what it says,
-                            # which a block keeps under its own name -- text under `text`.
+
                             words = str(
                                 (
                                     block.get("tool_name")
@@ -553,18 +497,14 @@ class KimiCodeCLISession(SessionBase):
                             if kind is None or not words.strip():
                                 continue
                             if not self._agent._watchers:
-                                # On stderr, where every other backend puts its progress: a
-                                # turn nobody can watch is a flow that reads as hung for as
-                                # long as the turn takes. Something watching the agent shows
-                                # the turn itself, and would then be showing it twice.
+
                                 say(words, sys.stderr)
                             yield Event(kind=kind, text=words)
                         shown[message["id"]] = len(message["content"])
-                    # And the answer is taken fresh each time, so that it is what the agent ended
-                    # up saying rather than what it had said when it was first readable.
+
                     for (
                         message
-                    ) in said:  # newest first: the last thing said that has any words
+                    ) in said:  
                         text = "".join(
                             block["text"]
                             for block in message["content"]
@@ -574,17 +514,12 @@ class KimiCodeCLISession(SessionBase):
                             answer = text
                             break
                     if settled:
-                        # Taken note of before it is passed on: a turn that landed is a session
-                        # this agent opened, whether or not there is anywhere left to say so.
+
                         self._adopt(session)
                         if not self._agent._watchers:
-                            # Where the CLI would have put the response. Something watching
-                            # the agent has had it already, as the turn said it.
+
                             say(answer, sys.stdout)
-                        # What the turn cost: the daemon counts the whole session, so what
-                        # this turn spent is the rise across it, added up as the turn went.
-                        # Asked once more here and never at the cost of the answer -- a turn
-                        # that landed has landed, whatever the daemon then says it came to.
+
                         with contextlib.suppress(subprocess.CalledProcessError):
                             costing = costing + self._counting(server, session)
                         spent = (
@@ -599,20 +534,16 @@ class KimiCodeCLISession(SessionBase):
                             spent=costing,
                         )
                         return
-                    # A session says it has stopped before the last thing it said can be read
-                    # back, so what it said is read once more after it stops rather than at the
-                    # moment it does -- otherwise a turn returns everything but its answer.
+
                     settled = not busy
                     time.sleep(_POLL_SECONDS)
 
             finally:
                 self._running = _Running()
 
-
 class KimiCodeCLIAgent(AgentBase):
     """Kimi Code, driven through an app server of its own so a whole session is settable."""
 
-    #: Kimi keeps itself going toward an objective, which is what `pursue` reaches for.
     pursues: ClassVar[bool] = True
 
     def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
@@ -624,8 +555,7 @@ class KimiCodeCLIAgent(AgentBase):
         """
         super().__init__(config, name=name)
         self._server: _AppServer | None = None
-        #: Which account the daemon up now was started as: an agent that has fallen back
-        #: starts another rather than going on submitting turns as somebody else.
+
         self._server_as = ""
         self._serving = threading.Lock()
 
@@ -641,11 +571,9 @@ class KimiCodeCLIAgent(AgentBase):
         """
         with (
             self._serving
-        ):  # two sessions of one agent share the server rather than start two
+        ):  
             if self._server is not None and self._server_as != self.node().name:
-                # Started as an account this agent has since left. Let go of rather than
-                # taken down: a turn on another thread may still be talking to it, and its
-                # own finalizer stops it when the agent is collected either way.
+
                 self._server, self._server_as = None, ""
             if self._server is None:
                 argv = [
@@ -657,15 +585,11 @@ class KimiCodeCLIAgent(AgentBase):
                     "--log-level",
                     "error",
                 ]
-                # Read before the environment is built out of it: a fallback landing
-                # between the two reads would name the account this server is *not* signed
-                # into, and a server that believes it is already elsewhere is one nothing ever
-                # starts again.
+
                 account = self.node().name
                 self._server = _AppServer(self.spawned(argv), self._environ())
                 self._server_as = account
-                # Held by the finalizer alone, which is what takes the daemon down: when the
-                # agent is collected, and at exit for one held to the end.
+
                 weakref.finalize(self, self._server.stop)
             return self._server
 

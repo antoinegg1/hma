@@ -25,7 +25,6 @@ if TYPE_CHECKING:
 
 __all__ = ["agents"]
 
-
 def agents(argv: list[str]) -> int:
     """Carries out one `hmz agents` line.
 
@@ -103,7 +102,6 @@ def agents(argv: list[str]) -> int:
         force=args.force,
     )
 
-
 def _list(*, quiet: bool) -> int:
     """Prints every agent written down, by name and by what it runs."""
     from hmz.sdk import Hmz
@@ -120,7 +118,6 @@ def _list(*, quiet: bool) -> int:
             continue
         print(f"{one.name:16} {_reads(one.runs)}")
     return 0
-
 
 def _show(name: str) -> int:
     """Prints what one agent is, a field a line, saying nothing where it says nothing."""
@@ -142,11 +139,9 @@ def _show(name: str) -> int:
     print(f"works       {runs.anchor or 'here'}")
     print(f"goals       {'on' if runs.goals else 'off'}")
     print(f"web search  {'on' if runs.web_search else 'off'}")
-    # The skills are the CLI's own: every one it finds here, installed and switched off the
-    # way that CLI does it, plus whatever the flow it is driving mounts onto its sessions.
+
     print("skills      as its CLI finds them")
     return 0
-
 
 def _add(
     name: str,
@@ -170,8 +165,7 @@ def _add(
             force=force,
         )
     except Taken as why:
-        # Which flag means it, said here rather than where it was refused: a menu that has
-        # already asked which name to save over has nothing to add to the same refusal.
+
         print(f"hmz: {why}; --force writes over it", file=sys.stderr)
         return 1
     except ValueError as why:
@@ -179,7 +173,6 @@ def _add(
         return 1
     print(f"{kept.name}  {_reads(kept.runs)}")
     return 0
-
 
 def _remove(name: str) -> int:
     """Takes one agent away."""
@@ -191,7 +184,6 @@ def _remove(name: str) -> int:
     print(f"{name} is no longer written down")
     return 0
 
-
 def _reads(runs: Runs) -> str:
     """One agent on one line: what it runs, and whatever else it says about itself."""
     said = [runs.spec]
@@ -201,8 +193,7 @@ def _reads(runs: Runs) -> str:
         said.append(f"on {runs.anchor}")
     if runs.permission:
         said.append(runs.permission)
-    # Only where it is a narrowing: on is what an agent nobody has been asked about does,
-    # and a line that said so of every agent would be a line saying nothing.
+
     if not runs.web_search:
         said.append("no web search")
     return "  ".join(said)

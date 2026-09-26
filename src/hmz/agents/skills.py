@@ -45,20 +45,13 @@ __all__ = [
     "unmount",
 ]
 
-#: How much of a `SKILL.md` is read to find its front matter. The front matter is at the top
-#: and the rest of the file is the skill itself, which can be a hundred kilobytes of prose.
 _FRONT = 4096
 
-#: What front matter is fenced with, and how little of a description a row has room for.
 _FENCE = "---"
 _ABOUT = 90
 
-#: The layout every one of these CLIs reads a skill in: a directory of skills, one directory
-#: apiece, each holding the file that is the skill. It is what a flow keeps its own in too, so
-#: that a skill written for one of these CLIs is a skill a flow can carry unchanged.
 SKILLS = "skills"
 CARD = "SKILL.md"
-
 
 @dataclass(frozen=True, slots=True)
 class Skill:
@@ -75,7 +68,6 @@ class Skill:
     name: str
     about: str
     whose: str
-
 
 def skills(backend: str, where: Path | str | None = None) -> list[Skill]:
     """The skills one backend would load here, the way that backend finds them.
@@ -95,24 +87,20 @@ def skills(backend: str, where: Path | str | None = None) -> list[Skill]:
     seen: set[str] = set()
     for root, globs, whose in (
         (profile.directory(), profile.skills, "yours"),
-        # The backend's own too, for one that keeps them under the directory every program
-        # keeps its configuration in rather than beside its sessions.
+
         (profile.configuration(), profile.config, "yours"),
-        # Under your own home rather than the backend's, and so not moved by whatever moves
-        # that: `.agents` is the directory more than one of these has agreed to read.
+
         (Path.home(), profile.shared, "yours"),
         (Path(where or Path.cwd()), profile.works, "this project"),
     ):
         for pattern in globs:
             for path in sorted(root.glob(pattern)):
                 skill = _skill(path, whose)
-                # One name is one skill: a project's own of the same name is the same skill
-                # to the CLI, which loads whichever of them it prefers and lists it once.
+
                 if skill is not None and skill.name not in seen:
                     seen.add(skill.name)
                     found.append(skill)
     return found
-
 
 def _skill(path: Path, whose: str) -> Skill | None:
     """One `SKILL.md`, read as the CLI reads it: its front matter, and nothing else.
@@ -136,8 +124,7 @@ def _skill(path: Path, whose: str) -> Skill | None:
         with contextlib.suppress(yaml.YAMLError):
             front = yaml.safe_load(block)
     said = cast("dict[str, Any]", front) if isinstance(front, dict) else {}
-    # The directory is the name where the front matter states none, which is the rule these
-    # CLIs read a skill by -- the file is always `SKILL.md`.
+
     name = str(said.get("name") or path.parent.name).strip()
     about = " ".join(str(said.get("description") or "").split())
     return Skill(
@@ -145,7 +132,6 @@ def _skill(path: Path, whose: str) -> Skill | None:
         about=about[:_ABOUT] + ("…" if len(about) > _ABOUT else ""),
         whose=whose,
     )
-
 
 @dataclass(frozen=True, slots=True)
 class Loaded:
@@ -165,7 +151,6 @@ class Loaded:
     at: Path
     whose: str = ""
 
-
 @dataclass(frozen=True, slots=True)
 class Mounted:
     """What one session put where its backend reads skills, to be taken away again.
@@ -179,23 +164,10 @@ class Mounted:
 
     at: tuple[Path, ...] = ()
 
-
-#: What has been mounted where: the skill it was copied from, and how many sessions are
-#: holding it. Two sessions of one flow working in one directory mount the same skills into
-#: the same place, and the first to end must not take them out from under the second -- so a
-#: mount is counted rather than owned, under a lock, since sessions open and close on whichever
-#: thread a flow is driving them from. Where it came from is kept beside the count because two
-#: flows may each bring a `review`, and one of those is not the other.
 _PLANTED: dict[Path, tuple[Path, int]] = {}
 _PLANTING = threading.Lock()
 
-#: The directories that had to be made to hold a mount -- `.claude/`, and `skills/` inside it.
-#: They go when the last skill in them does, and only these: a `.claude/` the project already
-#: had is the project's own empty directory, and a session ending is not a reason for it to
-#: disappear. Held under the same lock, and beyond the mount that made it, because the session
-#: that made the directory is rarely the last one out of it.
 _MADE: set[Path] = set()
-
 
 def mount(backend: str, workspace: Path | str, loaded: Iterable[Loaded]) -> Mounted:
     """Puts a flow's skills where one backend reads a project's own, for one session.
@@ -227,35 +199,26 @@ def mount(backend: str, workspace: Path | str, loaded: Iterable[Loaded]) -> Moun
             if held is not None:
                 whence, count = held
                 if whence != one.at:
-                    # Another flow's skill of the same name is mounted there and a session is
-                    # still working by it. A name is one skill to the CLI, so this one is left
-                    # where it is rather than written over: a flow called by another flow must
-                    # not change what the flow that called it is running with.
+
                     _clashed()
                     continue
-                # Another session of this flow is working here and mounted it already: the
-                # same skill from the same place, so it is shared rather than copied twice.
+
                 _PLANTED[at] = (whence, count + 1)
                 planted.append(at)
                 continue
             if at.exists():
-                # Somebody's own skill of that name, which is theirs: a flow does not get to
-                # write over what the project keeps, and the CLI will load that one.
+
                 _clashed()
                 continue
-            # Which of the directories above it are about to be made, noted before making
-            # any: those are the ones a mount takes away again, and one that was already
-            # there was the project's before this session and is the project's after it.
+
             making = [one for one in (into.parent, into) if not one.exists()]
             if not _copied(one.at, at):
-                # A workspace that cannot be written is a skill the agent will not have,
-                # which is a turn that runs without it rather than a run that will not start.
+
                 continue
             _MADE.update(making)
             _PLANTED[at] = (one.at, 1)
             planted.append(at)
     return Mounted(tuple(planted))
-
 
 def _copied(skill: Path, at: Path) -> bool:
     """Copies one skill into place whole, or leaves nothing of it where it could not.
@@ -286,7 +249,6 @@ def _copied(skill: Path, at: Path) -> bool:
         return False
     return True
 
-
 def _clashed() -> None:
     """Says that a skill a flow brought is not the skill of that name the session will read.
 
@@ -298,7 +260,6 @@ def _clashed() -> None:
     from hmz import telemetry
 
     telemetry.snag("skill-name-taken")
-
 
 def unmount(one: Mounted) -> None:
     """Takes away what a session mounted, once no other session is holding it.
@@ -318,19 +279,15 @@ def unmount(one: Mounted) -> None:
                 continue
             shutil.rmtree(at, ignore_errors=True)
             if at.exists():
-                # It would not go -- a file held open, a directory nobody may write. Kept in
-                # the table rather than forgotten: forgotten, the next session reads it as a
-                # skill the project owns and mounts nothing over it, forever.
+
                 _PLANTED[at] = (whence, 0)
                 continue
             del _PLANTED[at]
-    # And what humanize made to hold them, wherever nothing is left in it -- deepest first,
-    # since `skills/` is inside `.claude/`. Only what humanize made: one the project already
-    # had is the project's, empty or not.
+
     with _PLANTING:
         for empty in sorted(_MADE, reverse=True):
             try:
                 empty.rmdir()
             except OSError:
-                continue  # something is still in it, which is somebody's or another mount's
+                continue  
             _MADE.discard(empty)

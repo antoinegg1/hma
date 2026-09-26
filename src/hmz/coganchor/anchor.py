@@ -20,7 +20,6 @@ __all__ = ["AnchorConfig", "check", "connect"]
 
 log = logging.getLogger(__name__)
 
-
 @dataclass(frozen=True, kw_only=True, slots=True)
 class AnchorConfig:
     """Where an agent's work lands, and what of it stays on this machine.
@@ -84,8 +83,7 @@ class AnchorConfig:
         if self.net not in ("local", "remote"):
             raise ValueError(f"unsupported net {self.net!r}; expected local or remote")
         for pair in self.redirects:
-            # Absolute both ways: what the agent names is resolved before it is looked up,
-            # and a relative answer would be read against wherever the turn happens to be.
+
             if not all(part.startswith("/") for part in pair):
                 raise ValueError(
                     f"unsupported redirect {'='.join(pair)!r}; expected two absolute paths"
@@ -154,7 +152,6 @@ class AnchorConfig:
         real = self.remote_path or target.path
         return target, workspace, f"{workspace}:{real}" if real else workspace
 
-
 def check(config: AnchorConfig | None = None) -> dict[str, Any]:
     """Asks the target what it is, without running anything on it.
 
@@ -187,7 +184,6 @@ def check(config: AnchorConfig | None = None) -> dict[str, Any]:
         client.close()
         link.close()
 
-
 def connect(command: Sequence[str], config: AnchorConfig | None = None) -> int:
     """Runs a coding agent on this machine that acts on another one.
 
@@ -209,8 +205,7 @@ def connect(command: Sequence[str], config: AnchorConfig | None = None) -> int:
       FileNotFoundError: If the agent is not on PATH.
       OSError: If the mirror cannot be prepared or the target cannot be reached.
     """
-    # Imported here rather than at the top: this half needs ptrace and an x86-64 register
-    # map, which the machines reading the settings above are not required to have.
+
     from hmz.coganchor import __version__, statepaths, transport
     from hmz.coganchor.netproxy import NetProxy
     from hmz.coganchor.policy import Layout, Router
@@ -222,8 +217,7 @@ def connect(command: Sequence[str], config: AnchorConfig | None = None) -> int:
     target, workspace, export = config.mount()
     agent = statepaths.resolve(list(command))
     shadow_root = os.path.abspath(config.shadow) if config.shadow else workspace
-    # Where the agent itself starts: the mirror of the directory it was told to work in,
-    # which is the workspace unless a session asked for one inside it.
+
     started_in = shadow_root
     if config.chdir:
         under = os.path.abspath(config.chdir)
@@ -239,8 +233,7 @@ def connect(command: Sequence[str], config: AnchorConfig | None = None) -> int:
         local_paths=tuple(
             agent.local_paths
             + [os.path.abspath(path) for path in config.local_paths]
-            # What a path is answered with is this machine's business: mirroring a
-            # provider's credentials onto the target would put them where the work lands.
+
             + [instead for _, instead in redirects]
         ),
         local_programs=tuple(
@@ -254,12 +247,7 @@ def connect(command: Sequence[str], config: AnchorConfig | None = None) -> int:
     link = transport.connect(target, [export], config.token)
     client = RemoteClient(link.channel)
     netproxy = NetProxy(client, config.net_allow) if config.net == "remote" else None
-    # The mirror fills itself in as the agent looks at things, and the one directory it
-    # cannot be asked about first is the one the agent is started in: the `chdir` happens in
-    # the forked child, before it has become the agent and before anything may talk to the
-    # target -- a reader thread cannot exist across that fork. So the directory is made here
-    # and left empty; the first thing the agent does in it is what fills it in, and a
-    # directory the target does not have is emptied again by the same reconciliation.
+
     os.makedirs(started_in, exist_ok=True)
     supervisor = Supervisor(
         client,
@@ -273,7 +261,7 @@ def connect(command: Sequence[str], config: AnchorConfig | None = None) -> int:
                 "HUMANIZE": __version__,
                 "HUMANIZE_TARGET": target.describe(),
                 "PWD": started_in,
-                # Agents surface this to the model; being explicit beats it guessing.
+                
                 "HUMANIZE_WORKSPACE": workspace,
             },
             cwd=started_in,

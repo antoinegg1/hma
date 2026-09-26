@@ -35,23 +35,16 @@ if TYPE_CHECKING:
 
 __all__ = ["ANYONE", "FLOW", "USER", "WHOSE", "Board", "Item", "Refused"]
 
-#: Who may change one line. `both` is the ordinary one: a line either of them may write is
-#: how a flow and a person hand something back and forth. The other two are for the lines
-#: that are one side's own -- a flow's note of how far through it is, a person's list of what
-#: they want next -- which the other side may read and may not rewrite.
 ANYONE, USER, FLOW = "both", "user", "flow"
 
-#: Every answer to that, in the order a menu offers them.
 WHOSE = (ANYONE, USER, FLOW)
 
-
-class Refused(PermissionError):  # noqa: N818  -- what happened, not what went wrong
+class Refused(PermissionError):  
     """Raised where one side changes a line the other side's alone.
 
     A `PermissionError` because that is what it is, and raised rather than ignored because a
     write that quietly did nothing is a flow that quietly does not do what it says.
     """
-
 
 @dataclass(frozen=True, slots=True)
 class Item:
@@ -89,7 +82,6 @@ class Item:
           True where the line is either side's, or is that side's own.
         """
         return self.whose in (ANYONE, by)
-
 
 class Board:
     """Every line of one run's board, and whatever is watching it.
@@ -268,7 +260,6 @@ class Board:
         with self._lock:
             watching = list(self._watchers)
         for one in watching:
-            # A watcher that raised has said nothing, the way a watcher of an agent has: a
-            # flow must not fail because something looking at its board did.
+
             with contextlib.suppress(Exception):
                 one(self)

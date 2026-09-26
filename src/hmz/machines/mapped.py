@@ -37,7 +37,6 @@ if TYPE_CHECKING:
 
 __all__ = ["Mapped", "Ran"]
 
-
 @dataclass(frozen=True, slots=True)
 class Ran:
     """What one command run on the machine came to.
@@ -62,7 +61,6 @@ class Ran:
     def __str__(self) -> str:
         """What it wrote, so that a flow may print one or put it in a prompt."""
         return self.output
-
 
 class Mapped:
     """The workspace on the machine a run lands on, reached the way a turn reaches it.
@@ -229,8 +227,7 @@ class Mapped:
                 went.append(why)
             elif payload is not None:
                 held = payload.get("exit_code")
-                # A command killed by a signal has no status of its own, and the shell's
-                # convention is what everything that reads one expects.
+
                 status.append(
                     int(held)
                     if held is not None
@@ -246,10 +243,7 @@ class Mapped:
             wrote,
             ended,
         )
-        # Its input ends where it began, since nothing here can send it any: a command that
-        # reads to the end of one -- `cat`, a `git apply` with no file -- would otherwise wait
-        # for what cannot arrive, and the wait below has no end of its own. A channel that has
-        # already died is left to say so through `ended`, which is where the real error is.
+
         with contextlib.suppress(OSError):
             handle.close_stdin()
         done.wait()
@@ -257,8 +251,7 @@ class Mapped:
             raise went[0]
         return Ran(
             argv=tuple(held),
-            # One that ended without saying how did not succeed: a status made up as zero
-            # would be a command a flow read as having worked.
+
             status=status[0] if status else 1,
             output=b"".join(said).decode("utf-8", "replace"),
         )
@@ -287,12 +280,7 @@ class Mapped:
             try:
                 client.start(self._anchor.token)
             except BaseException:
-                # Held only once it is whole. A handshake that failed halfway is what every
-                # later ask reads as an open mapping -- an empty workspace, and a path that
-                # is there because asking about it failed -- so it is let go of here and the
-                # next ask connects again. The link is let go of whatever the client makes of
-                # being closed: it is the child process and the pipes, and leaking those is
-                # the very thing this handler is here to stop.
+
                 try:
                     client.close()
                 finally:
@@ -303,7 +291,7 @@ class Mapped:
     def _client_of(self) -> RemoteClient:
         """The connection, opening it where nothing has yet."""
         self._open()
-        assert self._client is not None  # noqa: S101 -- `_open` set it or raised
+        assert self._client is not None  
         return self._client
 
     def _at(self, path: str) -> str:
@@ -317,7 +305,7 @@ class Mapped:
         """
         if path.startswith("/"):
             return path
-        return os.path.normpath(os.path.join(self.workspace, path))  # noqa: PTH118
+        return os.path.normpath(os.path.join(self.workspace, path))  
 
     def __enter__(self) -> Self:
         """Answers with itself, so a flow may hold one for a block."""

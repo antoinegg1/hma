@@ -18,15 +18,10 @@ if TYPE_CHECKING:
 
 __all__ = ["Monitor", "Shape", "Spend", "Under", "short", "thousands"]
 
-#: How far back the rate is measured. Five minutes is long enough to carry across the gaps a
-#: flow leaves -- a turn that thinks, a round it sleeps off, a commit it makes -- and short
-#: enough that a run which has gone quiet reads as quiet.
 _WINDOW = 300.0
 
-#: Where a count stops fitting and starts being abbreviated.
 _THOUSAND = 1000
 _MILLION = 1_000_000
-
 
 def thousands(count: int) -> str:
     """Renders a token count short enough for a status line.
@@ -43,7 +38,6 @@ def thousands(count: int) -> str:
         return f"{count / _THOUSAND:.1f}k"
     return f"{count / _MILLION:.2f}M"
 
-
 def short(agent: str) -> str:
     """An agent's name, cut down to what fits beside a transcript.
 
@@ -54,11 +48,10 @@ def short(agent: str) -> str:
       Something recognisable and narrow.
     """
     kind, _, tail = agent.partition("#")
-    if not tail:  # a flow that named its agents said what it wanted them called
+    if not tail:  
         return agent[:16]
     backend = kind.removesuffix("Agent").removesuffix("CLI").removesuffix("Code")
     return f"{backend.lower()}#{tail[:4]}"
-
 
 @dataclass(frozen=True, slots=True)
 class Under:
@@ -78,7 +71,6 @@ class Under:
     whose: str
     about: str
     working: bool = True
-
 
 @dataclass(frozen=True, slots=True)
 class Shape:
@@ -105,7 +97,6 @@ class Shape:
         default_factory=dict[str, tuple[Under, ...]]
     )
 
-
 @dataclass(frozen=True, slots=True)
 class Spend:
     """What one model has cost so far, and how fast it is costing it.
@@ -123,55 +114,43 @@ class Spend:
     tokens: int
     rate: float
 
-
 @dataclass
 class Monitor:
     """The running state of one flow, written from the turns and read by the interface."""
 
-    #: Who is working right now, counted rather than listed: an agent may hold two sessions,
-    #: and one of them ending does not mean the agent has stopped.
     working: Counter[str] = field(default_factory=Counter[str])
-    #: How many turns each agent has taken.
+    
     turns: Counter[str] = field(default_factory=Counter[str])
-    #: Which agent handed to which, and how often, as the flow went from one to the next.
+    
     handovers: Counter[tuple[str, str]] = field(
         default_factory=Counter[tuple[str, str]]
     )
-    #: The model each agent runs at, so that spending can be named by model.
+    
     models: dict[str, str] = field(default_factory=dict[str, str])
-    #: The agents each of them has started of its own, in the order they started, by the
-    #: backend's own id for each. A dict rather than a list: one ends by name, and a fleet of
-    #: forty would be a list searched forty times.
+
     fleets: dict[str, dict[str, Under]] = field(
         default_factory=dict[str, dict[str, Under]]
     )
-    #: Tokens spent per model, all told.
+    
     spent: Counter[str] = field(default_factory=Counter[str])
-    #: What each source says has been spent on each model so far. Two of them say: the
-    #: backends, as each turn ends, and the logs those backends keep, as they write them. They
-    #: are counting the same tokens, so what was spent is the higher of the two rather than
-    #: the sum -- and whichever has seen further is the one that is right.
+
     totals: dict[tuple[str, str], int] = field(
         default_factory=dict[tuple[str, str], int]
     )
-    #: Recent spending as (when, model, tokens), which is what the rate is measured over.
-    #: Bounded by the window rather than by the length of the run: a flow going for days
-    #: keeps five minutes of it.
+
     recent: deque[tuple[float, str, int]] = field(
         default_factory=deque[tuple[float, str, int]]
     )
-    #: The rate per model as it was last worked out, and what it was worked out from: the rate
-    #: is worked out again when something it is made of moves, and not on any clock of its own.
+
     rates: dict[str, float] = field(default_factory=dict[str, float])
     figured: int | None = None
-    #: How many times what has been spent has changed, which is what `figured` is against.
+    
     changed: int = 0
-    #: When the run began, which is when this was made: one of these is made for one flow.
+    
     began: float = field(default_factory=time.monotonic)
-    #: When it ended, or None while it is still going -- so that a run that is over reads as
-    #: what it was doing when it ended rather than as a rate decaying to nothing after it.
+
     until: float | None = None
-    #: The agent whose turn ended last, which is who the next one was handed from.
+    
     _last: str | None = None
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -237,7 +216,7 @@ class Monitor:
         """Notes that the run is over, which is what stops the clock the rate is read at."""
         with self._lock:
             self.until = time.monotonic()
-            self.figured = None  # so the last rate shown is the one it ended on
+            self.figured = None  
 
     def spend(
         self,
@@ -260,8 +239,7 @@ class Monitor:
         if model is not None:
             self.models[agent] = model
         model = self.models.get(agent, agent)
-        # Added up here rather than there, so that what a backend reports a turn at a time
-        # arrives as the same kind of thing a log read from the top does: a total.
+
         self.counted("told", model, self.totals.get(("told", model), 0) + tokens, now)
 
     def counted(
@@ -283,8 +261,7 @@ class Monitor:
             if total <= self.totals.get((source, model), 0):
                 return
             self.totals[(source, model)] = total
-            # The most any source has seen, which is what has been spent: two sources counting
-            # the same tokens are not two lots of tokens.
+
             seen = max(
                 held for (_, named), held in self.totals.items() if named == model
             )
@@ -309,17 +286,14 @@ class Monitor:
         if self.until is not None:
             moment = min(
                 moment, self.until
-            )  # a run that is over is read at its own end
+            )  
         with self._lock:
             aged = False
             while self.recent and self.recent[0][0] < moment - _WINDOW:
                 self.recent.popleft()
                 aged = True
             if aged or self.figured != self.changed:
-                # Seconds on the clock: the window holds the turns and the flow's own code
-                # alike, so what a flow spent between two turns -- sleeping off a round,
-                # committing, reading what the last turn wrote -- is time it is measured over.
-                # Under five minutes old, the run itself is the window it has had.
+
                 over = min(_WINDOW, moment - self.began)
                 lately: Counter[str] = Counter()
                 for _, model, tokens in self.recent:

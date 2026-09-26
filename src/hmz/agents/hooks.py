@@ -40,7 +40,6 @@ __all__ = [
     "Verdict",
 ]
 
-
 class Moment(StrEnum):
     """A point in a turn where whatever is driving the agent gets a word in.
 
@@ -51,53 +50,39 @@ class Moment(StrEnum):
     declares the agents it drives.
     """
 
-    #: A session is about to take its first turn.
     SESSION_START = "SessionStart"
-    #: A prompt is about to go to the agent. Refusing it means the turn does not run, and
-    #: what is added goes into the prompt.
+
     USER_PROMPT_SUBMIT = "UserPromptSubmit"
-    #: The agent has reached for a tool.
+    
     PRE_TOOL_USE = "PreToolUse"
-    #: The agent has started an agent of its own, which is what these CLIs call a subagent.
-    #: Refusing it is not a thing a backend waits to be told, so it is a moment to be told
-    #: about rather than one to answer.
+
     SUBAGENT_START = "SubagentStart"
-    #: One of those has finished.
+    
     SUBAGENT_STOP = "SubagentStop"
-    #: The backend is asking whether a tool may run. Refusing it means the tool does not.
+    
     PERMISSION_REQUEST = "PermissionRequest"
-    #: The agent has stopped to ask its user something.
+    
     NOTIFICATION = "Notification"
-    #: A turn has ended. Refusing it sends the agent on, with what was said as its prompt.
+    
     STOP = "Stop"
-    #: A session has been closed.
+    
     SESSION_END = "SessionEnd"
 
-
-#: The moments a turn passes through wherever it is run, which is every backend driven here:
-#: they are read off the turn itself rather than out of anything the backend offers. What is
-#: not among them is a moment only some backends reach, and is named on the agents that do.
 EVERYWHERE = frozenset(Moment) - {
     Moment.PERMISSION_REQUEST,
     Moment.SUBAGENT_START,
     Moment.SUBAGENT_STOP,
 }
 
-#: The two a backend reaches only where it says which of its tool calls start an agent of
-#: their own. Named together because they are one thing to be told: a fleet under a turn is
-#: visible or it is not, and a backend that says one and not the other would be one whose
-#: subagents never finish.
 SUBAGENTS = frozenset({Moment.SUBAGENT_START, Moment.SUBAGENT_STOP})
 
-
-class Unhooked(ValueError):  # noqa: N818  -- what the moment is here, not what went wrong
+class Unhooked(ValueError):  
     """Raised for a hook hung on a moment the agent it was hung on does not run.
 
     Where it is hung rather than where it would have fired: a hook that quietly never runs is
     a flow that quietly does not do what it says. A flow that declares which moments it needs
     hears about this before its first turn instead, from `Runner`.
     """
-
 
 @dataclass(frozen=True, slots=True)
 class Occasion:
@@ -136,7 +121,6 @@ class Occasion:
     said: str = ""
     again: int = 0
 
-
 @dataclass(frozen=True, slots=True)
 class Verdict:
     """What a hook says back, which is nothing at all unless it says otherwise.
@@ -155,12 +139,7 @@ class Verdict:
     because: str = ""
     adds: str = ""
 
-
-#: What a flow hangs on a moment: told what is happening, and answering with what to do about
-#: it, or with nothing. One that raises is one that has said nothing -- a flow must not fail
-#: because something watching it did.
 type Hook = Callable[[Occasion], Verdict | None]
-
 
 class Hung:
     """One hook, hung on one moment, until it is taken down.
@@ -203,7 +182,6 @@ class Hung:
         """Takes the hook down, however the block ended."""
         self.off()
 
-
 class Hooks:
     """What is hung on one agent's moments, and what happens when one of them arrives.
 
@@ -220,13 +198,10 @@ class Hooks:
           agent: What the agent is called, which is what an occasion says it happened to.
         """
         self._moments = moments
-        #: What the agent is called, which is what an occasion says it happened to. Public
-        #: because a flow may name an agent after it was made, and a name that went stale
-        #: here would be the name a refused hook complained about.
+
         self.agent = agent
         self._hung: dict[Moment, list[Hung]] = {}
-        # Hung and taken down from wherever the flow happens to be, and fired from the thread
-        # a turn is running on, which is not that one.
+
         self._lock = threading.Lock()
 
     @property
@@ -314,7 +289,7 @@ class Hooks:
                 said = hung.hook(occasion)
             except Stopped:
                 raise
-            except Exception:  # noqa: BLE001, S110 -- a hook that failed has said nothing
+            except Exception:  
                 pass
             if said is None:
                 continue

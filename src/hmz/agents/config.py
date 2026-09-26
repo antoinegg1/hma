@@ -6,9 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    # Named for the type only: a flow that runs its agents here is the common one, and it
-    # should not pay to import the half of coganchor that runs a session, nor the docker
-    # client behind a container.
+
     from hmz.machines import MachineConfig
 
 __all__ = [
@@ -23,30 +21,9 @@ __all__ = [
     "isolated",
 ]
 
-#: What an agent may do without being asked, loosest last. Named the way these CLIs name them
-#: rather than in a vocabulary of humanize's own, so that a rung reads as the thing it is
-#: wherever it is shown. Every backend has a ladder of its own and none of them has the same
-#: four rungs, so these are the question rather than any one CLI's answer, and each driver
-#: says which of its own settings it reaches for:
-#:
-#: - `read-only`: it may look at anything and change nothing -- no edits, no commands.
-#: - `workspace-write`: it may change the workspace it was given, and is stopped at the edge
-#:   of it.
-#: - `auto`: it may reach for anything, and what it asks for is granted -- which is where a
-#:   hook hung on `PERMISSION_REQUEST` gets a say, since that is the one moment a backend
-#:   actually waits on.
-#: - `bypass`: nothing is asked and nothing is checked, which is what an unattended flow has
-#:   always run its agents at.
-#:
-#: A backend with no sandbox of its own cannot tell `workspace-write` from `auto`, and says so
-#: where it maps them rather than pretending to a rung it has not got.
 PERMISSIONS = ("read-only", "workspace-write", "auto", "bypass")
 
-#: How quickly a provider is asked to serve one agent, independent of how hard its model
-#: reasons. Backends map these common meanings into their own request vocabulary and refuse
-#: ``fast`` when they cannot express it exactly.
 SERVICE_TIERS = ("default", "fast")
-
 
 class Goal:
     """What a flow writes beside an agent it runs under the backend's own goal feature.
@@ -62,7 +39,6 @@ class Goal:
     than raising in the middle of one, which is where a loop would otherwise find out.
     """
 
-
 @dataclass(frozen=True, slots=True, kw_only=True)
 class AgentDefaults:
     """The initial goal availability offered for one place in a flow.
@@ -75,7 +51,6 @@ class AgentDefaults:
     """
 
     goals: bool = True
-
 
 class Remote:
     """What a flow writes beside an agent that may be pointed at another machine.
@@ -91,7 +66,6 @@ class Remote:
 
     and only that one may be given a machine. The others run here, whatever anybody chooses.
     """
-
 
 @dataclass(frozen=True, slots=True)
 class Isolated:
@@ -112,7 +86,6 @@ class Isolated:
     """
 
     image: str = "python:3.12"
-
 
 @dataclass(frozen=True, kw_only=True)
 class AgentConfig:
@@ -172,16 +145,12 @@ class AgentConfig:
                 "service_tier must be one of "
                 f"{', '.join(SERVICE_TIERS)}, not {self.service_tier!r}"
             )
-        # Said where it is written, which for a config read back out of an older file is the
-        # moment it is read: a rung no backend has a word for is one every driver would have
-        # to answer for, so it is refused here where they all pass rather than reached down in
-        # one of them as a key that is not there.
+
         if self.permission not in PERMISSIONS:
             raise ValueError(
                 f"permission must be one of {', '.join(PERMISSIONS)}, "
                 f"not {self.permission!r}"
             )
-
 
 def anchored(target: str) -> MachineConfig | None:
     """The machine an agent's turns land on, named the way a target is written.
@@ -208,7 +177,6 @@ def anchored(target: str) -> MachineConfig | None:
     from hmz.machines import AnchoredConfig
 
     return AnchoredConfig(anchor=AnchorConfig(target=target))
-
 
 def isolated(image: str, workspace: str | None = None) -> MachineConfig:
     """A container of the agent's own, holding the project directory it is to work in.

@@ -33,9 +33,6 @@ __all__ = ["ExecSession", "Session", "TunnelSession", "compose_env"]
 
 log = logging.getLogger(__name__)
 
-#: Environment variables that describe the *client's* machine and must not
-#: leak here.  Everything else the agent set (API keys, GIT_*, project
-#: variables) passes through, layered on top of this machine's environment.
 HOST_SPECIFIC_ENV = frozenset(
     {
         "DISPLAY",
@@ -60,9 +57,7 @@ HOST_SPECIFIC_ENV = frozenset(
     }
 )
 
-#: Prefixes of variables that are host-specific or belong to coganchor itself.
 HOST_SPECIFIC_PREFIXES = ("LD_", "SSH_", "XDG_", "HUMANIZE_")
-
 
 def compose_env(remote_env: dict[str, str], cwd: str, *, tty: bool) -> dict[str, str]:
     """Build the environment for a remote command.
@@ -79,7 +74,6 @@ def compose_env(remote_env: dict[str, str], cwd: str, *, tty: bool) -> dict[str,
     if tty:
         env.setdefault("TERM", "xterm-256color")
     return env
-
 
 class Session:
     """Base class for a streaming exchange bound to one ``msg id``."""
@@ -128,7 +122,6 @@ class Session:
 
     def _emit(self, stream: Stream, data: bytes) -> None:
         self._send(Frame.chunk(self.msg_id, stream, data))
-
 
 class ExecSession(Session):
     """Runs one command on this machine and streams its I/O back."""
@@ -238,9 +231,8 @@ class ExecSession(Session):
                     stdout=stdio,
                     stderr=stdio,
                     start_new_session=True,
-                    # A controlling tty can only be claimed between the fork and the exec, and
-                    # the call that claims it is a single ioctl.
-                    preexec_fn=_attach_controlling_tty if self._tty else None,  # noqa: PLW1509
+
+                    preexec_fn=_attach_controlling_tty if self._tty else None,  
                     close_fds=True,
                 )
             except (FileNotFoundError, NotADirectoryError) as exc:
@@ -255,8 +247,7 @@ class ExecSession(Session):
         try:
             return self._table.resolve(self._cwd_virtual)
         except PermissionError:
-            # A command launched from outside the workspace must still run;
-            # fall back to this machine's home directory.
+
             return os.path.expanduser("~")
 
     def _pump_stdin(self, master: int | None, pipe: IO[bytes] | None) -> None:
@@ -271,8 +262,7 @@ class ExecSession(Session):
                 except OSError:
                     break
         finally:
-            # Closing the pipe delivers EOF to the child.  The pty master is
-            # shared with the output pump, so its owner closes it instead.
+
             if master is None and pipe is not None:
                 _close_quietly(pipe)
 
@@ -283,8 +273,8 @@ class ExecSession(Session):
         if master is not None:
             selector.register(master, selectors.EVENT_READ, Stream.STDOUT)
         else:
-            assert process.stdout is not None  # noqa: S101
-            assert process.stderr is not None  # noqa: S101
+            assert process.stdout is not None  
+            assert process.stderr is not None  
             selector.register(process.stdout, selectors.EVENT_READ, Stream.STDOUT)
             selector.register(process.stderr, selectors.EVENT_READ, Stream.STDERR)
         try:
@@ -293,7 +283,7 @@ class ExecSession(Session):
                     try:
                         data = os.read(key.fd, CHUNK_SIZE)
                     except OSError:
-                        data = b""  # a pty master reports EIO once the child is gone
+                        data = b""  
                     if not data:
                         selector.unregister(key.fileobj)
                         continue
@@ -303,7 +293,6 @@ class ExecSession(Session):
             for stream in (process.stdout, process.stderr):
                 if stream is not None:
                     _close_quietly(stream)
-
 
 class TunnelSession(Session):
     """Opens an outbound TCP connection from this machine and relays it."""
@@ -315,7 +304,7 @@ class TunnelSession(Session):
         self._socket: socket.socket | None = None
         self._ready = threading.Event()
 
-    def feed(self, stream: Stream, data: bytes) -> None:  # noqa: ARG002
+    def feed(self, stream: Stream, data: bytes) -> None:  
         if not self._ready.wait(timeout=30.0) or self._socket is None:
             return
         try:
@@ -323,7 +312,7 @@ class TunnelSession(Session):
         except OSError:
             self.shutdown()
 
-    def end_input(self, stream: Stream) -> None:  # noqa: ARG002
+    def end_input(self, stream: Stream) -> None:  
         if self._socket is not None:
             with suppress(OSError):
                 self._socket.shutdown(socket.SHUT_WR)
@@ -352,12 +341,10 @@ class TunnelSession(Session):
             _close_quietly(sock)
         return {}
 
-
-def _attach_controlling_tty() -> None:  # pragma: no cover - runs in the forked child
+def _attach_controlling_tty() -> None:  
     os.setsid()
     with suppress(OSError):
         fcntl.ioctl(0, termios.TIOCSCTTY, 0)
-
 
 def _close_quietly(handle: Any) -> None:
     with suppress(OSError):

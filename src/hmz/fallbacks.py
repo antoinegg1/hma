@@ -66,26 +66,13 @@ __all__ = [
     "waits",
 ]
 
-#: What the file every step is written down in is called. One file rather than one per step:
-#: a chain is read whole every time it is read at all -- a turn that failed asks where it
-#: goes, and the answer is the walk rather than the step -- and a directory of one-line files
-#: would be a directory to walk to answer it.
 _HELD = "fallbacks.json"
 
-#: The first wait, which every policy is written in terms of. A second is short enough that a
-#: turn nobody is watching is not held up by it and long enough that a service which has just
-#: refused one call is not immediately asked again.
 BASE = 1.0
 
-#: The longest any single wait may be, however far the backoff has climbed. A turn is minutes
-#: long, and a wait longer than the turn it is waiting for is a run that looks hung.
 CEILING = 60.0
 
-#: How far a backoff is worked out before the answer is the ceiling anyway. Doubling a second
-#: passes a minute at the seventh, and Fibonacci at the eleventh; anything past this is a
-#: number to stop computing rather than one to compute.
 _CLIMBED = 64
-
 
 @dataclass(frozen=True, slots=True)
 class Policy:
@@ -99,10 +86,6 @@ class Policy:
     name: str
     about: str
 
-
-#: Every way a turn may be waited over, in the order they are offered: the plainest first, and
-#: the one to reach for when several agents are failing at once marked as such. `none` is here
-#: because "try again at once" is a real answer for a transport that dropped a connection.
 POLICIES = (
     Policy("none", "try again at once, with no wait at all"),
     Policy("constant", "the same wait every time: 1s, 1s, 1s"),
@@ -115,11 +98,7 @@ POLICIES = (
     Policy("fibonacci", "the Fibonacci sequence: 1s, 1s, 2s, 3s, 5s"),
 )
 
-#: What a place is retried by where it says nothing, and what a menu starts a new one on:
-#: exponential backoff with full jitter is what every one of these services documents, and the
-#: jitter is what keeps a flow's agents from retrying in lockstep.
 DEFAULT = "exponential-jitter"
-
 
 @dataclass(frozen=True, slots=True)
 class Falls:
@@ -154,7 +133,6 @@ class Falls:
         """
         return bool(self.to) or self.tries > 0
 
-
 def spec(backend: str, model: str, provider: str = "") -> str:
     """One place as a step names it, which is three things and no more.
 
@@ -170,7 +148,6 @@ def spec(backend: str, model: str, provider: str = "") -> str:
       The spec, with the account in it only where there is one to name.
     """
     return f"{backend}{'@' + provider if provider else ''}/{model}"
-
 
 def reads(said: str) -> str:
     """One place as it is written down, or "" for one that is not a place at all.
@@ -202,7 +179,6 @@ def reads(said: str) -> str:
         return ""
     return spec(profile.name, model, account.strip())
 
-
 def _bare(profile: backends.Profile | None, model: str) -> str:
     """One model with the effort a step used to be written with taken off it.
 
@@ -220,7 +196,6 @@ def _bare(profile: backends.Profile | None, model: str) -> str:
     if rung in profile.efforts or rung in profile.beyond:
         return before
     return model
-
 
 def falls() -> list[Falls]:
     """Every place written down, in the order they were written.
@@ -243,9 +218,7 @@ def falls() -> list[Falls]:
         if not isinstance(said_, dict):
             continue
         one = cast("dict[str, Any]", said_)
-        # Read back through the same reading that wrote them: a file edited by hand holds
-        # whatever somebody typed, and a step naming a CLI there is none of is a step that
-        # could only fail the turn it was asked about.
+
         said, at_ = reads(str(one.get("spec") or "")), reads(str(one.get("to") or ""))
         if not said or said == at_ or said in seen:
             continue
@@ -262,7 +235,6 @@ def falls() -> list[Falls]:
         found.append(step)
     return found
 
-
 def tried(said: str) -> Falls:
     """What is written down about one place, which is nothing at all for most of them.
 
@@ -275,7 +247,6 @@ def tried(said: str) -> Falls:
     """
     from_ = reads(said) or said.strip()
     return next((one for one in falls() if one.spec == from_), Falls(from_))
-
 
 def points(said: str, at: str) -> Falls:
     """Says where one place's turns go when it cannot take them, and writes it down.
@@ -302,7 +273,6 @@ def points(said: str, at: str) -> Falls:
     if to == from_:
         raise ValueError(f"{from_} cannot fall back to itself")
     return _keeps(replace(tried(from_), spec=from_, to=to))
-
 
 def retrying(said: str, tries: int, policy: str, timeout: float) -> Falls:
     """Says how many times over a failed turn at one place is taken again, and how.
@@ -334,9 +304,7 @@ def retrying(said: str, tries: int, policy: str, timeout: float) -> Falls:
             f"{policy!r} is not a retry policy: "
             f"{', '.join(one.name for one in POLICIES)}"
         )
-    # `inf` and `nan` are both greater than nothing as far as `< 0` is concerned, and both
-    # go into the file as a bare `Infinity` or `NaN` -- a token JSON does not have, so a
-    # step written with one is a file no strict reader takes back. No limit at all is 0.0.
+
     if (
         tries < 0
         or not math.isfinite(tries)
@@ -349,7 +317,6 @@ def retrying(said: str, tries: int, policy: str, timeout: float) -> Falls:
             tried(from_), spec=from_, tries=tries, policy=policy, timeout=float(timeout)
         )
     )
-
 
 def clear(said: str) -> bool:
     """Takes one place's whole step away, tries and destination alike.
@@ -366,7 +333,6 @@ def clear(said: str) -> bool:
         return False
     _writes(kept)
     return True
-
 
 def chain(said: str) -> list[str]:
     """The places one turn walks, this one first and each falling back to the next.
@@ -394,11 +360,9 @@ def chain(said: str) -> list[str]:
         walked.append(nowhere)
     return walked
 
-
 def named(policy: str) -> Policy | None:
     """The policy of that name, or None for a name none answers to."""
     return next((one for one in POLICIES if one.name == policy), None)
-
 
 def waits(policy: str, attempt: int, base: float = BASE) -> float:
     """How long to wait before one try, given how many have already failed.
@@ -419,11 +383,10 @@ def waits(policy: str, attempt: int, base: float = BASE) -> float:
     Returns:
       The seconds to wait, never negative and never longer than :data:`CEILING`.
     """
-    over = max(attempt - 1, 0)  # how many waits have already been taken
+    over = max(attempt - 1, 0)  
     if not over:
         return 0.0
-    # Held to where the ceiling has long since been reached: `2 ** 4000` is a number Python
-    # is happy to build and `float` will not take, and a retry count is somebody's to set.
+
     over = min(over, _CLIMBED)
     if policy == "none":
         return 0.0
@@ -436,12 +399,9 @@ def waits(policy: str, attempt: int, base: float = BASE) -> float:
     elif policy == "exponential":
         held = base * 2 ** (over - 1)
     else:
-        # Full jitter, which is what "exponential backoff with jitter" means everywhere it is
-        # documented: anywhere between nothing and the exponential wait. Two agents that
-        # failed on the same second do not come back on the same second.
-        held = random.uniform(0.0, base * 2 ** (over - 1))  # noqa: S311 -- a wait, not a key
-    return min(held, CEILING)
 
+        held = random.uniform(0.0, base * 2 ** (over - 1))  
+    return min(held, CEILING)
 
 def _fibonacci(over: int) -> int:
     """The nth Fibonacci number, counting 1, 1, 2, 3, 5 from n = 1."""
@@ -450,33 +410,24 @@ def _fibonacci(over: int) -> int:
         before, held = held, before + held
     return held
 
-
 def _counted(said: object) -> int:
     """One count as it was written down, and none at all for anything that is not one."""
     try:
-        # OverflowError beside the rest because a file holds whatever somebody typed, and a
-        # number too big to be a count is one of the things they can type: `Infinity`, which
-        # `json` reads, and `1e400`, which is JSON and comes back as the same infinity. A
-        # count nothing can be made of is no count rather than the end of every run here.
+
         held = int(cast("int", said))
     except (OverflowError, TypeError, ValueError):
         return 0
     return max(held, 0)
 
-
 def _seconds(said: object) -> float:
     """One length of time as it was written down, and none at all for anything that is not."""
     try:
-        # And a 400-digit integer is the same hole from the other side: `float` will not
-        # take one either.
+
         held = float(cast("float", said))
     except (OverflowError, TypeError, ValueError):
         return 0.0
-    # A limit of `inf` or `nan` is a limit that never arrives -- both are something rather
-    # than nothing, and neither is ever passed -- and `max` cannot floor a `nan`, which
-    # loses every comparison it is in. No limit at all is 0.0, as it is written everywhere.
-    return max(held, 0.0) if math.isfinite(held) else 0.0
 
+    return max(held, 0.0) if math.isfinite(held) else 0.0
 
 def _keeps(step: Falls) -> Falls:
     """Writes one step down in place of whatever was written against that place.
@@ -492,7 +443,6 @@ def _keeps(step: Falls) -> Falls:
         kept.append(step)
     _writes(kept)
     return step
-
 
 def _writes(steps: Iterable[Falls]) -> None:
     """Writes every step out whole, so that a file read while it is written is one of the two.

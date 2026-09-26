@@ -22,19 +22,10 @@ if TYPE_CHECKING:
 
 __all__ = ["providers"]
 
-#: What one account is written down in, and the key that used to be in it. How often a failed
-#: turn is taken again was once a thing about an account and is now a thing about a place --
-#: the CLI, the account and the model -- so `hmz.providers` stopped reading this and nothing
-#: reads it since. A file written before that move still holds it, and an account whose tries
-#: quietly stopped happening is worse than one that never had any: it is a setting somebody
-#: goes on believing in. So the file is read again as it stands, wherever an account is read.
-#: Spelled here rather than asked of the store, which is the thing that stopped reading it, and
-#: pinned to the store's own spelling by a test so a rename cannot quietly end the notice.
 _HELD = "provider.json"
 _TRIED = "retries"
 _WAITED = "policy"
 _LONGEST = "timeout"
-
 
 def providers(argv: list[str]) -> int:
     """Carries out one `hmz providers` line.
@@ -133,8 +124,7 @@ def providers(argv: list[str]) -> int:
     if args.doing == "ways":
         return _ways(args.cli)
     try:
-        # `claude/` is the account this machine is already signed into: a thing to show
-        # and to point somewhere, and not one to make or take away.
+
         cli, name = _named(args.provider, made=args.doing not in ("show", "falls-back"))
     except ValueError as why:
         parser.error(str(why))
@@ -155,7 +145,6 @@ def providers(argv: list[str]) -> int:
         return _falls_back(cli, name, args.at)
     return _again(cli, name, args.given)
 
-
 def _falls_back(cli: str, name: str, at: str) -> int:
     """Says which account a turn under this one carries on under when it fails."""
     try:
@@ -173,7 +162,6 @@ def _falls_back(cli: str, name: str, at: str) -> int:
         else f"{whose} falls back to nowhere"
     )
     return 0
-
 
 def _named(said: str, *, made: bool = True) -> tuple[str, str]:
     """Reads `CLI/NAME` into the two it names.
@@ -196,13 +184,11 @@ def _named(said: str, *, made: bool = True) -> tuple[str, str]:
         raise ValueError(f"{said!r} is not {wanted}")
     return cli.strip(), name.strip()
 
-
 def _accounts() -> Accounts:
     """The accounts, as the one object every way in reaches them through."""
     from hmz.sdk import Hmz
 
     return Hmz().accounts
-
 
 def _tries_moved(provider: Provider) -> str:
     """What to say about tries written on one account before they moved, or "" for none.
@@ -230,10 +216,7 @@ def _tries_moved(provider: Provider) -> str:
     tries = held.get(_TRIED)
     if not isinstance(tries, int) or isinstance(tries, bool) or tries < 1:
         return ""
-    # As `hmz fallback` names a place: the account after an `@`, and nothing at all for the
-    # one this machine is signed into. The model is the part an account never had, which is
-    # why nothing could carry these over by itself -- so it is left as the command's own
-    # spelling of that argument rather than as anything a shell would try to read.
+
     place = f"{provider.cli}@{provider.name}" if provider.name else provider.cli
     line = f"hmz fallback retry {place}/MODEL {tries}"
     policy = held.get(_WAITED)
@@ -247,7 +230,6 @@ def _tries_moved(provider: Provider) -> str:
     ):
         line += f" -t {longest:g}"
     return f"the tries written down here are no longer read: `{line}` is where that is said now"
-
 
 def _also(cli: str) -> list[Provider]:
     """The account this machine is signed into, where it says anything about itself.
@@ -275,20 +257,16 @@ def _also(cli: str) -> list[Provider]:
         and (one.fallback or _tries_moved(one))
     ]
 
-
 def _list(cli: str) -> int:
     """Prints every provider there is, or one backend's."""
     from hmz import backends
 
     if cli and backends.named(cli) is None:
-        # Said rather than answered with everybody's: a name no backend answers to reads as
-        # "all of them" everywhere below, so a typo would report another backend's account
-        # and its chain as though they were this one's.
+
         print(f"hmz: {cli}: no such coding agent", file=sys.stderr)
         return 1
     found = _accounts().all(cli)
-    # And the account this machine is signed into, wherever it says something about itself:
-    # a chain in force is a thing to see, and it is an account here too.
+
     mine = _also(cli)
     if not found and not mine:
         whose = f"no {cli} providers yet" if cli else "no providers yet"
@@ -301,12 +279,10 @@ def _list(cli: str) -> int:
         if provider.fallback:
             said += f"  falls back to {provider.fallback}"
         print(said)
-        # Under the row rather than after it: it is about the account above rather than
-        # another account, and a row this ran onto the end of would be a row nobody reads.
+
         if moved := _tries_moved(provider):
             print(f"  {moved}")
     return 0
-
 
 def _ways(cli: str) -> int:
     """Prints how one backend can be signed into."""
@@ -322,7 +298,6 @@ def _ways(cli: str) -> int:
         print(f"{'':10} runs: {runs}")
     return 0
 
-
 def _show(cli: str, name: str) -> int:
     """Prints what one provider holds, saying nothing a secret is."""
     accounts = _accounts()
@@ -336,23 +311,19 @@ def _show(cli: str, name: str) -> int:
     print(f"kept in     {provider.at}")
     print(f"falls to    {provider.fallback or 'nowhere'}")
     for variable in sorted(provider.env):
-        # The names, never the values: this prints where a person can read it, and a key
-        # printed once is a key in a scrollback.
+
         print(f"sets        {variable}")
     for one in provider.args:
         print(f"adds        {one}")
     for named, instead in provider.swaps():
         print(f"answers     {named} -> {instead}")
     for backend in accounts.serves(provider):
-        # What else this account is: a vendor's credential is the vendor's, and an account
-        # that several backends could be run as is worth saying so about where it is read.
+
         print(f"also runs   {backend}")
-    # Last, and not as a field: a setting nothing reads any more is not one of the things
-    # this account holds, and reading it as one is how it went unnoticed in the first place.
+
     if moved := _tries_moved(provider):
         print(moved)
     return 0
-
 
 def _copies(provider: Provider, also: str) -> int:
     """Writes one account down for the other backends it could be run as, where asked.
@@ -374,8 +345,7 @@ def _copies(provider: Provider, also: str) -> int:
     among = accounts.serves(provider)
     if not also:
         if among:
-            # Said rather than done: a line that did not ask for it gets a line saying it
-            # could have, which is how somebody finds out this is a thing at all.
+
             print(
                 f"it could also run {', '.join(among)}; `--also` writes it down for them"
             )
@@ -390,11 +360,9 @@ def _copies(provider: Provider, also: str) -> int:
         print(f"{copied.cli}/{copied.name} is written down at {copied.at}")
     return 0
 
-
 def _backends(said: str) -> tuple[str, ...]:
     """The backends one `--also` named, in the order they were named."""
     return tuple(one.strip() for one in said.split(",") if one.strip())
-
 
 def _remove(cli: str, name: str) -> int:
     """Takes a provider away."""
@@ -408,7 +376,6 @@ def _remove(cli: str, name: str) -> int:
         return 1
     print(f"{cli}/{name} is gone, credentials and all")
     return 0
-
 
 def _add(
     cli: str,
@@ -443,8 +410,7 @@ def _add(
         print("hmz: nothing to read the answers from", file=sys.stderr)
         return 1
     except ValueError as why:
-        # A line typed at the prompt that is not `NAME=VALUE`, which is a line to correct
-        # and not a traceback: the same answer as the same mistake made on the command line.
+
         print(f"hmz: {why}", file=sys.stderr)
         return 1
     try:
@@ -457,14 +423,11 @@ def _add(
     if status:
         return status
     if not login:
-        # A line that says not to run the backend's own way in is a line that says not to
-        # start the backend: asking it what it runs would be starting it. What it runs is
-        # found out by whatever next wants a list of it.
+
         return 0
     if not chosen.argv:
         return _asks(provider.cli, provider.name)
     return _sign(provider, chosen, answers) or _asks(provider.cli, provider.name)
-
 
 def _asks(cli: str, name: str) -> int:
     """Asks a new account's CLI what it runs, so that there is a list before one is wanted.
@@ -484,12 +447,11 @@ def _asks(cli: str, name: str) -> int:
     """
     try:
         found = _accounts().ask(cli, name)
-    except Exception as why:  # noqa: BLE001 -- a CLI that will not say, however it will not
+    except Exception as why:  
         print(f"hmz: {cli} did not say what it runs as {name}: {why}", file=sys.stderr)
         return 0
     print(f"{cli} says it runs {len(found)} models as {name}")
     return 0
-
 
 def _again(cli: str, name: str, given: list[str]) -> int:
     """Signs an existing provider in again, by the way it was made with."""
@@ -515,25 +477,21 @@ def _again(cli: str, name: str, given: list[str]) -> int:
     except EOFError:
         print("hmz: nothing to read the answers from", file=sys.stderr)
         return 1
-    # Signed in again is possibly a different account, and certainly a fresh answer to what
-    # it runs: an account that has just changed hands is one to ask again.
-    return _sign(provider, chosen, answers) or _asks(cli, name)
 
+    return _sign(provider, chosen, answers) or _asks(cli, name)
 
 def _sign(provider: object, way: object, answers: dict[str, str]) -> int:
     """Runs the backend's own way in, and says what came of it."""
     from hmz.backends import Way
     from hmz.providers import Provider
 
-    assert isinstance(provider, Provider)  # noqa: S101 -- built by the caller, two lines up
-    assert isinstance(way, Way)  # noqa: S101
+    assert isinstance(provider, Provider)  
+    assert isinstance(way, Way)  
     status = _accounts().sign_in(provider, way, answers)
     if status:
-        # Including a CLI that is not installed: what is spawned is the supervisor, and a
-        # program it cannot start is a status of its own with the reason already on stderr.
+
         print(f"hmz: {way.argv[0]} exited {status}", file=sys.stderr)
     return status
-
 
 def _asking(way: object, given: dict[str, str]) -> dict[str, str]:
     """Puts whatever a way still needs to whoever is at the terminal.
@@ -556,7 +514,7 @@ def _asking(way: object, given: dict[str, str]) -> dict[str, str]:
     from hmz.backends import Way
     from hmz.providers import ENV
 
-    assert isinstance(way, Way)  # noqa: S101 -- taken from the table two lines up
+    assert isinstance(way, Way)  
     answers = dict(given)
     for one in way.asks:
         if answers.get(one.env):
@@ -574,8 +532,7 @@ def _asking(way: object, given: dict[str, str]) -> dict[str, str]:
             raise EOFError(one.env)
         answers[one.env] = said or one.fixed
     if way.name == ENV.name and not answers:
-        # The way that is only variables asks nothing in particular, so it is asked for all of
-        # them at once -- and a provider of no variables at all is one that does nothing.
+
         if not sys.stdin.isatty():
             raise EOFError("--set NAME=VALUE")
         print(

@@ -24,7 +24,6 @@ if TYPE_CHECKING:
 
 __all__ = ["flowverses"]
 
-
 def flowverses(argv: list[str]) -> int:
     """Carries out one `hmz flowverses` line.
 
@@ -84,7 +83,6 @@ def flowverses(argv: list[str]) -> int:
         return _fetch(args.name)
     return _remove(args.name)
 
-
 def _list(*, quiet: bool) -> int:
     """Prints every place flows come from, in the order they are offered.
 
@@ -100,12 +98,10 @@ def _list(*, quiet: bool) -> int:
         if quiet:
             print(one.name)
             continue
-        # What has been downloaded is not the same question as what there is to run, so one
-        # that has not been fetched says that rather than being left off the list.
+
         state = "fetched" if one.fetched else "not fetched"
         print(f"{one.name:14} {state:12} {verses.whence(one)}")
     return 0
-
 
 def _show(name: str) -> int:
     """Prints what one flowverse is, and the name each flow in it is offered under.
@@ -137,13 +133,11 @@ def _show(name: str) -> int:
         return 0
     held = verses.holds(one)
     for flow in held:
-        # The name `-f` takes, worked out the one place that rule lives, and what the flow says
-        # about itself beside it -- which is what somebody choosing between them is reading.
+
         print(f"holds       {flow.name:28} {flow.about}".rstrip())
     if not held:
         print("holds       nothing that is a flow")
     return 0
-
 
 def _add(url: str, name: str) -> int:
     """Fetches a flowverse, and says what it is called here and where it landed."""
@@ -156,7 +150,6 @@ def _add(url: str, name: str) -> int:
         return 1
     print(f"{one.name} is fetched into {one.at}")
     return _ask(one)
-
 
 def _fetch(name: str) -> int:
     """Fetches a flowverse again, or for the first time."""
@@ -171,7 +164,6 @@ def _fetch(name: str) -> int:
     print(f"{one.name} is fetched from {verses.plain(one.url)}")
     return _ask(one)
 
-
 def _remove(name: str) -> int:
     """Takes a flowverse away, flows and all."""
     from hmz.sdk import Hmz
@@ -179,9 +171,7 @@ def _remove(name: str) -> int:
     try:
         gone = Hmz().verses.remove(name)
     except (ValueError, OSError) as why:
-        # OSError too: taking one away is an rmtree, and a directory that will not go -- a
-        # parent that cannot be written, a symlink, a file still held open -- is a line that
-        # could not be carried out rather than a traceback to read.
+
         print(f"hmz: {why}", file=sys.stderr)
         return 1
     if not gone:
@@ -189,7 +179,6 @@ def _remove(name: str) -> int:
         return 1
     print(f"{name} is gone, flows and all")
     return 0
-
 
 def _ask(one: Flowverse) -> int:
     """Points at the line that says what a flowverse holds, without reading it to find out.

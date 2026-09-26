@@ -49,37 +49,19 @@ if TYPE_CHECKING:
 
 __all__ = ["Held", "hosts", "logged", "sized"]
 
-#: How much is read off the pseudoterminal at a time. A screen is kilobytes.
 _READ = 1 << 16
 
-#: How much of what a run drew before anybody was reading is kept, so that the first terminal
-#: to arrive sees the screen it drew rather than a blank one. Dropped whole if it grows past
-#: this: half an escape sequence is worse than none, and the terminal that arrives is drawn
-#: for again anyway.
 _KEPT = 1 << 17
 
-#: How long the loop waits on nothing at all before looking again at whether the run is over.
 _PATIENCE = 5.0
 
-#: How much a terminal may let pile up before it is let go of. Nothing here waits on one --
-#: every write is one that would not block -- so what a terminal that has stopped reading
-#: costs is memory, and this is the ceiling on it. A screen is kilobytes, so a megabyte is a
-#: terminal that has taken nothing for a long while.
 _BACKLOG = 1 << 20
 
-#: How many rounds may go wrong before the thread carrying them gives up. A handful, so that
-#: a terminal that went away mid-write is one bad round rather than a run nobody can read.
 _WRONG = 8
 
-#: How big the pseudoterminal is before any terminal has said, which is what a run drawn for
-#: nobody is drawn at.
 _COLUMNS, _ROWS = 80, 24
 
-#: The smallest terminal a run is drawn for. Anything under this is not a window somebody is
-#: reading -- it is a terminal that has not been told its own size, or one being taken down --
-#: and laying a screen out against it is what a full-screen program crashes on.
 _NARROW, _SHORT = 8, 2
-
 
 @dataclasses.dataclass(slots=True)
 class _Reading:
@@ -102,7 +84,6 @@ class _Reading:
     joined: bool = False
     sending: bytearray = dataclasses.field(default_factory=bytearray)
 
-
 def sized(fd: int, columns: int, rows: int) -> None:
     """Says how big the terminal on this descriptor is.
 
@@ -113,7 +94,6 @@ def sized(fd: int, columns: int, rows: int) -> None:
     """
     with contextlib.suppress(OSError):
         fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, columns, 0, 0))
-
 
 class Held:
     """One run, the terminals reading it, and the pseudoterminal between them.
@@ -137,10 +117,7 @@ class Held:
         self._lock = threading.Lock()
         self._reading: dict[int, _Reading] = {}
         self._letting: list[tuple[socket.socket, str]] = []
-        #: What was typed at a terminal and is not in the run's own terminal yet. Held here
-        #: rather than written where it arrives: the descriptor it goes to is the one this
-        #: thread is the only reader of, so a write that waited would be a screen nobody is
-        #: carrying out while it waited.
+
         self._typing = bytearray()
         self._woken_r, self._woken_w = os.pipe()
         self._buffer = bytearray()
@@ -151,8 +128,6 @@ class Held:
         self._redraws: Callable[[], None] | None = None
         self._stops: Callable[[], None] | None = None
         self._saying: Callable[[], dict[str, Any]] | None = None
-
-    # -- what the interface being held is told about, which is the whole of `hmz.sdk.Session`
 
     @property
     def attached(self) -> int:
@@ -167,8 +142,6 @@ class Held:
           How many were let go of, which is zero where nobody was reading.
         """
         return self._lets_go("detached")
-
-    # -- what the process holding it registers
 
     def redrawn(self, hook: Callable[[], None]) -> None:
         """Says what to do when a terminal arrives, which is to draw the screen again.
@@ -198,8 +171,6 @@ class Held:
           hook: What to call for it.
         """
         self._saying = hook
-
-    # -- the loop
 
     def start(self) -> None:
         """Starts carrying between the run and the terminals, on a thread of its own."""
@@ -266,29 +237,21 @@ class Held:
                         self._ready(selector, key.fd, events)
                     self._closes(selector)
                     self._watches(selector)
-                    # Counted in a row rather than for the life of the run: a terminal that
-                    # went away mid-write is one bad round, and a daemon holding a flow for a
-                    # week must not spend its last go on the eighth of those.
+
                     wrong = 0
-                except Exception:  # noqa: BLE001 -- a bad round is not the run over
-                    # A descriptor that has gone, a terminal that went away mid-write: the
-                    # run goes on, and the round after this one is tried. Only a thread that
-                    # can do nothing at all stops, since a screen nobody carries out is a
-                    # run that blocks writing one.
+                except Exception:  
+
                     wrong += 1
                     self._logs(
                         "the daemon could not carry a round of what the run drew"
                     )
             if wrong >= _WRONG:
-                # Nothing can be carried any more, so nothing may go on being told there is
-                # something here to read: a socket that is still accepting and no longer
-                # answering is a terminal that hangs rather than one that says so.
+
                 self._going = False
                 self._lets_go("this run can no longer be read")
                 self._unlisten()
         finally:
-            # Whichever terminals were let go of in the round the loop came out of: a
-            # terminal told nothing reads a closed socket as the machine having gone down.
+
             with contextlib.suppress(Exception):
                 self._closes(selector)
             selector.close()
@@ -334,7 +297,7 @@ class Held:
         try:
             drawn = os.read(self._master, _READ)
         except (BlockingIOError, InterruptedError):
-            return  # said it was readable and was not, which a pseudoterminal may
+            return  
         except OSError:
             self._going = False
             return
@@ -357,8 +320,7 @@ class Held:
             return
         self._buffer += drawn
         if len(self._buffer) > _KEPT:
-            # Half an escape sequence is worse than none: the terminal that arrives is
-            # drawn for again from the top, which is what makes this safe to throw away.
+
             self._spilled = True
             self._buffer.clear()
 
@@ -412,7 +374,7 @@ class Held:
             one, _ = self._listening.accept()
         except OSError:
             return
-        one.setblocking(False)  # noqa: FBT003 -- what a socket takes, not a flag of ours
+        one.setblocking(False)  
         with self._lock:
             self._reading[one.fileno()] = _Reading(one, Frames())
         with contextlib.suppress(ValueError, KeyError, OSError):
@@ -470,11 +432,9 @@ class Held:
             kept = bytes(self._buffer) if first and not self._spilled else b""
             self._buffer.clear()
         if kept and held is not None:
-            # What it drew before anybody was reading, so that a terminal arriving at a run
-            # that has not moved since is not looking at a blank screen.
+
             self._writes(held, frame(OUTPUT, kept))
-        # And then again from the top, in this terminal's own modes and at its own size: a
-        # terminal that has just arrived is in whatever modes the shell left it in.
+
         os.kill(os.getpid(), signal.SIGWINCH)
         self._redraw()
 
@@ -517,8 +477,7 @@ class Held:
         """Says how big the terminal reading this is now, and tells the run."""
         if not self._sizes(said):
             return
-        # The pseudoterminal has no foreground process group to signal, this process having
-        # no controlling terminal at all, so the run is told the one way that is left.
+
         os.kill(os.getpid(), signal.SIGWINCH)
 
     def _sizes(self, said: dict[str, Any]) -> bool:
@@ -599,7 +558,6 @@ class Held:
         """Writes down what went wrong where nobody was reading a terminal to see it."""
         logged(self._at, about)
 
-
 def logged(at: Path, about: str) -> None:
     """Writes down what went wrong where nobody was reading a terminal to see it.
 
@@ -612,7 +570,6 @@ def logged(at: Path, about: str) -> None:
         (at / where.LOG).open("a", encoding="utf-8") as writing,
     ):
         writing.write(f"{about}\n{traceback.format_exc()}\n")
-
 
 def _watching(
     selector: selectors.BaseSelector, one: socket.socket | int, *, waiting: bool
@@ -633,12 +590,10 @@ def _watching(
         if selector.get_key(one).events != wanted:
             selector.modify(one, wanted)
 
-
 def _quietly(hook: Callable[[], object]) -> None:
     """Runs one of the registered hooks, which must not be able to end the run."""
     with contextlib.suppress(Exception):
         hook()
-
 
 def hosts(
     opens: Callable[[Held], object],
@@ -672,22 +627,18 @@ def hosts(
     import pty
 
     at.mkdir(parents=True, exist_ok=True)
-    # Taken before anything is looked at: two `hmz` started in the same second would both
-    # find no daemon here, and one of them would take the other's socket away as stale.
+
     holding = where.holds(at)
     listening = _listens(at)
     master, slave = pty.openpty()
-    # Nothing carrying between the two ends may wait on either of them: the one thread that
-    # reads what the run draws is the one that writes what was typed, so a write that waited
-    # would be waiting for a run that is waiting for it.
+
     os.set_blocking(master, False)
     sized(master, columns, rows)
     where.wrote(
         at,
         {
             "pid": os.getpid(),
-            # This process's own directory, which is the workspace: a daemon is forked in
-            # the project it is holding, and the flow it runs runs there as it always did.
+
             "workspace": str(Path.cwd()),
             "started": _now(),
             "term": os.environ.get("TERM", ""),
@@ -711,7 +662,6 @@ def hosts(
                 with contextlib.suppress(OSError):
                     os.close(fd)
 
-
 def _listens(at: Path) -> socket.socket:
     """Binds the socket terminals arrive on, taking away one a daemon that is gone left.
 
@@ -729,9 +679,7 @@ def _listens(at: Path) -> socket.socket:
     """
     path = at / where.SOCKET
     if path.exists():
-        # A socket file outlives the process that bound it, and one nothing is listening on
-        # is a terminal that hangs rather than one that says nothing is running. Nothing else
-        # can be listening on it: this workspace's daemon lock is held.
+
         with contextlib.suppress(OSError):
             path.unlink()
     listening = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -744,7 +692,6 @@ def _listens(at: Path) -> socket.socket:
         listening.close()
         raise
     return listening
-
 
 @contextlib.contextmanager
 def _drawn_on(slave: int) -> Generator[None]:
@@ -764,8 +711,7 @@ def _drawn_on(slave: int) -> Generator[None]:
         with contextlib.suppress(Exception):
             stream.flush()
     kept = [os.dup(fd) for fd in (0, 1, 2)]
-    # A size the terminal itself answers for, so that a run drawn for nobody is drawn at the
-    # pseudoterminal's own size rather than at whatever the shell that started it was.
+
     said = {name: os.environ.pop(name, None) for name in ("COLUMNS", "LINES")}
     try:
         for fd in (0, 1, 2):
@@ -780,7 +726,6 @@ def _drawn_on(slave: int) -> Generator[None]:
         for name, was in said.items():
             if was is not None:
                 os.environ[name] = was
-
 
 def _now() -> str:
     """This moment, to the second, which is how long a daemon's own note has to be true."""

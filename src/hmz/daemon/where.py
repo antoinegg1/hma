@@ -37,41 +37,23 @@ __all__ = [
     "wrote",
 ]
 
-#: The socket a terminal reaches a run through, inside that run's own directory.
 SOCKET = "daemon.sock"
 
-#: What is written down about the daemon there: which process, which workspace, since when.
 RECORD = "daemon.json"
 
-#: Where whatever the daemon itself could not say through a terminal goes -- a crash before
-#: the interface was up, after the last terminal let go, or a directory that went away under
-#: whoever was reaching for the socket.
 LOG = "daemon.log"
 
-#: What the one daemon of a workspace holds for as long as it is running. A lock rather than
-#: a file that is looked at: the kernel drops it when the process goes, however it goes, so
-#: there is no such thing as one left behind by a machine that was turned off.
 LOCK = "daemon.lock"
 
-#: What a directory may be called after: everything else in a path is flattened, the way a
-#: epic flattens the workspace it was run in.
 _PLAIN = re.compile(r"[^A-Za-z0-9]+")
 
-#: How much of the workspace's own name is kept in front of the digest of the whole path. A
-#: directory of these is read by people, and `humanize2-a1b2c3d4e5f6` says which project.
 _KEPT = 24
 
-#: The longest a socket may be reached by its whole path. What a Unix socket address holds is
-#: about a hundred bytes -- 108 on Linux, 104 on macOS -- and the shorter of the two is what
-#: is measured against, so that a humanize which works here works there. A path longer than
-#: this is reached by standing in its directory and naming the socket alone.
 _LONGEST = 100
-
 
 def under() -> Path:
     """Where every workspace's daemon is kept, which is one directory under humanize's home."""
     return home() / "daemons"
-
 
 def at(workspace: str | os.PathLike[str] | None = None) -> Path:
     """The directory one workspace's daemon keeps its socket in.
@@ -90,7 +72,6 @@ def at(workspace: str | os.PathLike[str] | None = None) -> Path:
     named = _PLAIN.sub("-", where.name).strip("-")[:_KEPT] or "workspace"
     digest = hashlib.sha256(str(where).encode()).hexdigest()[:12]
     return under() / f"{named}-{digest}"
-
 
 @contextlib.contextmanager
 def reached(where: Path) -> Generator[str]:
@@ -127,10 +108,7 @@ def reached(where: Path) -> Generator[str]:
         return
     was = Path.cwd()
     try:
-        # The move is under the same `try` as what undoes it, so that a signal arriving in
-        # the breath between the two cannot be the thing that leaves the process here. The
-        # cost is putting a process back where it already is when the move itself failed,
-        # which is one syscall and never wrong.
+
         os.chdir(where)
         yield SOCKET
     finally:
@@ -138,7 +116,6 @@ def reached(where: Path) -> Generator[str]:
             os.chdir(was)
         except OSError:
             _logged(where, f"a run reaching for its socket could not go back to {was}")
-
 
 def _logged(where: Path, about: str) -> None:
     """Writes down beside the socket what there was no terminal to say.
@@ -156,7 +133,6 @@ def _logged(where: Path, about: str) -> None:
         (where / LOG).open("a", encoding="utf-8") as writing,
     ):
         writing.write(f"{about}\n{traceback.format_exc()}\n")
-
 
 def holds(where: Path) -> int:
     """Takes the one daemon of this workspace, for as long as this process lives.
@@ -186,7 +162,6 @@ def holds(where: Path) -> int:
         raise
     return taking
 
-
 def wrote(where: Path, said: dict[str, Any]) -> None:
     """Writes down what is running here, whole and then moved into place.
 
@@ -197,7 +172,6 @@ def wrote(where: Path, said: dict[str, Any]) -> None:
     beside = where / f".{RECORD}.new"
     beside.write_text(json.dumps(said, indent=2) + "\n", encoding="utf-8")
     beside.replace(where / RECORD)
-
 
 def held(where: Path) -> dict[str, Any]:
     """What is written down about the daemon there, and nothing at all where nothing is.
@@ -220,7 +194,6 @@ def held(where: Path) -> dict[str, Any]:
     if not isinstance(pid, int) or not alive(pid):
         return {}
     return held
-
 
 def alive(pid: int) -> bool:
     """Whether a process of that number is still there.

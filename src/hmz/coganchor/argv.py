@@ -20,7 +20,6 @@ if TYPE_CHECKING:
 
 __all__ = ["parser", "render", "settings"]
 
-
 def parser() -> ArgumentParser:
     """Builds the parser for `hmz anchor`, whose every option is a setting of the session.
 
@@ -140,7 +139,6 @@ def parser() -> ArgumentParser:
     )
     return built
 
-
 def settings(args: Namespace) -> AnchorConfig:
     """Reads what the parser answered with into the settings a session runs under.
 
@@ -173,7 +171,6 @@ def settings(args: Namespace) -> AnchorConfig:
         force=args.force,
     )
 
-
 def render(config: AnchorConfig, argv: Sequence[str]) -> list[str]:
     """Writes the settings back out as the `hmz anchor` line that would read as them.
 
@@ -187,8 +184,7 @@ def render(config: AnchorConfig, argv: Sequence[str]) -> list[str]:
     Returns:
       The command to spawn, which exits with the agent's own status.
     """
-    # Joined to their flag rather than following it, so that a setting reading as an option
-    # of ours -- a token that happens to start with a dash -- is still its value.
+
     options = [f"--target={config.target}", f"--net={config.net}"]
     for flag, value in (
         ("--workspace", config.workspace),
@@ -210,7 +206,6 @@ def render(config: AnchorConfig, argv: Sequence[str]) -> list[str]:
     if config.force:
         options.append("--force")
     return [sys.executable, "-m", "hmz", "anchor", *options, *argv]
-
 
 def _pair(said: str) -> tuple[str, str]:
     """Reads one `FROM=TO` as the two paths it names.

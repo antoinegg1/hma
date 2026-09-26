@@ -15,7 +15,6 @@ from __future__ import annotations
 
 __all__ = ["about", "hinted", "offered"]
 
-#: What each command does, shown beside its name.
 _ABOUT = {
     "flow": "Switch flow",
     "btw": "Ask a side question",
@@ -34,10 +33,6 @@ _ABOUT = {
     "exit": "Exit humanize",
 }
 
-
-#: What a command takes after its name, shown beside it so that the list says what may be
-#: written and not only what may be started. A switch takes `on` or `off` as well as being
-#: flipped, and nothing says so unless the list does.
 _TAKES = {
     "afk": "[on|off]",
     "btw": "<question>",
@@ -45,9 +40,7 @@ _TAKES = {
     "flow": "[flow]",
 }
 
-#: `/flow` and the name being typed after it. A third word is a line that has moved on.
 _FLOW_AND_NAME = 2
-
 
 def takes(name: str) -> str:
     """What a command takes after its name.
@@ -60,7 +53,6 @@ def takes(name: str) -> str:
     """
     return _TAKES.get(name, "")
 
-
 def about(name: str) -> str:
     """What a command is for.
 
@@ -71,7 +63,6 @@ def about(name: str) -> str:
       The one line said about it, or "" if it is not one to offer.
     """
     return _ABOUT.get(name, "")
-
 
 def offered(typed: str, commands: tuple[str, ...]) -> list[str]:
     """What the line being typed could be finished with.
@@ -93,12 +84,11 @@ def offered(typed: str, commands: tuple[str, ...]) -> list[str]:
         return []
     words = typed.split(" ")
     tail = words[-1]
-    if len(words) == 1:  # still naming the command
+    if len(words) == 1:  
         if tail.removeprefix("/") in commands:
             return []
         offers = sorted(f"/{name}" for name in commands if name in _ABOUT)
-    # The flow is the one thing `/flow` takes, so it is offered while that word is the one
-    # being typed and not after it: a line that already names a flow is a finished line.
+
     elif words[0] == "/flow" and len(words) == _FLOW_AND_NAME:
         from hmz.flows import found
 
@@ -106,7 +96,6 @@ def offered(typed: str, commands: tuple[str, ...]) -> list[str]:
     else:
         return []
     return [offer for offer in offers if offer.startswith(tail) and offer != tail]
-
 
 def hinted(typed: str, commands: tuple[str, ...]) -> str:
     """The command a line is writing, for as long as it is still being written.

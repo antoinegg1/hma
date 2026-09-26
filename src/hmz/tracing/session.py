@@ -10,7 +10,6 @@ if TYPE_CHECKING:
     import pathlib
     from collections.abc import Iterator
 
-#: How many of a list a trace keeps before saying how many it dropped.
 _ITEMS = 32
 
 _LABEL_KEYS = (
@@ -29,7 +28,6 @@ _LABEL_KEYS = (
     "message",
     "input",
 )
-
 
 @dataclasses.dataclass
 class Action:
@@ -51,7 +49,6 @@ class Action:
     end: float
     args: dict[str, Any] = dataclasses.field(default_factory=dict[str, Any])
     spawn: str | None = None
-
 
 @dataclasses.dataclass
 class Session:
@@ -86,7 +83,6 @@ class Session:
     args: dict[str, Any] = dataclasses.field(default_factory=dict[str, Any])
     actions: list[Action] = dataclasses.field(default_factory=list[Action])
 
-
 def records(path: pathlib.Path) -> Iterator[dict[str, Any]]:
     """Reads a JSON Lines log as the records it holds.
 
@@ -108,12 +104,10 @@ def records(path: pathlib.Path) -> Iterator[dict[str, Any]]:
         if isinstance(record, dict):
             yield record
 
-
 def summarize(text: str, limit: int = 96) -> str:
     """Collapses text into a single short line usable as a slice name."""
     line = " ".join(text.split())
     return line if len(line) <= limit else line[: limit - 1] + "…"
-
 
 def truncate(value: Any, limit: int = 4096) -> Any:
     """Clips long strings and wide containers so the trace stays loadable."""
@@ -132,11 +126,9 @@ def truncate(value: Any, limit: int = 4096) -> Any:
         return clipped
     return value
 
-
 def mapping(value: Any) -> dict[str, Any]:
     """Reads a log field as a mapping, treating anything else as an absent one."""
     return cast("dict[str, Any]", value) if isinstance(value, dict) else {}
-
 
 def text_of(content: Any) -> str:
     """Extracts the readable text carried by a message or content block."""
@@ -164,7 +156,6 @@ def text_of(content: Any) -> str:
         return text_of(held_content.get("text") or held_content.get("content"))
     return json.dumps(content, ensure_ascii=False)
 
-
 def label(tool: str, tool_input: Any) -> str:
     """Names a tool slice after the most descriptive field of its input."""
     if isinstance(tool_input, str) and tool_input.strip():
@@ -176,7 +167,6 @@ def label(tool: str, tool_input: Any) -> str:
             if isinstance(value, str) and value.strip():
                 return f"{tool}: {summarize(value)}"
     return tool
-
 
 def wanted(sessions: tuple[str, ...] | None, key: str, *extra: str) -> bool:
     """Reports whether a log known by this key was asked for.
@@ -196,7 +186,6 @@ def wanted(sessions: tuple[str, ...] | None, key: str, *extra: str) -> bool:
         return True
     idents = (key, key.split(":", 1)[-1], *extra)
     return any(ident.startswith(sessions) for ident in idents)
-
 
 def title_of(ident: str, actions: list[Action]) -> str:
     """Titles a session after the first prompt it was given."""

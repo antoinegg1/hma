@@ -25,9 +25,7 @@ if TYPE_CHECKING:
 
 __all__ = ["fallback"]
 
-#: What a place is called wherever this command asks for one.
 _PLACE = "CLI[@ACCOUNT]/MODEL"
-
 
 def fallback(argv: list[str]) -> int:
     """Lists, writes down and takes away the steps a turn walks between places.
@@ -105,7 +103,6 @@ def fallback(argv: list[str]) -> int:
         return _retry(steps, args.place, args.tries, args.policy, args.timeout)
     return _remove(steps, args.place)
 
-
 def _said(step: Falls) -> str:
     """One step as a line of a listing: where it goes, and how often it is tried first."""
     goes = f"falls back to {step.to}" if step.to else "falls back nowhere"
@@ -113,7 +110,6 @@ def _said(step: Falls) -> str:
         return goes
     over = f", up to {step.timeout:.0f}s" if step.timeout else ""
     return f"{step.tries} more tries, {step.policy}{over}; {goes}"
-
 
 def _list(steps: Fallbacks, *, quiet: bool) -> int:
     """Prints every step, one a line, in the order they were written down."""
@@ -130,7 +126,6 @@ def _list(steps: Fallbacks, *, quiet: bool) -> int:
         print(one.spec if quiet else f"{one.spec}  ->  {_said(one)}")
     return 0
 
-
 def _show(steps: Fallbacks, place: str) -> int:
     """Prints the places one turn walks, the one it starts at first."""
     if not steps.reads(place):
@@ -145,7 +140,6 @@ def _show(steps: Fallbacks, place: str) -> int:
         print("falls back nowhere: a failed turn is a failed turn")
     return 0
 
-
 def _add(steps: Fallbacks, place: str, at: str) -> int:
     """Says where one place's turns go when it has nowhere left to run."""
     try:
@@ -155,7 +149,6 @@ def _add(steps: Fallbacks, place: str, at: str) -> int:
         return 1
     print(f"{step.spec} falls back to {step.to}")
     return 0
-
 
 def _retry(
     steps: Fallbacks, place: str, tries: int, policy: str, timeout: float
@@ -172,7 +165,6 @@ def _retry(
     over = f", up to {step.timeout:.0f}s" if step.timeout else ""
     print(f"{step.spec} is tried {step.tries} more times, {step.policy}{over}")
     return 0
-
 
 def _remove(steps: Fallbacks, place: str) -> int:
     """Takes one step away, which is a place that falls back nowhere again."""

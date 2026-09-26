@@ -58,53 +58,28 @@ __all__ = [
     "under",
 ]
 
-#: What the flows humanize itself ships are listed under. Not a repository and not fetched
-#: from anywhere: they are in the package, and a name here means one file in it.
 BUILTIN = "builtin"
 
-#: What humanize's own repository of flows is called, and where it is. Always listed, whether
-#: or not it has been fetched: what there is to run is not the same question as what has been
-#: downloaded, and somebody who has never fetched it should still be able to see it and say so.
 OFFICIAL = "official"
-OFFICIAL_URL = "https://github.com/humanfia/flowverse"
+OFFICIAL_URL = ""
 
-#: What the flows of your own are listed under: this project's, and the ones in your home
-#: directory. Flowverses like any other, except that nothing fetches them.
 LOCAL = "local"
 USER = "user"
 
-#: And where those two are, nearest first. Kept unresolved: the project one is relative to
-#: wherever humanize is being run, and `~` is whoever is running it, neither of which is
-#: settled when this is imported.
 MINE = {
     LOCAL: ".humanize/flows",
     USER: "~/.humanize/flows",
 }
 
-#: The names a flowverse cannot be added under, being the four that are always listed. Two are
-#: humanize's own and two are yours, and a repository cloned into any of their slots would be
-#: one nobody could reach.
 _ALWAYS = (BUILTIN, OFFICIAL, LOCAL, USER)
 
-#: The places whose flows are read where they stand rather than out of a `flows/` inside them.
-#: A fetched flowverse needs that directory to tell its flows from the repository around them;
-#: these have no repository around them, and a directory of flows has nothing to tell them from.
 _AS_THEY_STAND = (BUILTIN, LOCAL, USER)
 
-#: The directory a fetched flowverse keeps its flows in, and the only one read for them. A
-#: flowverse is a repository, and a repository has a README, a pyproject and a test suite in it:
-#: reading a flow means running it, so the ones to run are the ones somebody put here and
-#: nothing else. `builtin` has no repository around it and so has no need of this.
 FLOWS = "flows"
 
-#: What a flowverse may be called: one directory name, and one that cannot climb out of the
-#: directory they are kept in.
 _NAMED = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
-#: How long a fetch is given before it is called off. A clone of a repository of text files is
-#: seconds; a minute is the difference between slow and not answering.
 _PATIENCE = 60.0
-
 
 @dataclass(frozen=True, slots=True)
 class Flowverse:
@@ -131,11 +106,9 @@ class Flowverse:
     fetched: bool
     fixed: bool
 
-
 def under() -> Path:
     """Where every fetched flowverse is kept, which is one directory under humanize's home."""
     return home() / "flowverses"
-
 
 def holds(one: Flowverse) -> Path:
     """The directory one flowverse's flows are read from, and the one place that is worked out.
@@ -153,7 +126,6 @@ def holds(one: Flowverse) -> Path:
       is a flowverse holding nothing, which is a thing to say rather than a thing to raise.
     """
     return one.at if one.name in _AS_THEY_STAND else one.at / FLOWS
-
 
 def where(name: str) -> Path:
     """The directory one flowverse is kept in.
@@ -174,7 +146,6 @@ def where(name: str) -> Path:
             "starting with a letter or a digit"
         )
     return under() / name
-
 
 def flowverses() -> list[Flowverse]:
     """Every place flows come from, in the order they are offered.
@@ -210,12 +181,9 @@ def flowverses() -> list[Flowverse]:
                 fixed=False,
             )
         )
-    # Last, because that is the order they are read in and not the order they are looked in:
-    # a menu of flows opens on the ones there are to run rather than on a directory that is
-    # empty in most projects. Which one wins a name is :func:`nearest`.
+
     held.extend(_own(name) for name in MINE)
     return held
-
 
 def nearest() -> list[Flowverse]:
     """Every place flows come from, nearest first, which is the order a name is looked up in.
@@ -234,7 +202,6 @@ def nearest() -> list[Flowverse]:
     return [one for one in held if one.name in MINE] + [
         one for one in held if one.name not in MINE
     ]
-
 
 def _own(name: str) -> Flowverse:
     """One of the two places flows of your own live, as a flowverse like any other.
@@ -262,11 +229,9 @@ def _own(name: str) -> Flowverse:
         fixed=True,
     )
 
-
 def named(name: str) -> Flowverse | None:
     """The flowverse called this, or None for a name none answers to."""
     return next((one for one in flowverses() if one.name == name), None)
-
 
 def add(url: str, name: str = "") -> Flowverse:
     """Fetches a flowverse, and answers with what was fetched.
@@ -292,22 +257,18 @@ def add(url: str, name: str = "") -> Flowverse:
         raise ValueError("no repository to fetch a flowverse from")
     called = name or _called(said)
     if called == BUILTIN:
-        # Cloned there, it would be in nobody's list: the flows humanize ships are the package's
-        # and this name is spoken for, so the directory would sit there offering nothing and
-        # refusing to be taken away again.
+
         raise ValueError(
             f"{BUILTIN} is what the flows humanize ships are called; pick another name"
         )
     if called == OFFICIAL:
-        # This one is listed from the start with humanize's own URL against it, so a stranger's
-        # repository here would be shown as humanize's own.
+
         raise ValueError(
             f"{OFFICIAL} is humanize's own repository of flows; "
             f"`fetch {OFFICIAL}` gets it, and another name holds another one"
         )
     if called in MINE:
-        # Same again: these two are the flows of your own, read out of a directory rather than
-        # a clone, so a repository under the name would be listed and never looked at.
+
         raise ValueError(
             f"{called} is what your own flows in {MINE[called]} are listed under; "
             "pick another name"
@@ -320,7 +281,6 @@ def add(url: str, name: str = "") -> Flowverse:
     return Flowverse(
         name=called, url=_url(at), at=at, fetched=_cloned(at), fixed=called == OFFICIAL
     )
-
 
 def fetch(name: str) -> Flowverse:
     """Fetches a flowverse again, or for the first time.
@@ -363,7 +323,6 @@ def fetch(name: str) -> Flowverse:
         fixed=one.fixed,
     )
 
-
 def remove(name: str) -> bool:
     """Takes a flowverse away, flows and all.
 
@@ -390,7 +349,6 @@ def remove(name: str) -> bool:
     shutil.rmtree(one.at)
     return True
 
-
 def flows(one: Flowverse) -> list[str]:
     """The flows in one flowverse, by the name each is offered under.
 
@@ -408,7 +366,6 @@ def flows(one: Flowverse) -> list[str]:
     from . import offered
 
     return offered(holds(one))
-
 
 def plain(url: str) -> str:
     """One URL with whatever was signed into it taken out.
@@ -431,7 +388,6 @@ def plain(url: str) -> str:
     """
     return re.sub(r"(?<=//)[^/@]+@", "***@", url, count=1)
 
-
 def refresh(at: Path) -> None:
     """Takes what a fetched repository says now, whatever is in the clone of it.
 
@@ -447,7 +403,6 @@ def refresh(at: Path) -> None:
     """
     _git("-C", str(at), "fetch", "--depth", "1", "origin", "HEAD")
     _git("-C", str(at), "reset", "--hard", "FETCH_HEAD")
-
 
 def clone(url: str, at: Path) -> None:
     """Clones a repository, and leaves nothing behind where it could not.
@@ -471,7 +426,6 @@ def clone(url: str, at: Path) -> None:
     except OSError:
         shutil.rmtree(at, ignore_errors=True)
         raise
-
 
 def _git(*said: str) -> None:
     """Runs one git command, and says what it said if it would not.
@@ -499,11 +453,7 @@ def _git(*said: str) -> None:
     if done.returncode != 0:
         raise OSError(done.stderr.strip() or f"git {said[0]} failed")
 
-
-#: What `owner/repo` looks like, which is the one spelling that is not already something git
-#: can clone: two names and one slash between them, and nothing that could be a path.
 _OWNED = re.compile(r"[A-Za-z0-9][\w.-]*/[A-Za-z0-9][\w.-]*\Z")
-
 
 def _url_of(said: str) -> str:
     """The URL to clone, from what somebody wrote.
@@ -520,7 +470,6 @@ def _url_of(said: str) -> str:
         return f"https://github.com/{said}"
     return said
 
-
 def _called(url: str) -> str:
     """What a flowverse fetched from this URL is called, which is the repository's own name.
 
@@ -529,11 +478,9 @@ def _called(url: str) -> str:
     """
     return PurePosixPath(url.rstrip("/")).name.removesuffix(".git") or "flowverse"
 
-
 def _cloned(at: Path) -> bool:
     """Whether there is a fetched flowverse at this path."""
     return (at / ".git").exists()
-
 
 def _url(at: Path) -> str:
     """Where a fetched flowverse came from, as its own clone says.
@@ -548,17 +495,13 @@ def _url(at: Path) -> str:
     Returns:
       The URL, or "" for one that cannot be read -- which is one that is not there.
     """
-    # No interpolation: a `%` in a URL is ordinary -- a percent-encoded password, or a path
-    # with one in it -- and configparser's default would read it as the start of a substitution
-    # and raise. Lazily, too: it raises where the value is read rather than where the file is,
-    # so the read is inside the try along with it.
+
     held = configparser.ConfigParser(strict=False, interpolation=None)
     try:
         held.read(at / ".git" / "config")
         return held.get('remote "origin"', "url", fallback="").strip()
     except (OSError, configparser.Error):
         return ""
-
 
 def _directories(at: Path) -> list[Path]:
     """Every directory directly inside one, and nothing at all where there is no such place."""

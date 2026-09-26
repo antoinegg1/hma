@@ -1,8 +1,5 @@
 """DeepSeek Harness, driven through its Python SDK."""
 
-# A session and the agent holding it are two halves of one object declared here.
-# pyright: reportPrivateUsage=false
-
 from __future__ import annotations
 
 import contextlib
@@ -52,15 +49,11 @@ _KEY_REQUIRED = (
 )
 _GOAL = "Use create_goal to pursue this objective until it is complete:\n\n{}"
 
-#: What the model says when the conversation no longer fits in it. Read from the message
-#: because that is where the runtime puts it: a turn refused for length is refused at the
-#: same length on the next try, so it is a failure to report rather than one to repeat.
 _TOO_LONG = (
     "maximum context length",
     "context length exceeded",
     "context_length_exceeded",
 )
-
 
 class _Subscription(Protocol):
     """The part of an SDK notification subscription used by a turn."""
@@ -70,7 +63,6 @@ class _Subscription(Protocol):
     def __exit__(self, exc_type: object, exc: object, traceback: object) -> None: ...
 
     def next(self) -> object: ...
-
 
 class _Client(Protocol):
     """The low-level public SDK calls used to stream one session."""
@@ -85,7 +77,6 @@ class _Client(Protocol):
         notification_subscription: _Subscription,
     ) -> str: ...
 
-
 class _Harness(Protocol):
     """A running SDK harness and its low-level client."""
 
@@ -95,26 +86,22 @@ class _Harness(Protocol):
 
     def close(self) -> None: ...
 
-
 class _ObjectLoader(Protocol):
     """The typed part of PyYAML's loader used by duplicate-key validation."""
 
     def construct_object(
         self,
         node: yaml.Node,
-        deep: bool = False,  # noqa: FBT001, FBT002 -- mirrors PyYAML's method
+        deep: bool = False,  
     ) -> object: ...
-
 
 @dataclass(frozen=True, kw_only=True)
 class DshAgentConfig(AgentConfig):
     """The model and effort every DeepSeek Harness session runs at."""
 
-
 class DshAgent(AgentBase):
     """A DeepSeek Harness agent using the bundled SDK runtime."""
 
-    #: The official goal service keeps the session working until its objective is complete.
     pursues: ClassVar[bool] = True
 
     def __init__(self, config: DshAgentConfig, *, name: str | None = None) -> None:
@@ -123,7 +110,6 @@ class DshAgent(AgentBase):
     def new(self, cwd: str | os.PathLike[str] | None = None) -> DshSession:
         """Opens an SDK session, which stays unopened until its first turn."""
         return DshSession(self, cwd)
-
 
 class DshSession(SessionBase):
     """One durable DeepSeek Harness conversation."""
@@ -146,7 +132,7 @@ class DshSession(SessionBase):
         self, prompt: str, *, schema: type[BaseModel] | None = None
     ) -> Iterator[Event]:
         """Runs one SDK turn and maps its session notifications as they arrive."""
-        del schema  # SessionBase has already put unsupported shapes in the prompt.
+        del schema  
         self._validate()
         session_id = self._id or f"session-{uuid.uuid4().hex}"
         self._attempt_id = session_id
@@ -273,7 +259,7 @@ class DshSession(SessionBase):
         finally:
             self._attempt_id = None
             if anchored:
-                # Coganchor reconciles the mirror when the supervised process exits.
+                
                 self._shut()
 
     def _failing(self, why: BaseException) -> None:
@@ -326,8 +312,7 @@ class DshSession(SessionBase):
     def _running(self) -> _Harness:
         """Returns a runtime initialized for this session's current effort."""
         effort = self.effort
-        # The account as well as the effort: a runtime is started with one account's
-        # environment and its credential paths, and neither changes under one already up.
+
         if self._harness is not None and (
             self._runtime_effort != effort or self.elsewhere()
         ):
@@ -388,7 +373,6 @@ class DshSession(SessionBase):
             with contextlib.suppress(Exception):
                 harness.close()
 
-
 def _harness_type() -> Callable[..., _Harness]:
     """Loads the SDK only when a dsh turn needs it."""
     try:
@@ -398,7 +382,6 @@ def _harness_type() -> Callable[..., _Harness]:
             raise
         raise ModuleNotFoundError(_EXTRA) from why
     return cast("Callable[..., _Harness]", vars(module)["DeepSeekHarness"])
-
 
 def _runtime_args() -> tuple[str, ...]:
     """Resolves the executable bundled with the SDK."""
@@ -414,17 +397,14 @@ def _runtime_args() -> tuple[str, ...]:
     )
     return resolve()
 
-
 def _dsh_home() -> Path:
     """Where dsh keeps durable sessions for SDK turns."""
     return (
         Path(os.environ.get("DSH_HOME") or Path.home() / ".dsh").expanduser().absolute()
     )
 
-
 class _UniqueSafeLoader(yaml.SafeLoader):
     """A safe YAML loader that refuses silently shadowed duplicate keys."""
-
 
 def _unique_mapping(
     loader: yaml.SafeLoader, node: yaml.MappingNode, *, deep: bool = False
@@ -454,11 +434,9 @@ def _unique_mapping(
         held[key] = construct(value_node, deep)
     return held
 
-
 _UniqueSafeLoader.add_constructor(
     yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _unique_mapping
 )
-
 
 def native_ready(where: str | os.PathLike[str]) -> bool:
     """Whether dsh's local account can authenticate a turn in one workspace.
@@ -476,14 +454,13 @@ def native_ready(where: str | os.PathLike[str]) -> bool:
         return False
     return bool(environment[_API_KEY_ENV].strip())
 
-
 def _native_dsh_environment(where: Path) -> dict[str, str]:
     """Resolves the settings and credential layers used by an installed dsh."""
     home = _dsh_home()
     settings = _yaml_mapping(home / "settings.yaml", "settings")
     raw_section = settings.get("llm-deepseek", {})
     if not isinstance(raw_section, dict):
-        raise ValueError(  # noqa: TRY004 -- all configuration errors share one API
+        raise ValueError(  
             f"dsh settings at {home / 'settings.yaml'} must give "
             '"llm-deepseek" a mapping'
         )
@@ -521,7 +498,6 @@ def _native_dsh_environment(where: Path) -> dict[str, str]:
             environment[_BASE_URL_ENV] = base_url
     return environment
 
-
 def _yaml_mapping(path: Path, kind: str) -> dict[object, object]:
     """Reads one optional YAML mapping without echoing its possibly secret source."""
     try:
@@ -531,7 +507,7 @@ def _yaml_mapping(path: Path, kind: str) -> dict[object, object]:
     except (OSError, UnicodeError):
         raise ValueError(f"dsh could not read {kind} at {path}") from None
     try:
-        loaded = yaml.load(source, Loader=_UniqueSafeLoader)  # noqa: S506
+        loaded = yaml.load(source, Loader=_UniqueSafeLoader)  
     except yaml.YAMLError as why:
         mark = getattr(why, "problem_mark", None)
         location = (
@@ -543,11 +519,10 @@ def _yaml_mapping(path: Path, kind: str) -> dict[object, object]:
     if loaded is None:
         return {}
     if not isinstance(loaded, dict):
-        raise ValueError(  # noqa: TRY004 -- all configuration errors share one API
+        raise ValueError(  
             f"dsh {kind} at {path} must be a mapping"
         )
     return cast("dict[object, object]", loaded)
-
 
 def _credentials(path: Path) -> dict[str, str]:
     """Reads dsh's owner-only credential mapping and validates every entry."""
@@ -570,7 +545,7 @@ def _credentials(path: Path) -> dict[str, str]:
                 f"dsh credentials at {path} contain an invalid credential reference"
             )
         if not isinstance(value, str):
-            raise ValueError(  # noqa: TRY004 -- all configuration errors share one API
+            raise ValueError(  
                 f'dsh credentials at {path} must give "{ref}" a string value'
             )
         if not value:
@@ -580,7 +555,6 @@ def _credentials(path: Path) -> dict[str, str]:
             )
         credentials[ref] = value
     return credentials
-
 
 def _dotenv(path: Path) -> dict[str, str]:
     """Reads one optional dotenv layer without interpolation or process mutation."""
@@ -597,17 +571,14 @@ def _dotenv(path: Path) -> dict[str, str]:
     values = dotenv_values(stream=io.StringIO(source), interpolate=False)
     return {name: value for name, value in values.items() if value is not None}
 
-
 def _nonempty(values: Mapping[str, str], name: str) -> str | None:
     """Returns a present nonempty credential value from one layer."""
     value = values.get(name)
     return value or None
 
-
 def _layered(*layers: Mapping[str, str], name: str) -> str | None:
     """Returns the first layer's value for a setting, including an empty one."""
     return next((layer[name] for layer in layers if name in layer), None)
-
 
 def _notification(notification: object) -> tuple[str, Mapping[str, Any]]:
     """Reads one SDK notification without importing its optional model type."""
@@ -615,11 +586,9 @@ def _notification(notification: object) -> tuple[str, Mapping[str, Any]]:
     payload = getattr(notification, "payload", {})
     return str(method), _mapping(payload)
 
-
 def _mapping(value: object) -> Mapping[str, Any]:
     """Returns a wire object as a mapping, or an empty one for another JSON value."""
     return cast("Mapping[str, Any]", value) if isinstance(value, dict) else {}
-
 
 def _receipt(
     method: str,
@@ -641,7 +610,6 @@ def _receipt(
         for message in cast("list[object]", inserted)
     )
 
-
 def _usage(value: object) -> Usage:
     """Maps dsh's disjoint token counts onto humanize's common names."""
     raw = _mapping(value)
@@ -655,9 +623,8 @@ def _usage(value: object) -> Usage:
     ):
         if source in raw:
             kinds[name] = _tokens(raw.get(source))
-    # reasoningTokens is already part of outputTokens on the dsh contract.
+    
     return Usage(kinds)
-
 
 def _tokens(value: object) -> float:
     """Returns a non-negative numeric token count from the wire."""
@@ -666,7 +633,6 @@ def _tokens(value: object) -> float:
         if isinstance(value, (int, float)) and not isinstance(value, bool)
         else 0.0
     )
-
 
 def _failed(
     session_id: str, answer: str, reason: Mapping[str, Any] | None
@@ -683,7 +649,6 @@ def _failed(
         session_id, answer, f"DeepSeek Harness turn did not complete: {why}"
     )
 
-
 def _runtime_gone(why: BaseException) -> bool:
     """Whether a failed turn took its runtime with it, or left one the next turn may use.
 
@@ -698,11 +663,10 @@ def _runtime_gone(why: BaseException) -> bool:
     try:
         errors = importlib.import_module("deepseek_harness.errors")
     except ModuleNotFoundError:
-        # No SDK to have started a runtime with, so there is nothing to keep.
+        
         return True
     closed = cast("type[BaseException]", vars(errors)["TransportClosedError"])
     return isinstance(why, closed)
-
 
 def _refusal(session_id: str, answer: str, said: str) -> Failed:
     """One turn's failure, as the kind of failure it is.
@@ -724,14 +688,12 @@ def _refusal(session_id: str, answer: str, said: str) -> Failed:
     kind = Unrecoverable if terminal else Failed
     return kind(1, ["dsh", session_id], output=answer, stderr=said)
 
-
 def _diagnostic(refused: subprocess.CalledProcessError) -> str:
     """Returns the useful words from a common turn failure without its traceback."""
     for value in (refused.stderr, refused.output):
         if isinstance(value, str) and value.strip():
             return value.strip()
     return str(refused)
-
 
 def _require_completed(
     session_id: str, answer: str, reason: Mapping[str, Any] | None

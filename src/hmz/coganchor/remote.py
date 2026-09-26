@@ -7,10 +7,6 @@ costs nothing -- while :meth:`RemoteClient.start_exec` and
 run for minutes and must never stall the supervisor.
 """
 
-# A handle and the client it came off are two halves of one object declared in one
-# file, which is what the underscore keeps out of the package rather than out of them.
-# pyright: reportPrivateUsage=false
-
 from __future__ import annotations
 
 import errno
@@ -37,12 +33,10 @@ __all__ = ["ExecHandle", "RemoteClient", "TunnelHandle"]
 
 log = logging.getLogger(__name__)
 
-#: How long a filesystem call may take before the target is presumed dead.
 DEFAULT_TIMEOUT = 120.0
 
 ChunkHandler = Callable[[Stream, bytes], None]
 DoneHandler = Callable[[dict[str, Any] | None, OSError | None], None]
-
 
 @dataclass(slots=True)
 class _Pending:
@@ -53,7 +47,6 @@ class _Pending:
     done: threading.Event = field(default_factory=threading.Event)
     result: dict[str, Any] | None = None
     error: OSError | None = None
-
 
 class RemoteClient:
     """Speaks the wire protocol to one target."""
@@ -69,8 +62,6 @@ class RemoteClient:
             target=self._read_loop, name="remote-reader", daemon=True
         )
         self.info: dict[str, Any] = {}
-
-    # ---------------------------------------------------------------- lifecycle
 
     def start(self, token: str | None = None) -> dict[str, Any]:
         """Start the reader thread and complete the handshake."""
@@ -93,8 +84,6 @@ class RemoteClient:
         self._reader.join(timeout=2.0)
         self._fail_pending(ConnectionResetError(errno.EPIPE, "connection closed"))
 
-    # ----------------------------------------------------------------- requests
-
     def call(self, op: Op, body: bytes = b"", **meta: Any) -> dict[str, Any]:
         """Issue a request and block until the target replies."""
         msg_id, pending = self._register(None, None)
@@ -104,7 +93,7 @@ class RemoteClient:
     def read_file(self, path: str, sink: BinaryIO) -> dict[str, Any]:
         """Stream a remote file into ``sink``; returns its metadata."""
 
-        def on_chunk(stream: Stream, data: bytes) -> None:  # noqa: ARG001
+        def on_chunk(stream: Stream, data: bytes) -> None:  
             sink.write(data)
 
         msg_id, pending = self._register(on_chunk, None)
@@ -125,9 +114,6 @@ class RemoteClient:
             self._discard(msg_id)
             raise
         return self._await(msg_id, pending)
-
-    # --------------------------------------------------------- streaming
-    # sessions
 
     def start_exec(
         self,
@@ -170,8 +156,6 @@ class RemoteClient:
         self._send(Frame.request(msg_id, Op.CONNECT, host=host, port=port))
         return TunnelHandle(self, msg_id)
 
-    # ------------------------------------------------------- filesystem helpers
-
     def listdir(self, path: str) -> dict[str, Any]:
         return self.call(Op.LISTDIR, path=path)
 
@@ -198,8 +182,6 @@ class RemoteClient:
 
     def utime(self, path: str, atime_ns: int | None, mtime_ns: int | None) -> None:
         self.call(Op.UTIME, path=path, atime_ns=atime_ns, mtime_ns=mtime_ns)
-
-    # ---------------------------------------------------------------- internals
 
     def _register(
         self, on_chunk: ChunkHandler | None, on_done: DoneHandler | None
@@ -275,7 +257,6 @@ class RemoteClient:
             if item.on_done is not None:
                 item.on_done(None, error)
 
-
 class ExecHandle:
     """Handle on a running remote command."""
 
@@ -294,7 +275,6 @@ class ExecHandle:
             self._client.call(Op.SIGNAL, target=self.msg_id, sig=signum)
         except OSError:
             log.debug("could not forward signal %d to remote command", signum)
-
 
 class TunnelHandle:
     """Handle on a TCP connection opened from the target."""

@@ -32,29 +32,13 @@ if TYPE_CHECKING:
 
 __all__ = ["Tracing"]
 
-#: `AT_FDCWD`: the descriptor that means "wherever the process is".
 _AT_FDCWD = -100
 
-#: Where `struct open_how` keeps the resolution it insists on, and the two settings of it that
-#: an absolute path cannot honour: one says the file must be under the descriptor it was given,
-#: the other that the descriptor is the root. A call that asked for either is failed rather
-#: than answered, since answering it would either break the promise or quietly re-root it.
 _OPEN_HOW_RESOLVE = 16
 _RESOLVE_CONFINED = 0x08 | 0x10
 
-#: What a rewritten path is kept clear of: the red zone, which a leaf function of the tracee
-#: may be using this moment, and which is the only part of the stack below the pointer that is
-#: anybody's. Everything below it is stack the process has not reached.
-#:
-#: Only as many bytes as the paths themselves take, and no more: a thread with a stack of its
-#: own -- a Node worker, a Rust pool -- may have only a page or two left below the pointer,
-#: and a fixed few kilobytes would be written past the end of it, into whatever the allocator
-#: happened to put there.
 _RED_ZONE = 128
 
-#: Where each trapped syscall keeps the paths it names, as `(descriptor argument, path
-#: argument)` pairs -- the descriptor being None for a call that has none and resolves against
-#: the process's own directory. Read off the manual pages, one line per call.
 _PATHS: dict[int, tuple[tuple[int | None, int], ...]] = {
     NR.OPEN: ((None, 0),),
     NR.CREAT: ((None, 0),),
@@ -69,8 +53,7 @@ _PATHS: dict[int, tuple[tuple[int | None, int], ...]] = {
     NR.CHMOD: ((None, 0),),
     NR.TRUNCATE: ((None, 0),),
     NR.UTIMES: ((None, 0),),
-    # The link itself, not what it says: what a symlink points at is text the kernel does not
-    # resolve here, and rewriting it would be answering a question nobody asked.
+
     NR.SYMLINK: ((None, 1),),
     NR.LINK: ((None, 0), (None, 1)),
     NR.RENAME: ((None, 0), (None, 1)),
@@ -91,7 +74,6 @@ _PATHS: dict[int, tuple[tuple[int | None, int], ...]] = {
     NR.LINKAT: ((0, 1), (2, 3)),
 }
 
-
 class Tracing:
     """One redirected run: the processes it is watching, and what each of them is told."""
 
@@ -102,11 +84,9 @@ class Tracing:
           swaps: Which paths are answered by which others.
         """
         self._swaps = swaps
-        #: Every process being watched, and whether it has been attached to yet: a child
-        #: reports itself before its parent's fork event arrives, and the first stop of one
-        #: is where its options are set.
+
         self._watching: dict[int, bool] = {}
-        #: What to plant at the exit stop of a syscall that was cancelled, by process.
+        
         self._owed: dict[int, int] = {}
         self._root = 0
         self._status = 1
@@ -125,16 +105,10 @@ class Tracing:
           Its exit status, or 128 plus the signal that killed it.
         """
         self._root = pid
-        os.waitpid(pid, 0)  # the stop it raised for us, before it exec'd anything
+        os.waitpid(pid, 0)  
         ptrace.setoptions(pid)
         self._watching[pid] = True
 
-        # A signal aimed at this process is aimed at the program under it: whatever asked for
-        # it -- a flow taking a session down, a service manager -- asked for the agent to
-        # stop, and this is only the thing holding its paths. So it is passed on rather than
-        # acted on: dying here would leave the agent running with nobody answering its
-        # credential paths. `SIGINT` is the exception, and is ignored: a ctrl-c at a terminal
-        # already reaches the whole group, so passing it on would deliver it twice.
         def passed(said: int, _frame: object) -> None:
             with contextlib.suppress(OSError):
                 os.kill(pid, said)
@@ -150,7 +124,7 @@ class Tracing:
                 got, status = os.waitpid(-1, ptrace.WALL)
             except ChildProcessError:
                 break
-            except InterruptedError:  # pragma: no cover -- retried by the loop
+            except InterruptedError:  
                 continue
             self._stopped(got, status)
         return self._status
@@ -162,15 +136,11 @@ class Tracing:
             self._owed.pop(pid, None)
             if pid == self._root:
                 self._status = failed(status)
-                # The run is over the moment the program it was for is, rather than when the
-                # last thing it started is: waiting for those would be waiting on a daemon.
-                # What is still being traced goes with this process, which is what ptrace's
-                # own `EXITKILL` is for -- a process left running with nobody answering its
-                # credential paths would be one reading the wrong account's.
+
                 self._watching.clear()
             return
         if not self._watching.get(pid, False):
-            # Its first stop, whether or not the fork event has arrived: attach here.
+            
             self._watching[pid] = True
             _try(ptrace.setoptions, pid)
             _try(ptrace.cont, pid)
@@ -199,13 +169,13 @@ class Tracing:
         except OSError:
             return
         taken = (
-            0  # what the paths already planted have used, so two do not overwrite one
+            0  
         )
         for descriptor, argument in _PATHS.get(registers.syscall_number, ()):
             try:
                 named = self._named(pid, registers, descriptor, argument)
             except (OSError, ValueError):
-                continue  # a process that went away mid-read is not one to fail a call for
+                continue  
             if named is None:
                 continue
             instead = self._swaps.swap(named)
@@ -273,7 +243,7 @@ class Tracing:
             else procfs.fd_target(pid, at)
         )
         if not under.startswith("/"):
-            return None  # a descriptor that is not a directory of this filesystem
+            return None  
         return os.path.normpath(os.path.join(under, raw))
 
     def _plant(
@@ -295,8 +265,7 @@ class Tracing:
           whatever descriptor the call was also given, so nothing else has to be rewritten for
           it to be the file that is opened.
         """
-        # As the tracee named it: a path is bytes, and one that is not valid text came back
-        # through the surrogates `read_cstring` escapes it with.
+
         blob = os.fsencode(path) + b"\0"
         where = registers.stack_pointer - _RED_ZONE - taken - len(blob)
         try:
@@ -335,7 +304,6 @@ class Tracing:
             ptrace.cont(pid)
         except OSError:
             pass
-
 
 def _try(call: Any, *args: Any) -> None:
     """Runs a ptrace call, tolerating a process that has already gone."""

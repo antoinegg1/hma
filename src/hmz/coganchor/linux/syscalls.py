@@ -16,31 +16,28 @@ from dataclasses import dataclass
 
 __all__ = ["ARCH", "NR", "TRAPPED_SYSCALLS", "Arch", "syscall_name"]
 
-
 @dataclass(frozen=True, slots=True)
 class Arch:
     """Register layout needed to read and tamper with syscalls."""
 
     name: str
     audit_arch: int
-    #: Index into ``user_regs_struct`` of the syscall number as seen on entry.
+    
     number_index: int
-    #: Index of the register holding the syscall return value.
+    
     result_index: int
-    #: Indices of the six syscall argument registers, in order.
+    
     arg_indices: tuple[int, int, int, int, int, int]
-    #: Index of the stack pointer, whose red zone is used as scratch space.
+    
     stack_index: int
-    #: Number of ``unsigned long`` words in ``user_regs_struct``.
+    
     register_count: int
 
-
-# Field order of x86-64 ``struct user_regs_struct`` (see <sys/user.h>).
 _X86_64_FIELDS = [
     "r15", "r14", "r13", "r12", "rbp", "rbx", "r11", "r10", "r9", "r8",
     "rax", "rcx", "rdx", "rsi", "rdi", "orig_rax", "rip", "cs", "eflags",
     "rsp", "ss", "fs_base", "gs_base", "ds", "es", "fs", "gs",
-]  # fmt: skip
+]  
 _X86_64_INDEX = {name: index for index, name in enumerate(_X86_64_FIELDS)}
 
 X86_64 = Arch(
@@ -48,7 +45,7 @@ X86_64 = Arch(
     audit_arch=0xC000003E,
     number_index=_X86_64_INDEX["orig_rax"],
     result_index=_X86_64_INDEX["rax"],
-    arg_indices=tuple(  # pyright: ignore[reportArgumentType]
+    arg_indices=tuple(  
         _X86_64_INDEX[name] for name in ("rdi", "rsi", "rdx", "r10", "r8", "r9")
     ),
     stack_index=_X86_64_INDEX["rsp"],
@@ -56,7 +53,6 @@ X86_64 = Arch(
 )
 
 _SUPPORTED = {"x86_64": X86_64}
-
 
 def _detect() -> Arch:
     machine = platform.machine()
@@ -68,25 +64,20 @@ def _detect() -> Arch:
         )
     return arch
 
-
 ARCH = _detect()
-
 
 class NR:
     """x86-64 syscall numbers used by the supervisor."""
 
-    # Process execution.
     EXECVE = 59
     EXECVEAT = 322
     EXIT_GROUP = 231
 
-    # Opening files.
     OPEN = 2
     OPENAT = 257
     OPENAT2 = 437
     CREAT = 85
 
-    # Metadata lookups (trapped so the shadow tree can materialise lazily).
     STAT = 4
     LSTAT = 6
     NEWFSTATAT = 262
@@ -98,7 +89,6 @@ class NR:
     READLINKAT = 267
     CHDIR = 80
 
-    # Mutations, replayed on the target.
     MKDIR = 83
     MKDIRAT = 258
     RMDIR = 84
@@ -117,18 +107,14 @@ class NR:
     UTIMENSAT = 280
     UTIMES = 235
 
-    # Networking.
     CONNECT = 42
 
-    # Helpers invoked by the supervisor itself.
     SECCOMP = 317
     PIDFD_OPEN = 434
     PIDFD_GETFD = 438
     PROCESS_VM_READV = 310
     PROCESS_VM_WRITEV = 311
 
-
-#: The complete seccomp trap set.  Everything else runs untouched.
 TRAPPED_SYSCALLS: frozenset[int] = frozenset(
     {
         NR.EXECVE,
@@ -173,7 +159,6 @@ _NAMES = {
     for name, value in vars(NR).items()
     if not name.startswith("_") and isinstance(value, int)
 }
-
 
 def syscall_name(number: int) -> str:
     """Human-readable name for a syscall number, for logs and errors."""

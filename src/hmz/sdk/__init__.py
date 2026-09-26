@@ -46,8 +46,6 @@ __all__ = [
     "Taken",
 ]
 
-#: Which module each of them is written in. One entry per name this package offers, so that
-#: `from hmz.sdk import Hmz` costs the one module `Hmz` is in rather than all eight.
 _WRITTEN = {
     "Accounts": "hmz.sdk.accounts",
     "Agents": "hmz.sdk.agents",
@@ -60,7 +58,6 @@ _WRITTEN = {
     "Session": "hmz.sdk.session",
     "Taken": "hmz.sdk.agents",
 }
-
 
 def __getattr__(name: str) -> object:
     """Hands through what this package offers, out of the module it is written in.

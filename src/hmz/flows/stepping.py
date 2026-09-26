@@ -42,25 +42,15 @@ if TYPE_CHECKING:
 
 __all__ = ["walking"]
 
-#: What the state a run writes down keeps: which prophecy it is a run of, which node it was
-#: inside when it stopped, and what each node it has finished answered.
 _PROPHECY = "prophecy"
 _AT = "at"
 _DONE = "done"
 
-#: And that the run reached the way out. What a run has done is kept for whoever reads it
-#: back, so a finished one cannot be told from a stopped one by what it holds -- and the next
-#: run of the flow, handed that, would walk every answer it already had and do no work at all.
 _OVER = "over"
 
-#: What one visit to a node is written down under: the node, and how many times the run has
-#: been through it -- a loop is one node visited again, and a round whose answer overwrote
-#: the last round's would be a run that could not be picked up inside a loop.
 _VISIT = "#"
 
-#: And what a supernode's own nodes are written down under: its visit, then theirs.
 _UNDER = "/"
-
 
 def walking(
     flow: str | os.PathLike[str], inside: Mapping[str, Any], entry: Entry
@@ -110,19 +100,14 @@ def walking(
     walked = prophecy
 
     def running(agents: Any, task: Any, *said: Any) -> Any:
-        # A resumable flow is handed its state last and its config before it, and an atlas
-        # is always resumable: what a run of one has done is which of its nodes answered.
+
         state: dict[str, Any] = said[-1] if said else {}
         config = said[0] if len(said) > 1 else None
         return _stepped(
             walked, inside, agents, task, _set_up(walked, inside, config), state
         )
 
-    # Whatever the entry point was marked with, and not the two marks known today: both
-    # `flow` and `atlas` set theirs into the function's own `__dict__`, which is exactly
-    # what this copies -- so a third mark added later travels without this line moving.
     return functools.update_wrapper(running, entry, assigned=(), updated=("__dict__",))
-
 
 def _set_up(
     prophecy: Prophecy, inside: Mapping[str, Any], config: BaseModel | None
@@ -150,9 +135,8 @@ def _set_up(
         return None
     try:
         return model()
-    except Exception:  # noqa: BLE001 -- a model the compiling said could be built and now
-        return None  # cannot is a file rewritten under the run, not a run to end here
-
+    except Exception:  
+        return None  
 
 def _shipped(under: Path, wanted: str) -> Prophecy | None:
     """The prophecy a flow's own directory ships, where it ships the one being asked for.
@@ -185,7 +169,6 @@ def _shipped(under: Path, wanted: str) -> Prophecy | None:
             "again, or take the file away and let the run compile it"
         )
     return held.prophecy if held.prophecy.name == wanted else None
-
 
 @dataclass(slots=True)
 class _Walk:
@@ -231,7 +214,6 @@ class _Walk:
             for at in {"", *(one.out_of for one in self.prophecy.edges)}
         }
 
-
 def _stepped(
     prophecy: Prophecy,
     inside: Mapping[str, Any],
@@ -255,11 +237,7 @@ def _stepped(
     """
     written = digest(prophecy)
     if state.get(_PROPHECY) != written or state.get(_OVER):
-        # A different prophecy: the atlas was rewritten between the two runs, so what the
-        # last one did, it did somewhere else. Cleared rather than merged, since a node
-        # that kept its name is not thereby the node it was. And the same for a run that
-        # reached the way out: it is a run to read back rather than one to pick up, and
-        # picking it up would be a run with an answer for every node and nothing to do.
+
         state.clear()
         state[_PROPHECY] = written
     walk = _Walk(
@@ -272,12 +250,10 @@ def _stepped(
         beside={},
     )
     answered = _walked(walk, given, config)
-    # Written down as finished rather than emptied: what a run did is what whoever reads it
-    # back is after, and the next run of the flow is what must not be handed it.
+
     state[_OVER] = True
     _saved(state)
     return answered
-
 
 def _walked(walk: _Walk, given: Any, config: BaseModel | None) -> Any:
     """Walks one prophecy from its way in to its way out.
@@ -297,8 +273,7 @@ def _walked(walk: _Walk, given: Any, config: BaseModel | None) -> Any:
         edge = _way(walk, at, bound)
         node = None if edge is None else walk.nodes.get(edge.into)
         if node is None:
-            # What the `return` named, and not whatever the last node happened to say: a
-            # body may answer with something it bound three nodes ago.
+
             return bound.get(edge.answers) if edge is not None else None
         seen[node.at] = visit = seen.get(node.at, 0) + 1
         held = f"{walk.under}{node.at}{_VISIT}{visit}"
@@ -306,7 +281,6 @@ def _walked(walk: _Walk, given: Any, config: BaseModel | None) -> Any:
         if node.binds:
             bound[node.binds] = answered
         at = node.at
-
 
 def _way(walk: _Walk, at: str, bound: dict[str, Any]) -> Edge | None:
     """Which way out of one node this run takes.
@@ -330,7 +304,6 @@ def _way(walk: _Walk, at: str, bound: dict[str, Any]) -> Edge | None:
             return edge
     return None
 
-
 def _answered(walk: _Walk, bound: dict[str, Any], node: Node, held: str) -> Any:
     """What one node answers with: what it answered last time, or what it answers now.
 
@@ -347,25 +320,17 @@ def _answered(walk: _Walk, bound: dict[str, Any], node: Node, held: str) -> Any:
     if held in walk.kept:
         return _rebuilt(walk.kept[held], node.gives, walk.inside)
     if held == walk.state.get(_AT) and not node.rerun:
-        # Where the last run stopped, in a node that says it is not to be run again: it had
-        # its effect before anything could interrupt it, so the run steps past. It answers
-        # with nothing -- the compiling refuses one that does not -- so there is nothing for
-        # what comes next to be missing.
+
         walk.kept[held] = None
         _saved(walk.state)
         return None
-    # Written down before the node runs and saved once: `State` saves itself as it is
-    # written into, and what goes into `kept` below is a change inside a value it holds and
-    # cannot see -- which is the one that has to ask. Where a run stopped is the node that
-    # was running, so a supernode writes nothing here: the nodes under it write themselves,
-    # and one of theirs overwritten by this would be a run picked up past what it stopped in.
+
     if node.kind != "atlas":
         walk.state[_AT] = held
     answered = _ran(walk, bound, node, held)
     walk.kept[held] = _written(answered)
     _saved(walk.state)
     return answered
-
 
 def _ran(walk: _Walk, bound: dict[str, Any], node: Node, held: str) -> Any:
     """Runs one node for real: a turn, a Python function, or a whole prophecy.
@@ -396,7 +361,6 @@ def _ran(walk: _Walk, bound: dict[str, Any], node: Node, held: str) -> Any:
         )
     return call(*said)
 
-
 def _supernode(walk: _Walk, node: Node, held: str, said: list[Any]) -> Any:
     """Runs one supernode, which is a whole prophecy inside this one.
 
@@ -421,14 +385,7 @@ def _supernode(walk: _Walk, node: Node, held: str, said: list[Any]) -> Any:
         raise NotAFlow(
             f"{walk.prophecy.name}: nothing under it is called {node.under!r}"
         )
-    # Beside it or elsewhere: a supernode of this flow's own is in the file this prophecy
-    # was compiled from, and one reached by name is a flow of its own, run to be read as any
-    # flow is. Told apart by the mark rather than by the name being one this file holds:
-    # `inner = sub("inner")` binds that name here too, and a membership test would read a
-    # flow of its own as one beside it and walk its nodes against the wrong file. Read once
-    # for the run rather than once a visit: the graph was settled before the run started,
-    # and a file re-read between two rounds of a loop would be new code running under a
-    # shape that had already been agreed.
+
     if getattr(walk.inside.get(node.calls), ATLAS, None) is not None:
         beside = walk.inside
     elif node.calls not in walk.beside:
@@ -449,7 +406,6 @@ def _supernode(walk: _Walk, node: Node, held: str, said: list[Any]) -> Any:
         None,
     )
 
-
 def _read(bound: dict[str, Any], one: Reads) -> Any:
     """What one node reads, which is a name a node bound or a field of it.
 
@@ -464,12 +420,10 @@ def _read(bound: dict[str, Any], one: Reads) -> Any:
     held = bound.get(one.reads)
     if not one.field:
         return held
-    # The agents are the one thing a name holds that is not a node's answer, and they are
-    # held by name: everything else a body binds is a model or a plain kind.
+
     if isinstance(held, dict):
         return cast("dict[str, Any]", held).get(one.field)
     return getattr(held, one.field, None)
-
 
 def _written(answered: Any) -> Any:
     """One node's answer as something a run picked up again can be handed back.
@@ -483,7 +437,6 @@ def _written(answered: Any) -> Any:
     """
     dump = getattr(answered, "model_dump", None)
     return dump(mode="json") if callable(dump) else answered
-
 
 def _rebuilt(written: Any, gives: str, inside: Mapping[str, Any]) -> Any:
     """One node's kept answer, back in the shape the node declared.
@@ -500,7 +453,6 @@ def _rebuilt(written: Any, gives: str, inside: Mapping[str, Any]) -> Any:
     """
     validate = getattr(inside.get(gives), "model_validate", None)
     return validate(written) if callable(validate) and written is not None else written
-
 
 def _saved(state: dict[str, Any]) -> None:
     """Writes the run's state where it is kept, for a run stopped after this node.

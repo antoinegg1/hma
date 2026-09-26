@@ -33,7 +33,6 @@ _SYSTEM_FIELDS = (
     "hookInfos",
 )
 
-
 def collect(
     home: pathlib.Path,
     workspace: pathlib.Path | None,
@@ -122,7 +121,6 @@ def collect(
                 child.parent = owner.key
     return collected
 
-
 def _parse(
     path: pathlib.Path, window: tuple[float, float], spawns: dict[str, str]
 ) -> tuple[list[Action], dict[str, Any]]:
@@ -197,10 +195,7 @@ def _parse(
             prev = max(prev, at)
         elif kind == "assistant":
             model = message.get("model")
-            # Only the answers say what answered them, and Claude lets a session change model
-            # mid-conversation, so the first answer is taken: what the session opened at.
-            # `<synthetic>` names an answer Claude wrote for itself, such as an API error,
-            # rather than a model, and would otherwise take a session with it.
+
             if "model" not in info and isinstance(model, str) and model[:1] != "<":
                 info["model"] = model
                 if record.get("effort") is not None:
@@ -240,7 +235,6 @@ def _parse(
         turn.end = max(turn.end, closing)
         actions.append(turn)
     return actions, info
-
 
 def _add_block(
     actions: list[Action],

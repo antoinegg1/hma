@@ -39,24 +39,15 @@ if TYPE_CHECKING:
 
 __all__ = ["Daemon", "Held", "daemons", "running", "start"]
 
-#: How long a daemon is given to bind its socket before whoever asked for one gives up. It is
-#: a fork and a bind; a second is already generous, and ten is a machine under load.
 _PATIENCE = 10.0
 
-#: How long a question about a run is given to be answered.
 _ANSWERING = 5.0
 
-#: How long a run told to stop is given to go before whoever asked is told it has not.
 _UNWINDING = 20.0
 
-#: How often a process being waited on is looked at.
 _TICK = 0.1
 
-#: How long the socket of a daemon that may not be listening is given to answer at all. It
-#: is a connect to a file on this machine: either it is refused at once or it is taken, and a
-#: wedged one must not be what a listing of every run on the machine waits on.
 _ANSWERS_AT_ONCE = 1.0
-
 
 @dataclass(frozen=True, slots=True)
 class Daemon:
@@ -201,7 +192,6 @@ class Daemon:
         """What is written down beside its socket about it."""
         return dict(where.held(self.at))
 
-
 def running(workspace: str | os.PathLike[str] | None = None) -> Daemon | None:
     """The daemon holding a run in one workspace, if one is.
 
@@ -215,7 +205,6 @@ def running(workspace: str | os.PathLike[str] | None = None) -> Daemon | None:
     """
     return _read(where.at(workspace))
 
-
 def daemons() -> list[Daemon]:
     """Every run being held on this machine, oldest first."""
     found: list[Daemon] = []
@@ -227,7 +216,6 @@ def daemons() -> list[Daemon]:
             if held is not None:
                 found.append(held)
     return sorted(found, key=lambda one: one.started)
-
 
 def start(
     opens: Callable[[Held], object],
@@ -267,14 +255,12 @@ def start(
         )
     wide, tall = _terminal(columns, rows)
     reading, telling = os.pipe()
-    # Before the fork: what this process has written and not yet flushed is buffered in it,
-    # and a fork copies the buffer -- so anything left in one would be written twice, once
-    # by each of them.
+
     for stream in (sys.stdout, sys.stderr):
         with contextlib.suppress(Exception):
             stream.flush()
     middle = os.fork()
-    if middle == 0:  # pragma: no cover -- the child never comes back to be covered
+    if middle == 0:  
         os.close(reading)
         _detaches(opens, at, wide, tall, telling)
     os.close(telling)
@@ -283,8 +269,7 @@ def start(
     finally:
         with contextlib.suppress(OSError):
             os.close(reading)
-        # The middle process has already gone: it forked the one that holds the run and
-        # exited, so that the run's own parent is whatever adopts it rather than this.
+
         with contextlib.suppress(ChildProcessError):
             os.waitpid(middle, 0)
     held = _read(at)
@@ -292,32 +277,29 @@ def start(
         raise OSError(f"the run in {at} did not come up")
     return held
 
-
 def _detaches(
     opens: Callable[[Held], object],
     at: Path,
     columns: int,
     rows: int,
     telling: int,
-) -> None:  # pragma: no cover -- runs only in the forked child
+) -> None:  
     """The two forks and the session, and then the run, in the process that holds it."""
     status = 0
     try:
         with contextlib.suppress(OSError):
             os.setsid()
         if os.fork() != 0:
-            os._exit(0)  # the middle process, which must unwind nothing at all
-        # A hangup cannot reach a process with no controlling terminal, and this one has
-        # none; refusing it as well costs nothing and says what is meant.
+            os._exit(0)  
+
         import signal
 
         with contextlib.suppress(OSError, ValueError):
             signal.signal(signal.SIGHUP, signal.SIG_IGN)
         hosts(opens, at, columns=columns, rows=rows, telling=telling)
-    except BaseException as why:  # noqa: BLE001 -- the last frame of a process nobody reads
+    except BaseException as why:  
         status = 1
-        # Said back down the pipe as well as written down: whoever asked for a daemon is
-        # still waiting, and `could not be held` on its own is a line nobody can act on.
+
         with contextlib.suppress(OSError):
             os.write(telling, f"the run could not be held: {why}\n".encode())
             os.close(telling)
@@ -328,8 +310,7 @@ def _detaches(
         with contextlib.suppress(Exception):
             sys.stdout.flush()
             sys.stderr.flush()
-        os._exit(status)  # nothing of this process is anybody's to unwind
-
+        os._exit(status)  
 
 def _waits(reading: int, seconds: float) -> None:
     """Waits for the detached process to say it is listening, or for the time to run out."""
@@ -349,14 +330,12 @@ def _waits(reading: int, seconds: float) -> None:
     finally:
         selector.close()
 
-
 def _terminal(columns: int, rows: int) -> tuple[int, int]:
     """How big to draw for, which is this terminal unless somebody said otherwise."""
     if columns and rows:
         return columns, rows
     wide, tall = size()
     return columns or wide, rows or tall
-
 
 def _read(at: Path) -> Daemon | None:
     """The daemon whose directory this is, or None where nothing is being held there."""
@@ -374,7 +353,6 @@ def _read(at: Path) -> Daemon | None:
         pid=pid,
         started=str(said.get("started") or ""),
     )
-
 
 def _listening(at: Path) -> bool:
     """Whether something is actually listening on the socket there.

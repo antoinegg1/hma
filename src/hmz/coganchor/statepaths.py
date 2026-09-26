@@ -14,15 +14,13 @@ from dataclasses import dataclass, field
 
 __all__ = ["PROFILES", "AgentProfile", "ResolvedAgent", "profile_for", "resolve"]
 
-
 @dataclass(frozen=True, slots=True)
 class AgentProfile:
     """What coganchor knows about one coding agent."""
 
     name: str
-    #: Paths holding the agent's own state; always served from this machine.
+    
     state_paths: tuple[str, ...] = ()
-
 
 PROFILES: tuple[AgentProfile, ...] = (
     AgentProfile(
@@ -42,9 +40,7 @@ PROFILES: tuple[AgentProfile, ...] = (
         name="codex",
         state_paths=("~/.codex",),
     ),
-    # Cursor Agent keeps its settings, its rules and its login under one directory, and the
-    # versions of the CLI itself under another -- the second being where it re-execs from, so
-    # it stays on this machine like every other agent's own program.
+
     AgentProfile(
         name="cursor-agent",
         state_paths=("~/.cursor", "~/.local/share/cursor-agent"),
@@ -69,9 +65,7 @@ PROFILES: tuple[AgentProfile, ...] = (
         name="pi",
         state_paths=("~/.pi",),
     ),
-    # opencode and mimocode are one program under two names, and each keeps its install, its
-    # settings, its cached model catalogue and the database its sessions are rows of in four
-    # directories of its own.
+
     AgentProfile(
         name="opencode",
         state_paths=(
@@ -90,9 +84,7 @@ PROFILES: tuple[AgentProfile, ...] = (
             "~/.cache/mimocode",
         ),
     ),
-    # One directory, holding both halves of ZCode: `cli/` is the command line's own settings,
-    # sessions and rollouts, and `v2/` is what it shares with the desktop app, the login among
-    # it. Both stay on this machine, as every other agent's state does.
+
     AgentProfile(
         name="zcode",
         state_paths=("~/.zcode",),
@@ -101,10 +93,6 @@ PROFILES: tuple[AgentProfile, ...] = (
 
 _BY_NAME = {profile.name: profile for profile in PROFILES}
 
-#: Directories that hold per-user state for *any* agent and should never be
-#: mirrored, even when the workspace happens to contain them.  ``~/.humanize``
-#: is humanize's own home, which holds the providers a turn may be run as: those
-#: credentials belong to this machine, never to the one the work lands on.
 COMMON_STATE_PATHS: tuple[str, ...] = (
     "~/.humanize",
     "~/.cache/humanize",
@@ -112,7 +100,6 @@ COMMON_STATE_PATHS: tuple[str, ...] = (
 )
 
 _CODEX_VENDOR_BIN = os.path.join("vendor", "x86_64-unknown-linux-musl", "bin")
-
 
 @dataclass(slots=True)
 class ResolvedAgent:
@@ -124,16 +111,13 @@ class ResolvedAgent:
     local_paths: list[str] = field(default_factory=list[str])
     local_programs: list[str] = field(default_factory=list[str])
 
-
 def profile_for(name: str) -> AgentProfile:
     """Return the known profile for ``name``, or a permissive generic one."""
     basename = os.path.basename(name)
-    # The Python SDK launches this bundled executable directly rather than through the
-    # `dsh` CLI, but it owns the same durable session state.
+
     if basename.startswith("dsh-jsonrpc-agent-"):
         return _BY_NAME["dsh"]
     return _BY_NAME.get(basename, AgentProfile(name=basename))
-
 
 def resolve(command: list[str]) -> ResolvedAgent:
     """Locate the agent named by ``command`` and classify its own files.
@@ -153,14 +137,7 @@ def resolve(command: list[str]) -> ResolvedAgent:
     local_paths = [
         _expand(path) for path in (*profile.state_paths, *COMMON_STATE_PATHS)
     ]
-    # Only the agent's own runtime stays here. Work helpers such as ripgrep
-    # deliberately go to the target: running them against the partly materialised
-    # mirror would return quietly wrong answers, which is worse than a visible failure.
-    # A program the agent keeps in its own state directory is its own runtime, not a helper
-    # for the work: grok installs its native binary under `~/.grok/bin` and re-execs it, and
-    # sending that to the target sends the agent there with it. Those directories are
-    # already answered from this machine as paths; this is the same claim about executing
-    # them.
+
     local_programs = [
         located,
         program,
@@ -181,10 +158,8 @@ def resolve(command: list[str]) -> ResolvedAgent:
         local_programs=sorted({path for path in local_programs if path}),
     )
 
-
 def _expand(path: str) -> str:
     return os.path.normpath(os.path.expanduser(path))
-
 
 def _shebang(program: str) -> tuple[str, ...]:
     """Return the command naming a script's interpreter."""
@@ -196,7 +171,6 @@ def _shebang(program: str) -> tuple[str, ...]:
     if not first.startswith(b"#!"):
         return ()
     return tuple(first[2:].decode("utf-8", "replace").strip().split())
-
 
 def _interpreter(shebang: tuple[str, ...]) -> list[str]:
     """Every path an ``#!/usr/bin/env NAME`` line could reach its interpreter at.
@@ -223,8 +197,7 @@ def _interpreter(shebang: tuple[str, ...]) -> list[str]:
         return []
     words: list[str] = []
     for word in shebang[1:]:
-        # `env -S "node --flag"` carries the whole command in one word, and
-        # `env NAME=VALUE prog` sets variables before naming one.
+
         words.extend(word.split())
     name = next(
         (word for word in words if not word.startswith("-") and "=" not in word), ""
@@ -242,7 +215,6 @@ def _interpreter(shebang: tuple[str, ...]) -> list[str]:
     if resolved:
         found.extend((os.path.abspath(resolved), os.path.realpath(resolved)))
     return found
-
 
 def _codex_runtime_programs(program: str, shebang: tuple[str, ...]) -> list[str]:
     """Return the Node, native CLI and code-mode host that implement Codex."""

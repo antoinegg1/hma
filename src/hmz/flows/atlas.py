@@ -89,32 +89,16 @@ __all__ = [
     "told",
 ]
 
-#: What a node reads when it is handed one of the run's agents rather than a value: the
-#: agents are what the run was started with rather than anything a node answered, so they
-#: are named where a node id would be. Not an identifier, so nothing an atlas can write
-#: collides with it.
 AGENTS = "@agents"
 
-#: And what it reads when it is handed the flow's own input -- the task a command line gave,
-#: or the shape a supernode was called with.
 INPUT = "@input"
 
-#: And what it reads when it is handed what the run was set up with, for an atlas that says
-#: it takes a config.
 CONFIG = "@config"
 
-#: What a node is: a turn taken by an agent, a Python function, or a whole atlas of its own.
-#: The first two are what a prophecy is made of, and the third is what one prophecy is made of
-#: another by, which is what a supernode is.
 type Kind = Literal["mind", "logic", "atlas"]
 
-#: Where a marked node keeps what its mark said, and where an atlas keeps that it is one. On
-#: the function rather than in a table, for the reason `flow` puts it there: a file is read
-#: by running it, and a mark that travels with the thing it describes is a mark there is only
-#: one place to look for.
 MARKED = "__humanize_node__"
 ATLAS = "__humanize_atlas__"
-
 
 @dataclass(frozen=True, slots=True)
 class Atlas:
@@ -132,7 +116,6 @@ class Atlas:
 
     name: str = ""
 
-
 @dataclass(frozen=True, slots=True)
 class Marked:
     """What `mind` or `logic` marked a function with.
@@ -149,7 +132,6 @@ class Marked:
 
     kind: Kind
     rerun: bool = True
-
 
 @dataclass(frozen=True, slots=True)
 class Sub:
@@ -170,7 +152,7 @@ class Sub:
 
     named: str
 
-    def __call__(self, *args: object, **kwargs: object) -> object:  # noqa: ARG002
+    def __call__(self, *args: object, **kwargs: object) -> object:  
         """Refuses: an atlas's body is compiled, and the prophecy is what runs.
 
         Args:
@@ -185,7 +167,6 @@ class Sub:
             f"{self.named} is a supernode: an atlas's body is compiled rather than run, "
             "so nothing calls this outside the prophecy it was read into"
         )
-
 
 def sub(named: str) -> Sub:
     """Names the atlas one supernode is, for a body to call it by.
@@ -204,16 +185,13 @@ def sub(named: str) -> Sub:
     """
     return Sub(named)
 
-
 @overload
 def mind[**P, T](call: Callable[P, T], /) -> Callable[P, T]: ...
-
 
 @overload
 def mind[**P, T](
     *, rerun: bool = True
 ) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
-
 
 def mind[**P, T](
     call: Callable[P, T] | None = None, /, *, rerun: bool = True
@@ -241,16 +219,13 @@ def mind[**P, T](
     """
     return _noded("mind", call, rerun=rerun)
 
-
 @overload
 def logic[**P, T](call: Callable[P, T], /) -> Callable[P, T]: ...
-
 
 @overload
 def logic[**P, T](
     *, rerun: bool = True
 ) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
-
 
 def logic[**P, T](
     call: Callable[P, T] | None = None, /, *, rerun: bool = True
@@ -277,7 +252,6 @@ def logic[**P, T](
     """
     return _noded("logic", call, rerun=rerun)
 
-
 def _noded[**P, T](
     kind: Kind, call: Callable[P, T] | None, *, rerun: bool
 ) -> Callable[P, T] | Callable[[Callable[P, T]], Callable[P, T]]:
@@ -302,10 +276,8 @@ def _noded[**P, T](
 
     return marks if call is None else marks(call)
 
-
 @overload
 def atlas[**P, T](call: Callable[P, T], /) -> Callable[P, T]: ...
-
 
 @overload
 def atlas[**P, T](
@@ -315,7 +287,6 @@ def atlas[**P, T](
     skills: Iterable[str] = (),
     selectable: bool = True,
 ) -> Callable[[Callable[P, T]], Callable[P, T]]: ...
-
 
 def atlas[**P, T](
     call: Callable[P, T] | None = None,
@@ -379,12 +350,6 @@ def atlas[**P, T](
 
     return marks if call is None else marks(call)
 
-
-# ---------------------------------------------------------------------------------------
-# The prophecy itself: what an atlas compiles to, and what a run of one walks.
-# ---------------------------------------------------------------------------------------
-
-
 class Field(NamedTuple):
     """One field of one shape, as the compiling read it off the model that declares it.
 
@@ -399,7 +364,6 @@ class Field(NamedTuple):
     shape: str
     required: bool
 
-
 class Shape(NamedTuple):
     """One thing that may flow along an edge, read off the atlas's own files.
 
@@ -411,7 +375,6 @@ class Shape(NamedTuple):
 
     name: str
     fields: tuple[Field, ...] = ()
-
 
 class Reads(NamedTuple):
     """Where one of a node's arguments comes from.
@@ -430,7 +393,6 @@ class Reads(NamedTuple):
     reads: str
     field: str = ""
 
-
 class When(NamedTuple):
     """What has to hold for one edge to be the way out that is taken.
 
@@ -443,7 +405,6 @@ class When(NamedTuple):
     reads: str
     field: str
     truth: bool
-
 
 class Node(NamedTuple):
     """One node of a prophecy: one call site of the body it was compiled from.
@@ -477,7 +438,6 @@ class Node(NamedTuple):
     rerun: bool = True
     under: str = ""
 
-
 class Edge(NamedTuple):
     """One way from one node to the next.
 
@@ -495,7 +455,6 @@ class Edge(NamedTuple):
     into: str
     when: When | None = None
     answers: str = ""
-
 
 class Prophecy(NamedTuple):
     """One atlas, compiled: the whole of what a run of it will do.
@@ -560,7 +519,6 @@ class Prophecy(NamedTuple):
         """
         return next((one for one in self.prophecies if one.name == named), None)
 
-
 def canonical(prophecy: Prophecy) -> str:
     """One prophecy as the text two readings of the same atlas both answer with.
 
@@ -579,7 +537,6 @@ def canonical(prophecy: Prophecy) -> str:
     import json
 
     return json.dumps(_written(prophecy), sort_keys=True, ensure_ascii=False)
-
 
 def _written(prophecy: Prophecy) -> dict[str, Any]:
     """One prophecy as the plain objects :func:`canonical` writes out.
@@ -607,17 +564,11 @@ def _written(prophecy: Prophecy) -> dict[str, Any]:
         ],
     }
 
-
 def _ordered(edge: Edge) -> tuple[str, str, tuple[str, str, bool], str]:
     """One edge as something two of them can be sorted by, an absent guard and all."""
     return (edge.out_of, edge.into, edge.when or ("", "", False), edge.answers)
 
-
-#: What a shipped prophecy is written with. Fixed rather than highest, so that the same
-#: prophecy written by two installations is the same bytes -- a flowverse ships one, and a
-#: file whose contents moved under a Python upgrade is a file every checkout re-writes.
 _PROTOCOL = 5
-
 
 def kept(prophecy: Prophecy) -> bytes:
     """One prophecy as the bytes a flowverse ships beside the atlas it compiled.
@@ -632,13 +583,7 @@ def kept(prophecy: Prophecy) -> bytes:
 
     return pickle.dumps(prophecy, protocol=_PROTOCOL)
 
-
-#: The only classes a shipped prophecy is allowed to name. A pickle says which class to
-#: build as it goes, and the reader that took it at its word would run whatever the file
-#: asked for -- which the static reading of a flow, whose whole promise is that it executes
-#: nothing, must not do for a file it found in a directory it was pointed at.
 _SHAPES = frozenset({"Edge", "Field", "Node", "Prophecy", "Reads", "Shape", "When"})
-
 
 def told(said: bytes) -> Prophecy | None:
     """One shipped prophecy read back, or None where those bytes are not one.
@@ -684,19 +629,16 @@ def told(said: bytes) -> Prophecy | None:
 
     try:
         held = _Only(io.BytesIO(said)).load()
-    except Exception:  # noqa: BLE001 -- anything a pickle raises is a file that is not one
+    except Exception:  
         return None
     if not isinstance(held, Prophecy):
         return None
     try:
         canonical(held)
     except (AttributeError, TypeError, ValueError):
-        # A named tuple of the right class holding the wrong things: written by a humanize
-        # whose nodes had another shape, which is a prophecy to compile again rather than
-        # one to walk.
+
         return None
     return held
-
 
 class Shipped(NamedTuple):
     """What one flow's own directory ships beside its entry point.
@@ -710,7 +652,6 @@ class Shipped(NamedTuple):
 
     at: Path
     prophecy: Prophecy | None
-
 
 def shipped(under: str | os.PathLike[str]) -> Shipped | None:
     """The prophecy one flow's own directory ships, where it ships one.
@@ -733,7 +674,6 @@ def shipped(under: str | os.PathLike[str]) -> Shipped | None:
     if not at.is_file():
         return None
     return Shipped(at, told(at.read_bytes()))
-
 
 def digest(prophecy: Prophecy) -> str:
     """What one compiled atlas is, in sixteen characters.

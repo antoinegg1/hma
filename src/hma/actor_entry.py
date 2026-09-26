@@ -1,4 +1,4 @@
-"""Container-local fail-closed watchdog; no model work is performed here."""
+'Container-local fail-closed watchdog; no model work is performed here.'
 
 from __future__ import annotations
 
@@ -12,9 +12,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-
 def status(route: dict[str, Any]) -> dict[str, Any]:
-    """Fetch this session's count only, never scores or protected admin state."""
+    "Fetch this session's count only, never scores or protected admin state."
     connection = http.client.HTTPConnection(route["host"], route["port"], timeout=1)
     try:
         connection.request(
@@ -28,9 +27,8 @@ def status(route: dict[str, Any]) -> dict[str, Any]:
     finally:
         connection.close()
 
-
 def supervise(command: list[str], route: dict[str, Any]) -> int:
-    """Exit the container entry process on quota, timeout, or lost admission."""
+    'Exit the container entry process on quota, timeout, or lost admission.'
     remaining = route["deadline_epoch"] - time.time()
     if remaining <= 0:
         return 0
@@ -61,9 +59,6 @@ def supervise(command: list[str], route: dict[str, Any]) -> int:
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=1)
-        # Docker tears down remaining processes when this entry process exits,
-        # including training grandchildren that created independent sessions.
-
 
 def main() -> None:
     command = sys.argv[1:]
@@ -71,7 +66,7 @@ def main() -> None:
         command = command[1:]
     if not command:
         raise ValueError("missing actor command")
-    route = json.loads(Path("/run/submit3/route.json").read_text())
+    route = json.loads(Path("/run/hma/route.json").read_text())
     if token := os.environ.pop("CODEX_ACCESS_TOKEN", None):
         login = subprocess.run(
             ["codex", "login", "--with-access-token"],
@@ -85,7 +80,7 @@ def main() -> None:
             raise RuntimeError("Codex authentication bootstrap failed")
     proxy = None
     if os.environ.get("KIMI_MODEL_API_KEY"):
-        from wuwen_proxy import _PLACEHOLDER_KEY, _Proxy
+        from provider_proxy import _PLACEHOLDER_KEY, _Proxy
 
         proxy = _Proxy(
             os.environ["KIMI_MODEL_BASE_URL"], os.environ["KIMI_MODEL_API_KEY"]
@@ -101,7 +96,6 @@ def main() -> None:
         if proxy:
             proxy.shutdown()
             proxy.server_close()
-
 
 if __name__ == "__main__":
     main()

@@ -39,26 +39,14 @@ if TYPE_CHECKING:
 
 __all__ = ["HumanAgent", "HumanSession"]
 
-#: How many times a field is put again once what was typed is not what it takes. The first
-#: ask and two corrections: somebody told twice what is wrong who types a third wrong thing
-#: is somebody who is not going to fill this in, and a flow must not wait on them forever.
 _TRIES = 3
 
-#: What a switch is offered as. Both are words pydantic reads back as a boolean, so what is
-#: shown is also what is answered -- there is no second spelling of `yes` for this to get
-#: wrong.
 _YES, _NO = "yes", "no"
 
-#: What is typed to leave a field at what the flow declared it as. A word rather than an empty
-#: answer, because an empty answer is how every prompt here says nobody answered -- and a dash
-#: is short, is on every keyboard, and is nobody's idea of a value.
 _LEAVE = "-"
 
-#: What is said about a field the model will take more than one of, and about one that takes
-#: a number, where the options do not already say. A field with options needs neither.
 _SEVERAL = " (several, separated by commas)"
 _NUMBER = " (a number)"
-
 
 def _says(value: object) -> str:
     """One default, as a person is told it.
@@ -73,7 +61,6 @@ def _says(value: object) -> str:
     if isinstance(value, bool):
         return _YES if value else _NO
     return "nothing" if value in ("", None) else str(value)
-
 
 def _listed(kind: object) -> bool:
     """Whether a field takes several answers rather than one.
@@ -90,7 +77,6 @@ def _listed(kind: object) -> bool:
             return True
     return False
 
-
 def _options(field: FieldInfo) -> tuple[str, ...]:
     """The answers a field will take, where they are a fixed few.
 
@@ -102,15 +88,13 @@ def _options(field: FieldInfo) -> tuple[str, ...]:
       and nothing at all for a field that is written rather than chosen.
     """
     kind = field.annotation
-    # `Literal["a", "b"] | None` and `Literal["a", "b"]` offer the same few answers, so the
-    # union is unwrapped before the literal is read off it.
+
     for said in (kind, *get_args(kind)):
         if get_origin(said) is Literal:
             return tuple(str(one) for one in get_args(said))
     if kind is bool:
         return (_YES, _NO)
     return ()
-
 
 def _asking(name: str, field: FieldInfo, about: str = "") -> Question:
     """One field, as the question a person is put.
@@ -140,7 +124,6 @@ def _asking(name: str, field: FieldInfo, about: str = "") -> Question:
         text=f"{about}\n\n{said}{hint}" if about else said + hint, options=offered
     )
 
-
 def _read(schema: type[BaseModel], answers: dict[str, str]) -> dict[str, Any]:
     """What was typed, as the fields the model is to read.
 
@@ -165,7 +148,6 @@ def _read(schema: type[BaseModel], answers: dict[str, str]) -> dict[str, Any]:
             else said
         )
     return read
-
 
 class HumanSession(SessionBase):
     """One conversation with the person: said to, and answered when they answer."""
@@ -225,7 +207,7 @@ class HumanSession(SessionBase):
             said = self._agent.asked(_asking(name, field, about))
             if said is None:
                 return (
-                    ""  # nobody there, or they have gone: there is no answer to build
+                    ""  
                 )
             about = ""
             self._answered(schema, answers, name, said)
@@ -237,8 +219,7 @@ class HumanSession(SessionBase):
                     where = wrong.get("loc") or ()
                     named = str(where[0]) if where else ""
                     if named not in schema.model_fields:
-                        # The model refused the answers together rather than one of them --
-                        # a rule of the flow's own. There is no field to put back.
+
                         return ""
                     said = self._agent.asked(
                         _asking(named, schema.model_fields[named], str(wrong["msg"]))
@@ -284,7 +265,6 @@ class HumanSession(SessionBase):
         """
         yield from self.stream(prompt, schema=schema)
 
-
 class HumanAgent(AgentBase):
     """Whoever is at the prompt, said to as an agent and answering as one.
 
@@ -295,9 +275,6 @@ class HumanAgent(AgentBase):
     returns, rather than waiting on somebody who is not there.
     """
 
-    #: None. A moment is a point in a turn of a model, and the person takes no such turn:
-    #: there is no tool to be told about, nothing to send them on from, and a prompt that
-    #: refused them would be an interface refusing what was typed at it.
     moments: ClassVar[frozenset[Moment]] = frozenset()
 
     def __init__(self, *, name: str = "human") -> None:
@@ -308,10 +285,7 @@ class HumanAgent(AgentBase):
             for any other.
         """
         super().__init__(AgentConfig(model="human", effort=""), name=name)
-        #: The board this person and the flow both write on, which is the other half of
-        #: talking to them: a question stops the turn until it is answered, and this stops
-        #: nothing at all. Theirs rather than the flow's because the flow is a function that
-        #: returns and the board outlives any one turn of it.
+
         self._board = Board()
 
     @property
@@ -326,7 +300,7 @@ class HumanAgent(AgentBase):
         """
         return self._board
 
-    def _remade(self, config: AgentConfig, name: str | None) -> HumanAgent:  # noqa: ARG002
+    def _remade(self, config: AgentConfig, name: str | None) -> HumanAgent:  
         """Another person, which is the same person: they are made rather than configured.
 
         Args:

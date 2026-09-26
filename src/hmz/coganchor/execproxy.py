@@ -37,12 +37,9 @@ __all__ = ["ExecProxy", "ExecResult"]
 
 log = logging.getLogger(__name__)
 
-#: How often the stdin pump re-checks whether the command has finished.
 _STDIN_POLL = 0.2
 
-#: Warn once this many undelivered output chunks have piled up.
 _BACKLOG_WARN_CHUNKS = 1024
-
 
 @dataclass(slots=True)
 class ExecResult:
@@ -57,7 +54,6 @@ class ExecResult:
         if self.signal is not None:
             return 128 + self.signal
         return self.exit_code if self.exit_code is not None else 1
-
 
 class ExecProxy:
     """Bridges one stalled tracee to one command running on the target."""
@@ -93,8 +89,6 @@ class ExecProxy:
         self._forwarded: set[int] = set()
         self._warned_about_backlog = False
         self._stdin_thread: threading.Thread | None = None
-
-    # ------------------------------------------------------------------ startup
 
     def start(self) -> None:
         """Launch the command, then start pumping its I/O.
@@ -138,8 +132,6 @@ class ExecProxy:
         self._stop.set()
         self._outbox.put(None)
 
-    # ------------------------------------------------------- remote callbacks
-
     def _on_output(self, stream: Stream, data: bytes) -> None:
         self._outbox.put((stream, data))
         if (
@@ -165,10 +157,8 @@ class ExecProxy:
     def _report_failure(self, error: OSError) -> None:
         message = f"hmz: {' '.join(self._argv[:1]) or 'command'}: {error.strerror}\n"
         self._outbox.put((Stream.STDERR, message.encode()))
-        # 126/127 match the shell's "found but not executable" / "not found".
+        
         self._result = ExecResult(exit_code=127 if error.errno == errno.ENOENT else 126)
-
-    # ------------------------------------------------------------------- pumps
 
     def _pump_output(self) -> None:
         """Write remote output into the tracee's own descriptors, then finish."""
@@ -180,8 +170,7 @@ class ExecProxy:
                 if fd >= 0:
                     _write_all(fd, data)
         finally:
-            # Stop and join the stdin pump before closing the borrowed
-            # descriptors, or their numbers could be reused underneath it.
+
             self._stop.set()
             if self._stdin_thread is not None:
                 self._stdin_thread.join(timeout=_STDIN_POLL * 5)
@@ -214,7 +203,7 @@ class ExecProxy:
                 try:
                     handle.send_stdin(data)
                 except OSError:
-                    break  # the target is gone; the exit path reports it
+                    break  
         finally:
             if selector is not None:
                 selector.close()
@@ -228,12 +217,10 @@ class ExecProxy:
                 with suppress(OSError):
                     os.close(fd)
 
-
 def _spawn(target: Callable[[], None], name: str) -> threading.Thread:
     thread = threading.Thread(target=target, name=name, daemon=True)
     thread.start()
     return thread
-
 
 def _window_size(fd: int) -> tuple[int, int] | None:
     """Rows and columns of the terminal on ``fd``.
@@ -248,7 +235,6 @@ def _window_size(fd: int) -> tuple[int, int] | None:
     rows, columns = struct.unpack("HHHH", packed)[:2]
     return (rows, columns) if rows and columns else None
 
-
 def _pollable(fd: int) -> selectors.BaseSelector | None:
     """Return a selector watching ``fd``, or ``None`` if it cannot be polled."""
     selector = selectors.DefaultSelector()
@@ -258,7 +244,6 @@ def _pollable(fd: int) -> selectors.BaseSelector | None:
         selector.close()
         return None
     return selector
-
 
 def _write_all(fd: int, data: bytes) -> None:
     view = memoryview(data)

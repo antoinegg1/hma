@@ -30,39 +30,23 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-#: The version of the protocol this speaks, as an integer. Sent on the way in; an agent that
-#: answers with another is answering about itself, not refusing.
 _VERSION = 1
 
-#: What this client can do, which is nothing beyond being talked to. A client that says it
-#: reads files or holds terminals is a client the agent will ask to do those things, and the
-#: agent already has a machine of its own to do them on. Saying so keeps the only inbound
-#: request `session/request_permission`.
 _CAPABILITIES = {
     "fs": {"readTextFile": False, "writeTextFile": False},
     "terminal": False,
 }
 
-#: How a tool call is permitted, best first. The kind rather than the id: an id is the agent's
-#: own word -- one calls it `proceed_once`, another `allow-once` -- and a client that matched
-#: on those would work with the agent it was written against and no other.
 _GRANTS = ("allow_always", "allow_once")
 
-#: What each thing said in a turn reads as, by the name ACP gives that kind of update.
 _SAYS = {"agent_message_chunk": "text", "agent_thought_chunk": "reasoning"}
 
-#: The reasons a turn can end. The first two are a turn that answered; the rest are one that
-#: did not, and a flow told otherwise would be running on an answer nobody gave.
 _ANSWERED = ("end_turn", "max_tokens")
 
-#: What ACP says a backend runs and how hard it thinks, which is nothing at all. One of each
-#: is offered so that an agent can be configured; both are the agent's own to know.
 UNSAID = "as configured"
 
-
-class _Stopped(Exception):  # noqa: N818 -- not an error of ours: the agent went away
+class _Stopped(Exception):  
     """The agent went away while something was waiting on it."""
-
 
 @dataclass
 class AcpConnection:
@@ -76,8 +60,7 @@ class AcpConnection:
     environ: dict[str, str] | None = None
     cwd: str | None = None
     proc: subprocess.Popen[str] | None = None
-    #: What each request is waiting for, by the id it was sent under, and the lock that keeps
-    #: two threads from writing half a line each.
+
     answers: dict[int, Any] = field(default_factory=dict[int, Any])
     landed: threading.Condition = field(default_factory=threading.Condition)
     writing: threading.Lock = field(default_factory=threading.Lock)
@@ -156,8 +139,7 @@ class AcpConnection:
         if proc is None or proc.stdin is None:
             raise _Stopped("the agent is not running")
         try:
-            # Compact and on one line: the framing is the newline, so a message written with
-            # any in it would be read as several.
+
             proc.stdin.write(json.dumps(message) + "\n")
             proc.stdin.flush()
         except (OSError, ValueError) as gone:
@@ -174,7 +156,7 @@ class AcpConnection:
             try:
                 said: object = json.loads(line)
             except ValueError:
-                continue  # a line of something else, which stdout should not carry
+                continue  
             if isinstance(said, dict):
                 return cast("dict[str, Any]", said)
         return None
@@ -199,8 +181,7 @@ class AcpConnection:
             if proc.stderr is not None:
                 proc.stderr.close()
 
-
-class contextlib_suppress:  # noqa: N801 -- a tiny stand-in, kept local
+class contextlib_suppress:  
     """Swallows the errors a descriptor being closed twice raises."""
 
     def __enter__(self) -> None:
@@ -209,7 +190,6 @@ class contextlib_suppress:  # noqa: N801 -- a tiny stand-in, kept local
     def __exit__(self, kind: object, value: object, traceback: object) -> bool:
         return isinstance(value, (OSError, ValueError))
 
-
 class AcpSession(SessionBase):
     """One ACP conversation, held open on the agent this client spawned.
 
@@ -217,8 +197,6 @@ class AcpSession(SessionBase):
     as it is asked for, so the agent stays up between them rather than being run again.
     """
 
-    #: The protocol has no way of holding a turn to a shape, so one asked for is asked for in
-    #: the prompt, as it is for every other backend without a setting for it.
     shapes: ClassVar[bool] = False
 
     def __init__(
@@ -244,8 +222,7 @@ class AcpSession(SessionBase):
             protocol, or refuses to open a session.
         """
         if self._link is not None and self.elsewhere():
-            # Started as an account this agent has since left: ended here, on the thread that
-            # holds it, so that the next turn opens one as whoever the agent now is.
+
             self._shut()
         if self._link is not None:
             return self._link
@@ -275,9 +252,9 @@ class AcpSession(SessionBase):
                 link.send(
                     "session/new",
                     {
-                        # Absolute, which the protocol requires, and the one the session works in.
+                        
                         "cwd": self._workspace(),
-                        # Required even when there are none of them.
+                        
                         "mcpServers": [],
                     },
                 ),
@@ -311,7 +288,7 @@ class AcpSession(SessionBase):
           ValueError: If it answered with an error.
         """
         for event in self._serving(link, at):
-            del event  # nothing is shown from here: the turn is what is watched
+            del event  
         answered = link.answers.pop(at)
         if isinstance(answered, Exception):
             raise answered
@@ -339,7 +316,7 @@ class AcpSession(SessionBase):
                 yield from self._asked(link, message)
                 continue
             if message.get("id") != at:
-                continue  # an answer to something else, which nothing here is waiting on
+                continue  
             if (failed := message.get("error")) is not None:
                 link.answers[at] = ValueError(json.dumps(failed))
             else:
@@ -362,12 +339,11 @@ class AcpSession(SessionBase):
             yield from self._told(cast("dict[str, Any]", params.get("update") or {}))
             return
         if "id" not in message:
-            return  # a notification of some other kind: nothing to answer, nothing to show
+            return  
         if method == "session/request_permission":
             link.reply(message["id"], {"outcome": self._permits(params)})
             return
-        # Everything else is a thing this client said it could not do, and an agent asking
-        # anyway is told so in the protocol's own words rather than left waiting.
+
         link.refuse(message["id"], f"{method} is not offered")
 
     def _permits(self, params: dict[str, Any]) -> dict[str, Any]:
@@ -389,8 +365,7 @@ class AcpSession(SessionBase):
             for one in offered:
                 if one.get("kind") == kind:
                     return {"outcome": "selected", "optionId": str(one.get("optionId"))}
-        # Nothing that grants it: the turn is not ours to hang, so it is answered rather than
-        # left, and the agent decides what a refusal means to it.
+
         if offered:
             return {"outcome": "selected", "optionId": str(offered[0].get("optionId"))}
         return {"outcome": "cancelled"}
@@ -490,7 +465,6 @@ class AcpSession(SessionBase):
         if link is not None:
             link.stop()
 
-
 @dataclass(frozen=True, kw_only=True)
 class AcpAgentConfig(AgentConfig):
     """What an ACP agent is configured with, which is which CLI it is and little else.
@@ -502,7 +476,6 @@ class AcpAgentConfig(AgentConfig):
 
     cli: str = ""
     command: tuple[str, ...] = ()
-
 
 class AcpAgent(AgentBase):
     """A CLI of your own that speaks the Agent Client Protocol."""

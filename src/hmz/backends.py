@@ -46,7 +46,6 @@ __all__ = [
     "speaking",
 ]
 
-
 @dataclass(frozen=True, slots=True)
 class Asked:
     """One thing a person has to say for a way in to be usable.
@@ -69,7 +68,6 @@ class Asked:
     secret: bool = False
     keep: bool = True
     fixed: str = ""
-
 
 @dataclass(frozen=True, slots=True)
 class Way:
@@ -104,7 +102,6 @@ class Way:
     args: tuple[str, ...] = ()
     stdin: str = ""
 
-
 @dataclass(frozen=True, slots=True)
 class Model:
     """One model a backend runs, and the efforts it runs at.
@@ -126,7 +123,6 @@ class Model:
     name: str
     efforts: tuple[str, ...]
     swarms: bool = False
-
 
 @dataclass(frozen=True, slots=True)
 class Profile:
@@ -320,114 +316,57 @@ class Profile:
                 held.append((str(self.directory() / said), f"home/{said}"))
         return tuple(held)
 
-
-#: What Claude Code documents on its own command line, for every model it runs, and above them
-#: the one it does not document but takes: `ultracode` is `xhigh` with the turn opted into
-#: orchestrating a fleet of its own, which is more work than any single-agent effort and so is
-#: the top of this list. Hardest first, as every effort here is: the one to reach for is the
-#: one at the top.
 _CLAUDE = ("ultracode", "max", "xhigh", "high", "medium", "low")
 
-#: What codex calls its reasoning levels. Which of them a model takes differs across its
-#: models, and codex says which where it says what it runs.
 _CODEX = ("ultra", "max", "xhigh", "high", "medium", "low")
 
-#: What Kimi Code calls its thinking levels. It says which its models take too, and they
-#: differ: this is the ladder, not a promise that every model has every rung.
 _KIMI = ("max", "high", "medium", "low")
 
-#: What pi calls its thinking levels, hardest first. `off` is the model asked not to think at
-#: all, which is an effort like any other here: it is the least of them, not the absence of a
-#: setting.
 _PI = ("max", "xhigh", "high", "medium", "low", "minimal", "off")
 
-#: What the official DeepSeek adapter in DeepSeek Harness calls its reasoning levels.
 _DSH = ("max", "high", "off")
 
-#: What Grok Build calls its reasoning levels, hardest first, which is what it says when it
-#: is given one it has not got: `unknown effort level; use one of: xhigh, high, medium, low`.
-#: Written as it enumerates them rather than as the fuller ladders beside it: a rung it
-#: refuses is a turn that never starts, and it refuses one before it does anything else.
 _GROK = ("xhigh", "high", "medium", "low")
 
-#: What Qwen Code calls its reasoning levels, hardest first. It has no flag for them -- they
-#: are a setting of its own `settings.json`, which is why a turn is pointed at one of ours.
 _QWEN = ("max", "xhigh", "high", "medium", "low")
 
-#: What opencode and mimocode call a reasoning effort: a variant of the model, given as
-#: `--variant`, and provider-specific. These are the ones the models they front take; a
-#: provider with no variants of its own takes the flag and ignores it.
 _VARIANTS = ("xhigh", "high", "medium", "low", "minimal")
 
-#: What a gateway is asked for, whichever backend is being pointed at one: where it is and
-#: what it takes. Written once because it is one question -- an endpoint speaking a vendor's
-#: protocol is the same arrangement whoever is dialling it.
 _GATEWAY = (
     "an endpoint speaking this CLI's own protocol -- a proxy, a router, another vendor"
 )
 
-#: What Antigravity CLI calls its reasoning levels, hardest first.
 _AGY = ("high", "medium", "low")
 
-#: What Cursor calls a reasoning effort, hardest first. Not a flag of its own: its models are
-#: parameterized, and how hard one thinks is written into the model it is asked for, as
-#: `claude-opus-4-8[effort=high]` -- which is the spelling its own command line documents. The
-#: three rungs are the ones its model list names, where a variant of a model carries the rung
-#: in its name: `gpt-5-high`, `gpt-5-low-fast`, and the ones it says run at a fixed medium.
 _CURSOR = ("high", "medium", "low")
 
-#: What ZCode calls a thought level, hardest first. Two ladders rather than one, because its
-#: models have two: the ones that take a budget are asked for `max`, `high` or `low`, and the
-#: ones that only take thinking or no thinking are asked for `enabled` or `disabled`. `nothink`
-#: is what the first kind calls the bottom of its own. They are one list here because a
-#: backend's efforts are one list, and a model narrows it to the rungs it answered with.
 _ZCODE = ("max", "high", "low", "enabled", "nothink", "disabled")
 
-#: Every backend humanize drives, as each of them reported itself. Codex says which efforts
-#: each of its models takes and they differ, so they are written down as it gave them.
 PROFILES = (
     Profile(
         name="claude",
-        # `WebSearch` and `WebFetch` are tools like any other to Claude, and
-        # `--disallowedTools` is the flag that takes a tool away.
+
         searches=True,
         aliases=("claude", "claude-code"),
         home_var="CLAUDE_CONFIG_DIR",
         home_dir=".claude",
         logs=("projects/*/{ident}.jsonl", "projects/*/{ident}/subagents/**/*.jsonl"),
         efforts=_CLAUDE,
-        # `ultracode` is real and undocumented, so the catalogue Claude Code answers with
-        # will never name it: a model asked about keeps it whatever that list says.
+
         beyond=("ultracode",),
-        # The skills a person installs, which is what there is to choose between: the ones
-        # Claude ships with and the ones a plugin brought are the plugin's to say. Its own
-        # two directories and no more -- it does not read the shared one, which is why a
-        # skill kept there is symlinked into this. A turn is told which of these it may not
-        # reach for, as `Skill(<name>)`.
+
         skills=("skills/*/SKILL.md",),
         works=(".claude/skills/*/SKILL.md",),
-        # Where a flow's own skills go for the length of a session: the directory Claude
-        # reads a project's skills out of, which is the one place a skill can be given to it
-        # without touching what the person at this machine has installed.
+
         mounts=".claude/skills",
-        # Three places, and the last of them is the one people forget: the session lives in
-        # `.credentials.json`, the account it belongs to -- with the API key a run was
-        # approved for beside it -- lives in `.claude.json`, which sits outside the home
-        # directory until `CLAUDE_CONFIG_DIR` moves it inside, and the account Claude shares
-        # with the vendor's other programs lives under `XDG_CONFIG_HOME`, which neither of
-        # those moves. Both spellings of the second, so that a provider works whether or not
-        # the home has been moved; and the third because a machine signed in there and
-        # nowhere else would answer every provider's turns with its own account.
+
         creds=(
             ".credentials.json",
             ".claude.json",
             "~/.claude.json",
             "config/anthropic",
         ),
-        # Everything else Claude Code would read an account out of: the two the ways already
-        # name are there too, through `accounts()`. `ANTHROPIC_CONFIG_DIR` is an account for
-        # the reason the others are -- it moves the shared configuration directory whole, and
-        # a turn that read one this table had never heard of would be the wrong account.
+
         ambient=(
             "ANTHROPIC_CONFIG_DIR",
             "ANTHROPIC_CUSTOM_HEADERS",
@@ -476,8 +415,7 @@ PROFILES = (
                         env="ANTHROPIC_BASE_URL",
                         about="where it is, as a URL",
                     ),
-                    # A bearer rather than a key: it is sent as `Authorization` and outranks
-                    # the key, and it is the one an endpoint of somebody else's takes.
+
                     Asked(
                         env="ANTHROPIC_AUTH_TOKEN",
                         about="the token it takes",
@@ -508,24 +446,15 @@ PROFILES = (
     Profile(
         name="agy",
         aliases=("agy", "antigravity"),
-        # Nothing moves it: no variable of its own, and neither `XDG_CONFIG_HOME` nor the
-        # names its siblings use are read. Only the home directory it is under, and a hidden
-        # flag. So there is no variable to name here, and `directory()` reads the one place.
+
         home_var="",
         home_dir=".gemini/antigravity-cli",
-        # None: a conversation here is rows of a SQLite database whose payloads are protobuf,
-        # so there is no log to read a run's cost out of as it is spent, and none to gather.
+
         logs=(),
         efforts=_AGY,
-        # One place: the `skills/` of its own home, which is the global customization root it
-        # loads whatever else it is doing. Its other root is `.agents` under the workspace,
-        # and that one is not listed -- a turn is run as `--print`, which opens no project,
-        # and a skill left there is a skill such a turn never sees. So nothing is mounted for
-        # it either: what reads as a skill this agent has is a skill this agent has.
+
         skills=("skills/*/SKILL.md",),
-        # What a sign-in leaves behind where there is no keyring to put it in -- a session on
-        # a machine with no desktop, which is where a flow runs. The keyring is the first
-        # choice and is not a path.
+
         creds=("antigravity-oauth-token",),
         ambient=(
             "AGY_ADC_AUTH",
@@ -538,8 +467,7 @@ PROFILES = (
             Way(
                 name="login",
                 about="sign in to a Google account, in a session opened for it",
-                # It signs in from inside itself, so the way in is agy with the terminal
-                # handed over: a headless turn then runs on what that left behind.
+
                 argv=("agy",),
             ),
             Way(
@@ -562,30 +490,22 @@ PROFILES = (
     ),
     Profile(
         name="codex",
-        # `tools.web_search` is a setting of the app server, and is sent in both
-        # directions: Codex searches nothing until it is asked to.
+
         searches=True,
         aliases=("codex",),
         home_var="CODEX_HOME",
         home_dir=".codex",
         logs=("sessions/**/rollout-*{ident}.jsonl",),
         efforts=_CODEX,
-        # Four places, which is what `skills/list` answers with: its own home, the shared
-        # one under yours, and both of the directories a project may keep them in. A turn is
-        # given the ones left on, as `skills.config` says which are off.
+
         skills=("skills/*/SKILL.md",),
         shared=(".agents/skills/*/SKILL.md",),
         works=(".agents/skills/*/SKILL.md", ".codex/skills/*/SKILL.md"),
-        # The shared one of its two, being the directory more than one of these CLIs has
-        # agreed to read: a flow's skill mounted there is one whichever of them is driving.
+
         mounts=".agents/skills",
-        # One file, whichever way it was signed into: the subscription's tokens and an API
-        # key land in the same place, under the mode that says which of them is in force.
+
         creds=("auth.json",),
-        # `CODEX_AUTHAPI_BASE_URL` is an account for the reason a key is: codex sends the
-        # credential it was signed in with to whatever it names, so a turn run under a
-        # provider with somebody's copy of it still exported would hand that provider's token
-        # to somebody's endpoint.
+
         ambient=("CODEX_API_KEY", "CODEX_AUTHAPI_BASE_URL", "OPENAI_BASE_URL"),
         ways=(
             Way(
@@ -602,8 +522,7 @@ PROFILES = (
                 name="key",
                 about="an OpenAI API key, which codex keeps in its own store",
                 argv=("codex", "login", "--with-api-key"),
-                # Read off stdin by the command, which writes it where it keeps its own: an
-                # environment holding a second copy would be a second place to leak it.
+
                 asks=(
                     Asked(
                         env="OPENAI_API_KEY",
@@ -642,8 +561,7 @@ PROFILES = (
                         fixed="chat",
                     ),
                 ),
-                # Codex takes a provider as settings rather than as variables, and `-c` is
-                # how a setting is given for one run without writing anybody's config file.
+
                 args=(
                     "-c",
                     "model_provider=humanize",
@@ -664,15 +582,10 @@ PROFILES = (
         aliases=("dsh", "deepseek-harness"),
         home_var="DSH_HOME",
         home_dir=".dsh",
-        # The Python SDK's bundled JSONL persistence groups sessions under one project
-        # directory. humanize's composition keeps these logs uncompressed so the running
-        # tally can read complete rows as they land.
+
         logs=("sessions/*/{ident}/session.jsonl",),
         efforts=_DSH,
-        # None, and not for want of looking: the `dsh` command line reads `.dsh/skills` and
-        # `.agents/skills`, but that is its web profile's own harness. What humanize drives is
-        # the Python SDK, which carries no skills at all -- so a list here would be of skills
-        # nothing in this session would ever load.
+
         ambient=("DEEPSEEK_API_KEY", "DEEPSEEK_BASE_URL"),
         ways=(
             Way(
@@ -684,23 +597,16 @@ PROFILES = (
     ),
     Profile(
         name="grok",
-        # `web_search` and `web_fetch` are the two Grok Build already names where a
-        # rung takes the reaching outside the workspace away.
+
         searches=True,
-        # `grokbuild` among them because that is what the class driving it is called, and an
-        # agent names its backend by its own class name.
+
         aliases=("grok", "grok-build", "grokbuild"),
         home_var="GROK_HOME",
         home_dir=".grok",
-        # A directory per session, under one per directory the work was done in: the id names
-        # the directory rather than a file, and `updates.jsonl` is the conversation itself --
-        # the others beside it are the plan, the rewind points and what it was told.
+
         logs=("sessions/*/{ident}/updates.jsonl",),
         efforts=_GROK,
-        # Eight places, which is what `grok inspect` answers with: its own home and the
-        # shared one under yours, both of the directories a project may keep them in, and
-        # the two other harnesses' directories it reads for compatibility -- at both tiers,
-        # and on by default, as its own `Harness Compatibility` says.
+
         skills=("skills/*/SKILL.md",),
         shared=(
             ".agents/skills/*/SKILL.md",
@@ -713,12 +619,9 @@ PROFILES = (
             ".claude/skills/*/SKILL.md",
             ".cursor/skills/*/SKILL.md",
         ),
-        # The shared one of the four, being the directory more than one of these CLIs has
-        # agreed to read: a skill mounted there is a skill Codex and Kimi read too.
+
         mounts=".agents/skills",
-        #
-        # Two files: the accounts it has signed into, keyed by the way each was signed in, and
-        # the tokens its MCP servers handed back, which are somebody else's and kept apart.
+
         creds=("auth.json", "mcp_credentials.json"),
         ambient=(
             "GROK_AUTH",
@@ -779,22 +682,14 @@ PROFILES = (
         home_dir=".kimi-code",
         logs=("server/events/{ident}.jsonl",),
         efforts=_KIMI,
-        # Every model Kimi runs takes a turn as a fleet as well as as one agent: `swarmmax`
-        # and `max` are the same thinking at two widths.
+
         swarms=True,
-        # Kimi Code discovers both its own and the shared skill directories without a command
-        # line flag, including for sessions served by `kimi web`. The shared project directory
-        # is also where a flow can mount one skill for Claude, Codex or Kimi without installing
-        # it into any of their homes.
+
         skills=("skills/*/SKILL.md",),
         shared=(".agents/skills/*/SKILL.md",),
         works=(".kimi-code/skills/*/SKILL.md", ".agents/skills/*/SKILL.md"),
         mounts=".agents/skills",
-        #
-        # A directory apiece: kimi keeps one file per endpoint it has signed into, named
-        # after that endpoint, and a lock beside it that two of its processes rotate a
-        # refresh token under. Both move together or a provider would refresh into the
-        # other one's token.
+
         creds=("credentials", "oauth"),
         ambient=(
             "KIMI_API_KEY",
@@ -814,8 +709,7 @@ PROFILES = (
             Way(
                 name="model",
                 about=_GATEWAY,
-                # Kimi builds a whole provider out of these and makes it the default, in
-                # memory: nothing is written to the config file it would otherwise be in.
+
                 asks=(
                     Asked(
                         env="KIMI_MODEL_NAME", about="the model to run, as it names it"
@@ -836,25 +730,13 @@ PROFILES = (
         aliases=("pi",),
         home_var="PI_CODING_AGENT_DIR",
         home_dir=".pi/agent",
-        # One file per session, named for the moment it opened and the id it was given, under
-        # a directory per workspace. The id is the tail of the name, so a glob on it finds the
-        # session whichever workspace it was opened in.
+
         logs=("sessions/*/*{ident}.jsonl",),
         efforts=_PI,
-        # Two places, and both are yours: the `skills/` of its own home, and the shared one
-        # under yours. Nothing under the workspace, though pi reads `.pi/skills` and
-        # `.agents/skills` there too -- those are gated on the project having been trusted,
-        # which is `--approve` and a person to press it, and a turn driven here is neither.
-        # So a flow's skills are not mounted for pi: they would be copied into a directory
-        # the session is not permitted to read, which is a mount that quietly does nothing.
+
         skills=("skills/*/SKILL.md",),
         shared=(".agents/skills/*/SKILL.md",),
-        #
-        # One file holding every provider it has been signed into, and the lock its own
-        # processes serialize a refresh under.
-        # Every provider pi knows reads its own key out of the environment, and an agent under
-        # a provider must not be handed one of somebody else's. The vendors' own names, which
-        # is what pi looks for; a provider that wants one sets it itself.
+
         creds=("auth.json", "auth.json.lock"),
         ambient=(
             "ANTHROPIC_API_KEY",
@@ -874,36 +756,28 @@ PROFILES = (
             Way(
                 name="login",
                 about="pi's own /login, in a session opened for it",
-                # pi signs in from inside itself, so the way in is pi, handed the terminal:
-                # `/login`, whichever provider, and `/exit` when it has landed.
+
                 argv=("pi",),
             ),
         ),
     ),
     Profile(
         name="qwen",
-        # `web_search` and `web_fetch` are what Qwen Code calls the two, and
-        # `--exclude-tools` is what it takes a tool away with.
+
         searches=True,
         aliases=("qwen", "qwen-code"),
         home_var="QWEN_HOME",
         home_dir=".qwen",
-        # One file per session, named for the session and nothing else, under a directory per
-        # directory the work was done in.
+
         logs=("projects/*/chats/{ident}.jsonl",),
         efforts=_QWEN,
-        # Four places: its own home and the shared one under yours, and both of the
-        # directories a project may keep them in -- `.qwen` and `.agents`, which is the pair
-        # its own loader is written in terms of. The ones it ships with itself are not among
-        # them: those are the CLI's, not a person's to add to or switch off.
+
         skills=("skills/*/SKILL.md",),
         shared=(".agents/skills/*/SKILL.md",),
         works=(".qwen/skills/*/SKILL.md", ".agents/skills/*/SKILL.md"),
-        # The shared one of its two, so a flow's skills reach it there.
+        
         mounts=".agents/skills",
-        #
-        # What its own sign-in leaves behind, and the lock two of its processes rotate the
-        # token under. Everything else it runs as is a variable.
+
         creds=("oauth_creds.json", "oauth_creds.lock"),
         ambient=(
             "OPENAI_API_BASE",
@@ -920,8 +794,7 @@ PROFILES = (
             Way(
                 name="login",
                 about="sign in to a Qwen account, in a session opened for it",
-                # It signs in from inside itself, so the way in is qwen with the terminal
-                # handed over: `/auth`, whichever provider, and `/quit` when it has landed.
+
                 argv=("qwen",),
             ),
             Way(
@@ -940,26 +813,19 @@ PROFILES = (
     ),
     Profile(
         name="opencode",
-        # `webfetch` is the one reaching-out tool opencode names, and its permission
-        # table is where each tool is allowed or denied.
+
         searches=True,
         aliases=("opencode",),
-        # No home variable of its own: it keeps its data where every other program does, in a
-        # directory of its own under the one `XDG_DATA_HOME` names.
+
         home_var="XDG_DATA_HOME",
         home_in="opencode",
         home_dir=".local/share/opencode",
-        # None: a session here is rows of a database rather than a file, so there is no log to
-        # read a run's cost out of as it is spent, and none to gather afterwards.
+
         logs=(),
         efforts=_VARIANTS,
-        # Its own are under the configuration home rather than the data home this backend is
-        # otherwise kept under -- `~/.config/opencode`, where its `opencode.json` is, not
-        # `~/.local/share/opencode`, where its sessions and its logins are. Singular and
-        # plural both: it reads `skill/` and `skills/` wherever it reads either.
+
         config=("opencode/skills/*/SKILL.md", "opencode/skill/*/SKILL.md"),
-        # And the two it auto-loads from outside its own directories, which it calls external
-        # skills: another harness's, and the shared one.
+
         shared=(".agents/skills/*/SKILL.md", ".claude/skills/*/SKILL.md"),
         works=(
             ".opencode/skills/*/SKILL.md",
@@ -967,14 +833,11 @@ PROFILES = (
             ".agents/skills/*/SKILL.md",
             ".claude/skills/*/SKILL.md",
         ),
-        # The shared one of its three, as for the others that read it.
+        
         mounts=".agents/skills",
-        # One file per kind of thing signed into: the providers in one, the servers a session
-        # reaches out to in the other.
+
         creds=("auth.json", "mcp-auth.json"),
-        # The one that would bypass the file outright, and the vendors' own names it reads a
-        # key under. Its catalogue knows a hundred and eighty of those; these are the ones a
-        # machine is likely to be carrying already.
+
         ambient=(
             "ANTHROPIC_API_KEY",
             "ANTHROPIC_BASE_URL",
@@ -1013,7 +876,7 @@ PROFILES = (
     ),
     Profile(
         name="mimo",
-        # mimocode is opencode's, permission table and all.
+        
         searches=True,
         aliases=("mimo", "mimocode", "mimo-code"),
         home_var="XDG_DATA_HOME",
@@ -1021,10 +884,7 @@ PROFILES = (
         home_dir=".local/share/mimocode",
         logs=(),
         efforts=_VARIANTS,
-        # The same arrangement as opencode, which it is a fork of, and one directory more:
-        # it reads Codex's as well as Claude Code's. The ones it ships under its own data
-        # home -- its builtins, and the bundle its compose flows work by -- are not listed:
-        # those came with the CLI rather than from whoever is running it.
+
         config=("mimocode/skills/*/SKILL.md", "mimocode/skill/*/SKILL.md"),
         shared=(
             ".agents/skills/*/SKILL.md",
@@ -1063,41 +923,31 @@ PROFILES = (
     ),
     Profile(
         name="zcode",
-        # `WebFetch` and `WebSearch` are the two tools it reaches outside the workspace with,
-        # and a session may be opened with a denylist naming them.
+
         searches=True,
         aliases=("zcode", "zcode-cli"),
-        # None: its configuration, its sessions and its skills are all under `~/.zcode`, and
-        # the one variable it does read moves the part the desktop app shares rather than the
-        # part a turn runs out of. What moves the whole of it is `HOME`.
+
         home_var="",
         home_dir=".zcode",
-        # One file per session, a line per request the turn made: what was sent, what came
-        # back and what it cost. Under `cli/`, which is where the command line keeps what is
-        # its own rather than the desktop app's.
+
         logs=("cli/rollout/model-io-{ident}.jsonl",),
         efforts=_ZCODE,
-        # Four places, which is what `zcode skills list` answers with: its own directory and
-        # the shared one under your home, and the same pair under the project. Both tiers, and
-        # no flag to turn either off.
+
         skills=("skills/*/SKILL.md",),
         shared=(".agents/skills/*/SKILL.md",),
         works=(".zcode/skills/*/SKILL.md", ".agents/skills/*/SKILL.md"),
-        # The shared one of its two, being the directory more than one of these CLIs has
-        # agreed to read: a skill mounted there is a skill Codex and Kimi read too.
+
         mounts=".agents/skills",
-        # One file, and the desktop app's rather than the command line's: a login is shared
-        # between them, encrypted with a key derived from this machine and this user.
+
         creds=("v2/credentials.json",),
         ambient=(
-            # Its own, which outrank the file whichever way it was signed in.
+            
             "ZCODE_API_KEY",
             "ZCODE_BASE_URL",
             "ZCODE_CREDENTIAL_SECRET",
             "ZCODE_DATA_BASE_DIR",
             "ZCODE_ENDPOINT_ORIGIN",
-            # And the vendors' own names, which it reads a key under for a provider speaking
-            # that vendor's protocol -- which the Z.AI plan it ships with is one of.
+
             "ANTHROPIC_API_KEY",
             "OPENAI_API_KEY",
             "ZAI_API_KEY",
@@ -1130,30 +980,23 @@ PROFILES = (
     ),
     Profile(
         name="cursor",
-        # Its own command line has no way of taking a tool away: what an agent may reach for
-        # is `~/.cursor/cli-config.json`, which is the person at this machine's file and not
-        # one a driver writes. So web search is refused off here rather than said and ignored.
+
         searches=False,
-        # Installed under two names, `agent` being the one its installer calls primary and
-        # `cursor-agent` the one it has always also written. The second, because `agent` is a
-        # name anything on a machine could have taken and this one has to be that CLI.
+
         command="cursor-agent",
         aliases=("cursor", "cursor-agent", "cursor-cli"),
-        # Its own variable, else the directory every program keeps its configuration in, else
-        # `~/.cursor` -- which is what `config` below covers the middle of.
+
         home_var="CURSOR_CONFIG_DIR",
         home_dir=".cursor",
-        # None to read: a chat is kept in the agent store rather than as a file per session,
-        # so there is no trajectory here for a trace to gather.
+
         logs=(),
         efforts=_CURSOR,
-        # Both tiers, under the layout every one of these CLIs reads a skill in. It reads
-        # several other CLIs' directories too, and those are theirs rather than this one's.
+
         skills=("skills/*/SKILL.md",),
         config=("cursor/skills/*/SKILL.md",),
         works=(".cursor/skills/*/SKILL.md",),
         mounts=".cursor/skills",
-        # What a login leaves behind, beside the settings it keeps in the same directory.
+        
         creds=("cli-config.json", "auth.json"),
         ambient=(
             "CURSOR_API_ENDPOINT",
@@ -1184,24 +1027,15 @@ PROFILES = (
     ),
 )
 
-
-#: Where the CLIs somebody added themselves are written down, under humanize's own home. A
-#: file rather than a setting of one workspace: a CLI is installed on a machine, and a flow
-#: run in the next directory along is run against the same one.
 _SPOKEN = "acp.json"
 
-#: What is offered for a CLI that speaks only the Agent Client Protocol. The protocol says
-#: nothing about which models an agent runs or how hard it may be asked to think -- both are
-#: the agent's own -- so one of each is offered and neither is sent.
 _UNSAID = "as configured"
-
 
 def _spoken() -> Path:
     """Where the added CLIs are kept."""
     from hmz import home
 
     return home() / _SPOKEN
-
 
 def speaking() -> dict[str, tuple[str, ...]]:
     """Every CLI somebody has added, and the command that starts each one.
@@ -1227,7 +1061,6 @@ def speaking() -> dict[str, tuple[str, ...]]:
         if given:
             found[name] = given
     return found
-
 
 def remember(name: str, command: Sequence[str]) -> None:
     """Writes down a CLI that speaks the protocol, so that it is a backend from now on.
@@ -1255,15 +1088,13 @@ def remember(name: str, command: Sequence[str]) -> None:
     held[named_as] = tuple(argv)
     at = _spoken()
     at.parent.mkdir(parents=True, exist_ok=True)
-    # Whole and then moved into place, so that a list read while it is being written is
-    # either the old one or the new one and never half of each.
+
     beside = at.parent / f".{at.name}.new"
     beside.write_text(
         json.dumps({one: list(argv) for one, argv in held.items()}, indent=2) + "\n",
         encoding="utf-8",
     )
     beside.replace(at)
-
 
 def forget(name: str) -> bool:
     """Takes an added CLI away again.
@@ -1287,7 +1118,6 @@ def forget(name: str) -> bool:
     )
     return True
 
-
 def profiles() -> tuple[Profile, ...]:
     """Every backend there is: the ones humanize drives, and the ones somebody added.
 
@@ -1299,7 +1129,6 @@ def profiles() -> tuple[Profile, ...]:
       were written down.
     """
     return (*PROFILES, *(_speaks(name) for name in speaking()))
-
 
 def _speaks(name: str) -> Profile:
     """The profile of a CLI known only by the protocol it speaks.
@@ -1321,20 +1150,6 @@ def _speaks(name: str) -> Profile:
         efforts=(_UNSAID,),
     )
 
-
-#: The credentials more than one of these backends runs on, and what each of them calls one.
-#: A vendor's key is the vendor's rather than the CLI's -- an Anthropic key is an Anthropic
-#: key whether Claude Code, pi, opencode or mimocode is holding it -- so an account made for
-#: one backend is an account the others could be run as too.
-#:
-#: One entry per credential, holding every name it goes by. Most go by one: the variable is
-#: the vendor's own and every CLI that reads it reads it under that name. The ones with two
-#: are where a CLI named a vendor's credential after itself.
-#:
-#: Which backends actually read each of them is not written here: it is already written, as
-#: what each backend's ways ask for and what it says it would take an account from. This is
-#: only the sameness -- that `CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_OAUTH_TOKEN` are one
-#: subscription under two names.
 ALIKE: tuple[tuple[str, ...], ...] = (
     ("ANTHROPIC_API_KEY",),
     ("ANTHROPIC_AUTH_TOKEN",),
@@ -1348,7 +1163,6 @@ ALIKE: tuple[tuple[str, ...], ...] = (
     ("OPENAI_BASE_URL", "OPENAI_API_BASE"),
     ("XAI_API_KEY", "GROK_CODE_XAI_API_KEY"),
 )
-
 
 def alike(variable: str) -> tuple[str, ...]:
     """Every name one credential goes by, across the backends that read it.
@@ -1364,7 +1178,6 @@ def alike(variable: str) -> tuple[str, ...]:
         if variable in held:
             return held
     return (variable,)
-
 
 def serves(env: Mapping[str, str], backend: str) -> dict[str, str] | None:
     """What one account would be, spelled as another backend reads it.
@@ -1397,7 +1210,6 @@ def serves(env: Mapping[str, str], backend: str) -> dict[str, str] | None:
         held[under] = value
     return held
 
-
 def named(backend: str) -> Profile | None:
     """The backend a name stands for, whichever of its spellings was used.
 
@@ -1409,21 +1221,13 @@ def named(backend: str) -> Profile | None:
     """
     return next((one for one in profiles() if backend in one.aliases), None)
 
-
-#: Where a coding agent's CLI lands when it is installed, besides wherever `PATH` names. A flow
-#: is not always started from a shell somebody set up: a notebook kernel, a service, the
-#: launcher of a runtime platform each hand their child the `PATH` they were given, and one
-#: that is missing the directory an installer wrote to would make an agent that is installed
-#: read as one that is not. Looked in after `PATH`, so whatever somebody put in front stays in
-#: front, and only for a name -- a command given as a path is that path or nothing.
 _INSTALLED_AT = (
-    "~/.local/bin",  # where an installer run as a person puts it
-    "/usr/local/bin",  # and where one run as root does
-    "/opt/homebrew/bin",  # homebrew on apple silicon, which a bare login shell misses
+    "~/.local/bin",  
+    "/usr/local/bin",  
+    "/opt/homebrew/bin",  
     "/usr/bin",
     "/bin",
 )
-
 
 def program(command: str) -> str | None:
     """The program a backend's command runs, as the path to actually spawn.
@@ -1438,7 +1242,6 @@ def program(command: str) -> str | None:
     if os.sep in command:
         return command if _runnable(Path(command)) else None
     return shutil.which(command) or elsewhere(command)
-
 
 def elsewhere(command: str) -> str | None:
     """Where a CLI is installed, for a command this machine's `PATH` does not name.
@@ -1462,11 +1265,9 @@ def elsewhere(command: str) -> str | None:
         None,
     )
 
-
 def _runnable(path: Path) -> bool:
     """Whether that path is a program this machine would run."""
     return path.is_file() and os.access(path, os.X_OK)
-
 
 def read(
     spec: str,
@@ -1528,14 +1329,10 @@ def read(
                 "provider, permission, web_search or config.KEY"
             )
     else:
-        # Read from both ends: a model may hold slashes of its own -- Kimi Code's and
-        # opencode's are `provider/id` -- while a CLI and an effort never do.
+
         backend, _, rest = spec.partition("/")
         model, _, effort = rest.rpartition(":")
-    # The account, if one was named: a CLI is never spelled with an `@` in it, so the two are
-    # told apart wherever the agent was written -- `-a`, a settings file, an interface. An
-    # `@` with nothing after it is a line to correct rather than a line saying nothing: it
-    # was typed to name an account, and running as whoever is at this machine is not that.
+
     backend, at, said = backend.partition("@")
     if at and not said.strip():
         raise ValueError(
@@ -1568,7 +1365,6 @@ def read(
         _switched(searching),
         tuple(overrides),
     )
-
 
 def _switched(said: str | None) -> bool | None:
     """One on-or-off setting as it was written out, or nothing where nobody wrote it.

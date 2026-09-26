@@ -33,15 +33,8 @@ if TYPE_CHECKING:
     import os
     from collections.abc import Iterator
 
-#: What the CLI is installed as. Its installer writes two names and this is the one that can
-#: only be this CLI: `agent` is a name anything on a machine could have taken.
 _COMMAND = "cursor-agent"
 
-#: What a turn is run as at each rung of the ladder, in Cursor's own vocabulary. `plan` is the
-#: mode it documents as read-only -- it analyses and proposes and changes nothing; `--sandbox
-#: enabled` is its own sandbox, which is what stops a command at the edge of the workspace;
-#: `--auto-review` is its server-side classifier, which runs the safe calls itself; and
-#: `--force` is Run Everything, which is what an unattended flow has always run its agents at.
 _PERMITTED = {
     "read-only": ("--mode", "plan"),
     "workspace-write": ("--force", "--sandbox", "enabled"),
@@ -49,14 +42,9 @@ _PERMITTED = {
     "bypass": ("--force", "--sandbox", "disabled"),
 }
 
-#: The tools it starts a fleet of its own with, by the names its stream calls them. A turn
-#: that reaches for one of these is a turn with agents under it, which is worth showing as
-#: what it is rather than as another tool call.
 _SUBAGENTS = ("task", "subagent", "explore", "agent")
 
-#: How much of a tool call fits on a row of a transcript.
 _ROOM = 120
-
 
 def _about(given: dict[str, Any]) -> str:
     """What a tool was called with, as the one line a row of a transcript has room for.
@@ -76,7 +64,6 @@ def _about(given: dict[str, Any]) -> str:
         "",
     )
 
-
 def _called(said: dict[str, Any]) -> tuple[str, str]:
     """One tool call, as what was reached for and what with.
 
@@ -94,7 +81,6 @@ def _called(said: dict[str, Any]) -> tuple[str, str]:
     inside = cast("dict[str, Any]", call.get(named) or {})
     given = cast("dict[str, Any]", inside.get("args") or {})
     return named.removesuffix("ToolCall") or "tool", _about(given)
-
 
 def parameterized(model: str, effort: str, *, fast: bool) -> str:
     """One model as Cursor is asked for it, with the rung and the tier written into it.
@@ -118,7 +104,6 @@ def parameterized(model: str, effort: str, *, fast: bool) -> str:
     said += [f"fast={'true' if fast else 'false'}"]
     return f"{model}[{','.join(said)}]"
 
-
 class CursorSession(CommandSessionBase):
     """A Cursor chat, resumed by the id its first turn reported.
 
@@ -127,7 +112,6 @@ class CursorSession(CommandSessionBase):
     which is what keeps the conversation one conversation rather than a new one per run.
     """
 
-    #: What it writes on stdout is the turn as events rather than the agent talking.
     protocol: ClassVar[bool] = True
 
     def __init__(
@@ -140,12 +124,10 @@ class CursorSession(CommandSessionBase):
           cwd: The directory this conversation works in, as for `SessionBase`.
         """
         super().__init__(agent, cwd)
-        #: What the agent has said so far in the turn now running, and what went wrong with it
-        #: if anything did. Cursor states each complete message once, between tool calls.
+
         self._said: list[str] = []
         self._failed: str | None = None
-        #: Which tool calls have been shown, a call being stated twice -- once as it starts
-        #: and once as it comes back -- and a row per status being a transcript of statuses.
+
         self._shown: set[str] = set()
 
     def _turn(self, prompt: str) -> tuple[list[str], str | None]:
@@ -170,21 +152,17 @@ class CursorSession(CommandSessionBase):
                 self.effort,
                 fast=self._agent.config.service_tier == "fast",
             ),
-            # The workspace it works in is a session's rather than a run's, and Cursor takes
-            # it as a flag rather than reading the directory it was started in.
+
             "--workspace",
             self.cwd,
-            # It asks before it trusts a workspace it has not seen, and there is nobody at a
-            # headless turn to answer: a turn that waited on that would be a flow that stopped.
+
             "--trust",
             *_PERMITTED[self._agent.config.permission],
         ]
         if self._id is not None:
-            # Written onto the flag: its own argument is optional -- `--resume` with nothing
-            # after it means the latest chat -- so a value given separately would be read as
-            # the prompt.
+
             argv.append(f"--resume={self._id}")
-        # After `--`, so that a prompt opening with a dash is a prompt rather than a flag.
+        
         return [*argv, "--", prompt], None
 
     def _reads(self, line: str, *, error: bool) -> Iterator[Event]:
@@ -203,11 +181,10 @@ class CursorSession(CommandSessionBase):
         try:
             said: dict[str, Any] = json.loads(line)
         except json.JSONDecodeError:
-            return  # not ours: it prints the odd plain line among the JSON
+            return  
         kind = str(said.get("type") or "")
         if kind == "system" and said.get("session_id"):
-            # Noted, not taken: this is the first line out, said before anything can go
-            # wrong, and a chat is only opened by a turn that lands in it.
+
             self._named = str(said["session_id"])
         elif kind == "assistant":
             message = cast("dict[str, Any]", said.get("message") or {})
@@ -223,8 +200,7 @@ class CursorSession(CommandSessionBase):
             self._shown.add(marked)
             named, about = _called(said)
             if named.lower() in _SUBAGENTS:
-                # A fleet of its own rather than another tool: what is under this turn is
-                # agents, and whatever is watching draws them as agents.
+
                 yield Event(
                     kind="subagent",
                     text=f"{named} {about}".strip()[:_ROOM],
@@ -244,9 +220,7 @@ class CursorSession(CommandSessionBase):
             if said.get("is_error") or said.get("subtype") not in (None, "success"):
                 self._failed = str(said.get("result") or "") or json.dumps(said)
             elif said.get("result"):
-                # What it answers with is the whole of the turn, stated again at the end. It
-                # is what the messages already came to, so it stands in for them rather than
-                # being added to them.
+
                 self._said = [str(said["result"])]
 
     def _result(self, transcript: str) -> Event:
@@ -294,7 +268,6 @@ class CursorSession(CommandSessionBase):
                 return str(named)
         raise ValueError(f"{_COMMAND} named no chat")
 
-
 @dataclass(frozen=True, kw_only=True)
 class CursorAgentConfig(AgentConfig):
     """What Cursor Agent is configured with: the common model and effort, and nothing else.
@@ -305,16 +278,11 @@ class CursorAgentConfig(AgentConfig):
     beside it is left alone.
     """
 
-
 class CursorAgent(AgentBase):
     """Cursor Agent, driven through its own command line, one run per turn."""
 
-    #: Its models take `fast=true` in the bracket their parameters go in, which is the same
-    #: thing every other backend here calls a service tier.
     service_tiers = ("default", "fast")
 
-    #: Every moment a turn passes through, and the two about a fleet: its stream says when a
-    #: turn starts an agent of its own and when that one has come back.
     moments: ClassVar[frozenset[Moment]] = EVERYWHERE | SUBAGENTS
 
     def new(self, cwd: str | os.PathLike[str] | None = None) -> CursorSession:

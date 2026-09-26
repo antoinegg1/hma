@@ -17,14 +17,8 @@ if TYPE_CHECKING:
     import os
     from collections.abc import Iterator
 
-#: The tool Claude reaches for when it wants a person rather than a file. Its input is a list
-#: of questions and its answer is that same input with the answers written into it, which is
-#: what the permission prompt of an interactive Claude fills in.
 _ASKS = "AskUserQuestion"
 
-#: Noninteractive orchestration tools that can move work beyond the ordinary turn HMZ owns.
-#: An agent whose goals are disabled remains able to use its ordinary permission-bound tools,
-#: but cannot escape into a hidden goal, subagent, wakeup, or cron lifecycle.
 _CONTINUATION_TOOLS = (
     "Agent",
     "ScheduleWakeup",
@@ -33,23 +27,14 @@ _CONTINUATION_TOOLS = (
     "CronList",
 )
 
-#: The tools that reach the web, by the names Claude calls them. Both, because searching and
-#: fetching are one question here: an agent told not to search the web that went on reading
-#: whatever page it liked would be answering the same question the other way.
 _WEB_TOOLS = ("WebSearch", "WebFetch")
 
-#: The tools Claude starts an agent of its own with. A turn that reaches for one of these has
-#: agents under it rather than a tool running, which is worth saying as what it is: the id the
-#: call was made under is what pairs the one that started with the result that ends it.
 _FLEET = ("Task", "Agent")
 
 _ALLOWED_TOOLS_MAX = 32
 
 _ALLOWED_TOOL_RULE_MAX_CHARS = 4096
 
-#: Reasons that leave an answer unfinished even when a broken intermediary labels the result
-#: `success`. Claude normally keeps its own agent loop going for these rather than returning
-#: them as the result of the whole turn.
 _UNFINISHED = frozenset(
     {
         "max_tokens",
@@ -60,18 +45,6 @@ _UNFINISHED = frozenset(
     }
 )
 
-#: What Claude calls each rung of the ladder, said on its own command line. Three line up with
-#: a mode of Claude's own: `plan` is an agent that works everything out and changes nothing,
-#: `acceptEdits` is one that may change what it is working on without asking, and Claude's own
-#: `auto` is one whose requests are answered for it. `bypass` is the fourth, and it is `manual`
-#: -- the mode where Claude asks before every tool that would change something -- rather than
-#: `bypassPermissions`, the mode that skips the asking. It is not that Claude cannot be told to
-#: skip it: it is that an account can be given managed settings, and one carrying
-#: `disableBypassPermissionsMode` does not refuse `--dangerously-skip-permissions` the way a
-#: Codex given requirements refuses such a call -- it starts the turn at a mode where every
-#: edit is declined and the turn ends successfully having changed nothing. So humanize takes
-#: the asking rather than skipping it: `bypass` runs at `manual` and answers every request
-#: itself, which is a mode every account allows and which means the same thing on each of them.
 _PERMITTED = {
     "read-only": "plan",
     "workspace-write": "acceptEdits",
@@ -79,9 +52,6 @@ _PERMITTED = {
     "bypass": "manual",
 }
 
-#: What each kind of token is called on the total Claude states at the end of a turn, and what
-#: it is called on the message each request answered with. The same kinds either way, under
-#: the two spellings Claude uses for them.
 _KINDS = {
     "input": "inputTokens",
     "output": "outputTokens",
@@ -94,7 +64,6 @@ _AS_IT_GOES = {
     "cache_read": "cache_read_input_tokens",
     "cache_write": "cache_creation_input_tokens",
 }
-
 
 def _about(called: dict[str, Any]) -> str:
     """What a tool was called with, as the one line a row of a transcript has room for.
@@ -113,7 +82,6 @@ def _about(called: dict[str, Any]) -> str:
         ),
         "",
     )
-
 
 def _result_failure(said: dict[str, Any]) -> str | None:
     """Explains why a Claude result did not finish its turn, or says that it did.
@@ -143,7 +111,6 @@ def _result_failure(said: dict[str, Any]) -> str | None:
         return "; ".join(str(error) for error in errors)
     return reason
 
-
 @dataclass(frozen=True, kw_only=True)
 class ClaudeCodeAgentConfig(AgentConfig):
     """The common settings plus exact Claude-native tool allow rules."""
@@ -162,7 +129,6 @@ class ClaudeCodeAgentConfig(AgentConfig):
         ):
             raise ValueError("allowed_tools must be unique sorted Claude tool rules")
 
-
 class ClaudeCodeSession(StreamSessionBase):
     """A Claude Code conversation, addressed by an id chosen up front.
 
@@ -174,12 +140,8 @@ class ClaudeCodeSession(StreamSessionBase):
     is already there, and so is anything said to it while a turn is running.
     """
 
-    #: `--json-schema` is Claude's own: it validates the answer against the schema before it
-    #: hands it back, so a turn asked for a shape answers in it or does not answer.
     shapes: ClassVar[bool] = True
 
-    #: `--mcp-config` takes a server on the command line, so a flow's own callbacks reach
-    #: this turn without anything of the person at this machine's being written.
     takes_tools: ClassVar[bool] = True
 
     def __init__(
@@ -192,31 +154,20 @@ class ClaudeCodeSession(StreamSessionBase):
           cwd: The directory this conversation works in, as for `SessionBase`.
         """
         super().__init__(agent, cwd)
-        #: What each model has cost so far, by kind, as Claude counts it: a running total per
-        #: process, so what a turn cost is the rise across it.
+
         self._counted: dict[str, Counter[str]] = {}
-        #: What the turn now running has already been counted as spending, from the messages
-        #: it answered with -- so that the total it states at the end adds only the rest --
-        #: and what each of those messages last said it had cost.
+
         self._fed: Counter[str] = Counter()
         self._seen: dict[str, Counter[str]] = {}
-        #: What the process now up was started to think at, so that a flow moving the effort
-        #: mid-session is answered by starting one that thinks at the new one.
+
         self._at: str | None = None
-        #: The id Claude says this session has, taken only once a turn has landed in it.
+        
         self._named: str | None = None
-        #: The agents this turn has started of its own, by the id of the call that started
-        #: each: Claude ends one by answering that call, and what comes back names no tool,
-        #: so what it was is remembered here until it does.
+
         self._fleet: dict[str, str] = {}
-        #: Which of the flow's own callbacks the process now up was told about, by the names
-        #: it was told them under, so that a session whose offer changes between two turns is
-        #: answered by starting one that was told what this turn is offering.
+
         self._offering: tuple[str, ...] | None = None
-        #: What the command line just built said they were, read once while it was built and
-        #: kept for the process it starts. Read once rather than twice: an offer landing from
-        #: a sibling session between the two reads would be written down as a name the process
-        #: was told about when the process was told nothing at all, and never asked again.
+
         self._telling: tuple[str, ...] = ()
 
     @property
@@ -231,8 +182,7 @@ class ClaudeCodeSession(StreamSessionBase):
         an anchored session needs: its process ends with each turn, so the next one has a
         conversation to rejoin. An unanchored session opens once and stays open.
         """
-        # A fresh id per attempt: an opening turn that failed may still have left Claude holding
-        # the id it was given, and retrying under that one would collide forever.
+
         pinned = self._id or str(uuid.uuid4())
         argv = [
             "claude",
@@ -247,12 +197,7 @@ class ClaudeCodeSession(StreamSessionBase):
             "--permission-mode",
             _PERMITTED[self._agent.config.permission],
             *(
-                # `bypass` is the rung nobody was asked about, so nobody is at a prompt to
-                # answer for it -- and rather than skip the asking with the flag an account
-                # may forbid, humanize does the answering. `manual` mode routes every request
-                # to whoever the CLI is talking to, and `stdio` is that being us: each one is
-                # read as a `control_request` and answered `allow`, yes to whatever the account
-                # leaves decidable, with its own hard `deny` list still the CLI's to enforce.
+
                 ["--permission-prompt-tool", "stdio"]
                 if self._agent.config.permission == "bypass"
                 else []
@@ -268,15 +213,9 @@ class ClaudeCodeSession(StreamSessionBase):
             self.effort,
         ]
         if self._shaping is not None:
-            # Claude validates the answer against this itself, so a turn that lands has
-            # answered in the shape: what comes back is the object, and nothing else.
+
             argv += ["--json-schema", json.dumps(self._shaping.model_json_schema())]
-        # A tool call is a tool call, and `--disallowedTools` is that call written as a rule.
-        # Two things are said with it and the flag takes one list, so they are one list: an
-        # agent whose goals were switched off is refused the tools that would carry work past
-        # the turn humanize is holding -- a subagent of its own, a wakeup, anything on the
-        # scheduler -- and one told not to search the web is refused the two that reach it.
-        # Everything else it may reach for is what its permission rung says it may.
+
         denied: list[str] = []
         if not self._agent.goals_enabled:
             denied += _CONTINUATION_TOOLS
@@ -287,15 +226,10 @@ class ClaudeCodeSession(StreamSessionBase):
         allowed_tools = getattr(self._agent.config, "allowed_tools", ())
         if allowed_tools:
             argv += ["--allowedTools", ",".join(allowed_tools)]
-        # Read once and kept, so that what the process is recorded as having been told is
-        # what this line actually tells it.
+
         self._telling = self._offered()
         if self._telling:
-            # The flow's own callbacks, as the one thing Claude takes a tool it was not
-            # shipped with on: a server on the command line rather than a line written into
-            # anybody's settings file. Added to whatever the person at this machine has
-            # configured rather than replacing it -- `--strict-mcp-config` would take their
-            # own servers away for the length of this flow, which is not this flow's to do.
+
             argv += [
                 "--mcp-config",
                 json.dumps(self._agent.toolbox.config(), separators=(",", ":")),
@@ -332,7 +266,7 @@ class ClaudeCodeSession(StreamSessionBase):
     def _restarted(self) -> None:
         """Forgets what the last process had spent, which the new one has not counted."""
         self._counted, self._fed, self._seen = {}, Counter(), {}
-        # And whatever was under the turn the last process was taking: it went with it.
+        
         self._fleet = {}
         self._at = self.effort
         self._offering = self._telling
@@ -418,9 +352,7 @@ class ClaudeCodeSession(StreamSessionBase):
         """
         message: dict[str, Any] = said.get("message") or {}
         usage: dict[str, Any] = message.get("usage") or {}
-        # Claude says the same message twice -- once for the thinking in it and once for the
-        # words -- and states the whole of what that request cost both times. So what one of
-        # these adds is the rise on the message it names, not the figure on it.
+
         named = str(message.get("id") or "")
         counted: Counter[str] = Counter(
             {
@@ -456,9 +388,7 @@ class ClaudeCodeSession(StreamSessionBase):
             }
         )
         self._fed, self._seen = Counter(), {}
-        # Not a turn of the model: the requests it is settling up for have each been counted
-        # already, and counting this as one more would put a turn in the average that never
-        # happened.
+
         self._spends(owed, turn=False)
 
     def _read(self, line: str) -> Iterator[Event]:
@@ -477,28 +407,22 @@ class ClaudeCodeSession(StreamSessionBase):
         try:
             said: dict[str, Any] = json.loads(line)
         except json.JSONDecodeError:
-            return  # not ours: Claude prints the odd plain line among the JSON
+            return  
         if said.get("type") == "control_request":
-            # Claude waits on the answer, so one left unanswered is a turn that never ends.
+            
             self._answer(said)
         elif said.get("type") == "command_lifecycle":
-            # What Claude answers a word put into a turn with, under the uuid it was sent
-            # with: `queued` the moment it has been read off stdin, `started` once it is in
-            # front of the model, `completed` when its answer is done. Only `started` is the
-            # agent having heard -- the other two are the pipe and the answer.
+
             if said.get("state") == "started":
                 words = self.took(str(said.get("command_uuid") or ""))
                 if words is not None:
                     yield Event(kind="took", text=words)
         elif said.get("type") == "system" and said.get("session_id"):
-            # Noted, not taken: this is the first line out, said before anything can go
-            # wrong, and a session is only opened by a turn that lands in it.
+
             self._named = str(said["session_id"])
         elif said.get("type") == "result":
             if failure := _result_failure(said):
-                # Claude has emitted `subtype: success` with `is_error: true`, so neither
-                # field is sufficient alone. The remaining reasons also guard a malformed
-                # success result that arrives while Claude is still asking to use a tool.
+
                 tokens, risen = self._spent(said)
                 self._settle(risen)
                 yield Event(
@@ -509,7 +433,7 @@ class ClaudeCodeSession(StreamSessionBase):
                 )
                 return
             if self._named is not None:
-                self._adopt(self._named)  # a turn has landed, so the session is open
+                self._adopt(self._named)  
             tokens, risen = self._spent(said)
             self._settle(risen)
             yield Event(
@@ -528,8 +452,7 @@ class ClaudeCodeSession(StreamSessionBase):
                 ):
                     yield Event(kind="reasoning", text=part["thinking"])
                 elif part.get("type") == "tool_use":
-                    # The name and what it was called on, which is what a tool call reads
-                    # as: `Read src/x.py`, `Bash git status`. Only what will fit on a row.
+
                     called: dict[str, Any] = part.get("input") or {}
                     named = str(part.get("name") or "tool")
                     said_as = f"{named} {_about(called)}".strip()[:120]
@@ -540,8 +463,7 @@ class ClaudeCodeSession(StreamSessionBase):
                         continue
                     yield Event(kind="tool", text=said_as)
         elif said.get("type") == "user":
-            # A tool answering, which is the only thing said back to Claude on this stream
-            # that is worth reading: one of them is an agent of its own having finished.
+
             for part in said.get("message", {}).get("content", []):
                 if part.get("type") != "tool_result":
                     continue
@@ -651,21 +573,15 @@ class ClaudeCodeSession(StreamSessionBase):
         """
         return self(f"/goal {objective}")
 
-
 class ClaudeCodeAgent(AgentBase):
     """Claude Code, driven over its streaming JSON protocol so a turn can be talked to."""
 
     service_tiers = ("default", "fast")
 
-    #: Every moment a turn passes through, and three more: Claude asks before it uses a tool,
-    #: over the same stream the turn is read from, and waits for the answer -- so this is the
-    #: one backend here where a hook can say no to something and have the agent hear it -- and
-    #: it says on the same stream when it starts an agent of its own and when that one is done.
     moments: ClassVar[frozenset[Moment]] = (
         EVERYWHERE | SUBAGENTS | {Moment.PERMISSION_REQUEST}
     )
 
-    #: Claude keeps itself going toward an objective, which is what `pursue` reaches for.
     pursues: ClassVar[bool] = True
 
     def new(self, cwd: str | os.PathLike[str] | None = None) -> ClaudeCodeSession:

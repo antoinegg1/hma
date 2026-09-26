@@ -42,22 +42,13 @@ if TYPE_CHECKING:
 
 __all__ = ["PROTOCOL", "Tool", "Toolbox", "serve"]
 
-#: The version of the protocol this speaks, which is what a client is answered with. The
-#: revision every one of these CLIs shipped against; a client asking for another is answered
-#: with this one, which is what the protocol says to do.
 PROTOCOL = "2025-06-18"
 
-#: What the server calls itself where a client asks.
 _WHOSE = "humanize"
 
-#: How long a socket that nothing has connected to is waited on before the thread serving it
-#: looks again at whether it has been closed. A number rather than a blocking accept, so that
-#: taking a toolbox down does not need the socket poked to wake it.
 _LOOKING = 0.2
 
-#: What a JSON-RPC error is answered with, by the code the protocol gives each.
 _NO_METHOD, _BAD_PARAMS = -32601, -32602
-
 
 @dataclass(frozen=True, slots=True)
 class Tool:
@@ -114,7 +105,6 @@ class Tool:
             return "done"
         return said if isinstance(said, str) else json.dumps(said, default=str)
 
-
 class Toolbox:
     """The callbacks one agent's conversations are offering, served over a socket.
 
@@ -128,9 +118,7 @@ class Toolbox:
 
     def __init__(self) -> None:
         """Initializes a toolbox nothing has been put in and nothing is serving."""
-        #: What each conversation is offering, by the id of the conversation: a session that
-        #: stops offering something takes it away, and one that never offered anything is not
-        #: in here at all.
+
         self._held: dict[int, tuple[Tool, ...]] = {}
         self._lock = threading.RLock()
         self._at: str = ""
@@ -183,15 +171,12 @@ class Toolbox:
         with self._lock:
             if self._sock is not None:
                 return self._at
-            # A toolbox served again after it was closed is one an agent went on being
-            # offered callbacks through: the thread that was looking would otherwise see the
-            # old answer and stop before it had taken anything.
+
             self._closed.clear()
             self._where = tempfile.TemporaryDirectory(
                 prefix="humanize-tools-", ignore_cleanup_errors=True
             )
-            # Inside a directory this user alone may enter: a socket is a way into this
-            # process, and one anybody could connect to is a way in for anybody.
+
             where = Path(self._where.name)
             where.chmod(0o700)
             self._at = str(where / "tools.sock")
@@ -255,7 +240,7 @@ class Toolbox:
             except TimeoutError:
                 continue
             except OSError:
-                return  # closed under us, which is what closing does
+                return  
             threading.Thread(
                 target=self._serves, args=(held,), name="humanize-tool", daemon=True
             ).start()
@@ -270,18 +255,16 @@ class Toolbox:
             for line in stream:
                 answer = serve(line.decode("utf-8", "replace"), self.offered)
                 if answer is None:
-                    continue  # a notification, which is not answered
+                    continue  
                 stream.write((json.dumps(answer) + "\n").encode())
                 stream.flush()
 
-
 @dataclass(frozen=True, slots=True)
-class _Refused(Exception):  # noqa: N818  -- what it is, not what went wrong
+class _Refused(Exception):  
     """One call that could not be made, as the error to answer it with."""
 
     code: int
     said: str = field(default="")
-
 
 def serve(line: str, offered: Callable[[], tuple[Tool, ...]]) -> dict[str, Any] | None:
     """Answers one line of the protocol, which is one JSON-RPC message.
@@ -312,7 +295,7 @@ def serve(line: str, offered: Callable[[], tuple[Tool, ...]]) -> dict[str, Any] 
     given = cast("dict[str, Any]", said.get("params") or {})
     if marked is None:
         return (
-            None  # a notification: `initialized`, `cancelled`, and whatever comes next
+            None  
         )
     try:
         return {
@@ -326,7 +309,6 @@ def serve(line: str, offered: Callable[[], tuple[Tool, ...]]) -> dict[str, Any] 
             "id": marked,
             "error": {"code": refused.code, "message": refused.said},
         }
-
 
 def _answers(
     method: str, given: dict[str, Any], offered: Callable[[], tuple[Tool, ...]]
@@ -371,16 +353,13 @@ def _answers(
         raise _Refused(_BAD_PARAMS, f"there is no tool called {named!r}")
     try:
         said = tool.called(cast("dict[str, Any]", given.get("arguments") or {}))
-    except Exception as why:  # noqa: BLE001 -- the model's mistake, not the flow's failure
-        # Answered as the tool having failed rather than raised out of the turn: a flow must
-        # not end because a model called one of its tools wrongly, and the model reading what
-        # went wrong is a model that can call it again correctly.
+    except Exception as why:  
+
         return {
             "content": [{"type": "text", "text": _plainly(why)}],
             "isError": True,
         }
     return {"content": [{"type": "text", "text": said}], "isError": False}
-
 
 def _plainly(why: BaseException) -> str:
     """What a callback that raised said, as the agent is told it.

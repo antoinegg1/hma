@@ -39,17 +39,9 @@ from pydantic import BaseModel, Field
 
 from hmz.flows import Agent, flow
 
-#: Output tokens in one of the millions a budget is written in. The budget is written that
-#: way because that is the size these loops come in: a round of one is thousands, and a day
-#: of rounds is millions.
 MILLION = 1_000_000.0
 
-#: How many rounds in a row may answer with nothing before the loop gives up. A round that
-#: failed answers with nothing under `suppress` and spends no output tokens, so the budget
-#: meant to end the loop never moves for it. Three rather than one, because a round that
-#: genuinely had nothing to say is a round like any other and not a reason to stop.
 STALLED = 3
-
 
 class Config(BaseModel):
     """What this flow takes."""
@@ -63,7 +55,6 @@ class Config(BaseModel):
         "across every run of it in this workspace, or 0 to go on until it is stopped",
     )
 
-
 @flow(resumable=True)
 def run(
     agents: tuple[Agent],
@@ -74,29 +65,24 @@ def run(
     (agent,) = agents
     held = config or Config()
     kept = state if state is not None else {}
-    # What the runs before this one spent, which this run's own is added to: an agent counts
-    # what it has spent since it was made, and the loop is older than any of them.
+
     before = kept.get("output", 0.0)
     stalled = 0
     while True:
-        # Said before the turn rather than counted after it, so that a run watched from the
-        # outside says which round the one going now is.
+
         kept["rounds"] = kept.get("rounds", 0) + 1
         print(f"round {kept['rounds']}")
-        # A session of its own each turn: the agent starts from the task and the repository,
-        # with nothing of the last turn in context.
+
         answered = agent(task, suppress=True)
         kept["output"] = spent = before + agent.spent().output
         if held.budget and spent >= held.budget * MILLION:
             print(f"stopping: {spent / MILLION:.2f}M output tokens of {held.budget:g}M")
-            # Emptied rather than left, which is what the next run here is handed and reads
-            # as a run to start clean rather than as a run to carry on and stop at once.
+
             kept.clear()
             return
         stalled = 0 if answered else stalled + 1
         if stalled >= STALLED:
             print(f"stopping: {stalled} rounds in a row answered with nothing")
-            # Kept rather than cleared: this is a loop that was stopped rather than one that
-            # is over, and what stopped it is a thing to fix and carry on from.
+
             return
         time.sleep(5)

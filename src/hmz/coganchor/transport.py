@@ -41,20 +41,14 @@ __all__ = ["Target", "Transport", "build_bundle", "connect"]
 
 log = logging.getLogger(__name__)
 
-#: Where the bootstrapped copy is cached on the target machine.
 REMOTE_CACHE = "~/.cache/humanize"
 
-#: Installing that copy, for a target reached by piping it there. Written under a name of its
-#: own and moved into place, so a session finds the whole archive or none of it, and a copy
-#: already there is left where it is: it is named by its digest, so it is the same archive, and
-#: rewriting it would be rewriting a file a live session may still be importing from.
 _INSTALL = (
     "if [ ! -s {file} ]; then cat > {file}.part && mv {file}.part {file}; "
     "else cat > /dev/null; fi"
 )
 
 _SSH_OPTIONS = ("-T", "-o", "BatchMode=no", "-o", "ServerAliveInterval=30")
-
 
 @dataclass(frozen=True, slots=True)
 class Target:
@@ -97,7 +91,6 @@ class Target:
             return f"tcp://{self.host}:{self.port}"
         return f"local{':' + self.path if self.path else ''}"
 
-
 @dataclass(slots=True)
 class Transport:
     """An open channel plus whatever process is keeping it alive."""
@@ -113,10 +106,8 @@ class Transport:
                 self.process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 self.process.kill()
-                # Reaped rather than left: a run that opens an anchor per agent would
-                # otherwise gather a zombie for each one that would not go quietly.
-                self.process.wait()
 
+                self.process.wait()
 
 def connect(target: Target, exports: list[str], token: str | None = None) -> Transport:
     """Open a channel to the ``serve`` side described by ``target``."""
@@ -128,14 +119,12 @@ def connect(target: Target, exports: list[str], token: str | None = None) -> Tra
         return _connect_docker(target, exports)
     return _connect_local(target, exports, token)
 
-
 def _connect_tcp(target: Target) -> Transport:
     sock = socket.create_connection((target.host, target.port), timeout=30.0)
     sock.settimeout(None)
     return Transport(Channel.from_socket(sock))
 
-
-def _connect_local(target: Target, exports: list[str], token: str | None) -> Transport:  # noqa: ARG001
+def _connect_local(target: Target, exports: list[str], token: str | None) -> Transport:  
     command = [
         sys.executable,
         "-m",
@@ -146,7 +135,6 @@ def _connect_local(target: Target, exports: list[str], token: str | None) -> Tra
         *_export_args(exports),
     ]
     return _spawn(command, token)
-
 
 def _connect_ssh(target: Target, exports: list[str], token: str | None) -> Transport:
     payload = build_bundle().read_bytes()
@@ -182,7 +170,6 @@ def _connect_ssh(target: Target, exports: list[str], token: str | None) -> Trans
     )
     return _spawn([*ssh, remote_command], token)
 
-
 def _connect_docker(target: Target, exports: list[str]) -> Transport:
     """Serve from inside a running container, over ``docker exec``.
 
@@ -192,9 +179,8 @@ def _connect_docker(target: Target, exports: list[str]) -> Transport:
     """
     payload = build_bundle().read_bytes()
     digest = hashlib.sha256(payload).hexdigest()[:16]
-    # Inside the container rather than on this host, and named after what it holds, so two
-    # pushes of the same bundle land on the same file instead of racing for one name.
-    remote_file = f"/tmp/humanize-{digest}.pyz"  # noqa: S108
+
+    remote_file = f"/tmp/humanize-{digest}.pyz"  
     exec_in = ["docker", "exec", "-i", target.host]
 
     result = subprocess.run(
@@ -209,8 +195,6 @@ def _connect_docker(target: Target, exports: list[str]) -> Transport:
             f"{result.stderr.decode(errors='replace').strip()}"
         )
 
-    # Unquoted, unlike ssh: docker is handed the command as argv and passes it on, so an export
-    # holding a space or a quote needs nothing done to it to survive the trip.
     command = [
         *exec_in,
         "python3",
@@ -221,7 +205,6 @@ def _connect_docker(target: Target, exports: list[str]) -> Transport:
         *_export_args(exports),
     ]
     return _spawn(command, None)
-
 
 def _spawn(command: list[str], token: str | None) -> Transport:
     """Start a child that serves over its own stdin and stdout.
@@ -244,10 +227,9 @@ def _spawn(command: list[str], token: str | None) -> Transport:
         env=env,
         close_fds=True,
     )
-    assert process.stdin is not None  # noqa: S101
-    assert process.stdout is not None  # noqa: S101
+    assert process.stdin is not None  
+    assert process.stdout is not None  
     return Transport(Channel(process.stdout, process.stdin), process)
-
 
 def _export_args(exports: list[str], *, quote: bool = False) -> list[str]:
     """Build ``--export`` arguments, quoting them for a remote shell if needed.
@@ -261,7 +243,6 @@ def _export_args(exports: list[str], *, quote: bool = False) -> list[str]:
     for export in exports:
         args += ["--export", shlex.quote(export) if quote else export]
     return args
-
 
 def build_bundle(destination: Path | None = None) -> Path:
     """Package coganchor, and the command line reaching it, as a zipapp for the target.
@@ -278,8 +259,7 @@ def build_bundle(destination: Path | None = None) -> Path:
         destination = Path(tempfile.gettempdir()) / f"humanize-{os.getuid()}.pyz"
     with tempfile.TemporaryDirectory(prefix="humanize-bundle-") as staging:
         root = Path(staging)
-        # Laid out under the package's own dotted name, so that moving the package moves the
-        # bundle with it rather than breaking on the target, which is where it would surface.
+
         parts = coganchor.__name__.split(".")
         shutil.copytree(
             Path(coganchor.__file__).parent,
@@ -287,46 +267,29 @@ def build_bundle(destination: Path | None = None) -> Path:
             ignore=shutil.ignore_patterns("__pycache__", "*.md"),
         )
         for depth in range(1, len(parts)):
-            # A namespace of its own rather than the installed ``hmz/__init__.py``: the
-            # bundle stays pure stdlib however the rest of humanize grows, and a regular package
-            # cannot be shadowed by an unrelated ``hmz`` already on the target's path.
+
             init = root.joinpath(*parts[:depth]) / "__init__.py"
             init.write_text(
                 f'"""{".".join(parts[:depth])}, cut down to {parts[depth]}."""\n'
             )
-        # The command line comes too, because it is the only one: what the target runs is the
-        # same ``hmz anchor`` a user would run there, and each of its commands names the layers
-        # it needs only from inside itself, none of which is this one.
-        # Taken off disk rather than imported, so that the serving half still names nothing
-        # above itself.
+
         package = Path(coganchor.__file__).parent.parent
         shutil.copytree(
             package / "cli",
             root.joinpath(*parts[:-1]) / "cli",
             ignore=shutil.ignore_patterns("__pycache__", "*.md"),
         )
-        # Written by hand rather than via zipapp's ``main=`` shim, which calls
-        # the entry point but throws its return value away -- a target that
-        # failed to start would then look like a clean exit.
+
         (root / "__main__.py").write_text(
             "from hmz.cli import main\n\nraise SystemExit(main())\n"
         )
-        # One timestamp for everything, so the archive is a function of the source alone: the
-        # bundle is addressed on the target by its digest, and a build stamp would miss that
-        # cache on every connect and leave another copy behind. A zip entry holds local
-        # wall-clock time and cannot predate 1980, so the instant is the one reading as
-        # 1980-01-02 here: a fixed instant would fall out of that range west of UTC, and would
-        # still leave the digest following the machine's timezone.
+
         stamp = time.mktime((1980, 1, 2, 0, 0, 0, 0, 2, -1))
         for path in root.rglob("*"):
-            # Modes for the same reason: the files written just above carry the builder's
-            # umask, and a checkout's own bits vary with it too. Nothing on the target reads
-            # them -- it runs the archive, and zipimport ignores the entries' modes.
+
             path.chmod(0o755 if path.is_dir() else 0o644)
             os.utime(path, (stamp, stamp))
-        # Published by rename rather than written where it is read: two sessions starting at
-        # once build the same bytes to the same path, and a reader must find the whole archive
-        # or the last one, never a half-written file it would then ship to a target.
+
         handle, staged = tempfile.mkstemp(
             dir=destination.parent, prefix=f"{destination.name}."
         )
@@ -337,6 +300,6 @@ def build_bundle(destination: Path | None = None) -> Path:
             )
             os.replace(staged, destination)
         except BaseException:
-            os.unlink(staged)  # a build that failed leaves nothing of itself behind
+            os.unlink(staged)  
             raise
     return destination

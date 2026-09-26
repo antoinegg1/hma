@@ -53,18 +53,10 @@ __all__ = [
     "stop",
 ]
 
-#: Where the reports go. humanize's own project, and the one thing here that is not a
-#: setting: a report that went somewhere else would be a report nobody who could fix it reads.
-DSN = "https://cd097c311af7e8db070f593f62697d62@o4511914126344192.ingest.us.sentry.io/4511914131324928"
+DSN = ""
 
-#: What answers the question for one process without writing anything down: `on` or `off`.
-#: For a scripted install, for CI, and for this suite -- a run under it neither reports nor
-#: asks, whatever the settings file says.
 SAYS = "HUMANIZE_SENTRY"
 
-#: What is sent, in the words the question is asked in and the words `/settings` repeats. This
-#: is the promise: whatever is not on this list does not leave the machine, and the scrubbing
-#: below is what keeps the list true rather than the list being what the scrubbing came to.
 SENT = (
     "the error and where in humanize it happened",
     "which flow was running, and what each of its agents was set up to run",
@@ -74,8 +66,6 @@ SENT = (
     "the version of humanize, of Python, and the kind of machine this is",
 )
 
-#: And what is not, in the same words. Written down rather than left to be inferred from the
-#: first list: what somebody wants to know before answering is what humanize will not take.
 KEPT = (
     "nothing you typed: no task, no prompt, no line at the prompt",
     "nothing an agent said, and nothing out of any transcript or session log",
@@ -83,8 +73,6 @@ KEPT = (
     "no key, no token and no account credential -- not even the names of the variables",
 )
 
-#: How much of a string may be a path, a key or a sentence somebody typed. Everything that
-#: reaches a report goes through this, however it got there.
 _HOME = re.compile(r"/(?:home|homes|Users)/[^/\s:'\"]+")
 _KEYS = re.compile(
     r"\b(?:sk|pk|ghp|gho|github_pat|xai|sk-ant|sk-proj)[-_][A-Za-z0-9_\-]{8,}\b"
@@ -92,16 +80,8 @@ _KEYS = re.compile(
 _CREDS = re.compile(r"(?<=//)[^/\s@]+(?=@)")
 _LONG = 500
 
-#: What a failed command says of itself, which is the whole command line. A turn is a command,
-#: and several of these backends are given the prompt as an argument of it -- so the one line
-#: Python writes for a `CalledProcessError` is the task, verbatim, in the middle of an error
-#: message. The status is what a report needs and the command is what it must not carry.
 _RAN = re.compile(r"Command\s+'.*?'\s+(?=returned|timed out|died)", re.DOTALL)
 
-#: The roots a report may name a file under: humanize's own package, and wherever Python keeps
-#: what is installed beside it. A frame under one of them is named by its path under that root,
-#: which is the whole of what a traceback needs and none of where this machine keeps things.
-#: Settled once, since a traceback has thirty frames and this is per frame.
 _ROOTS = tuple(
     at
     for at in dict.fromkeys(
@@ -118,59 +98,22 @@ _ROOTS = tuple(
     )
 )
 
-#: What a frame is named where humanize does not recognise the file it is in. A traceback runs
-#: through humanize, through what humanize is installed beside, and through whatever the person
-#: running it wrote -- and the last of those is a file in their project, under a name they
-#: chose, in a directory named after the work. The line it stopped at is worth having; the rest
-#: of it is theirs.
 _THEIRS = "<not humanize>"
 
-#: What is registered to be asked when a report is being made, and nothing else: a callable
-#: apiece, run at the moment of the report and never before. Under a lock, since a flow
-#: registers from whichever thread it is running on and a crash is reported from another.
 _ABOUT: dict[str, Callable[[], object]] = {}
 _TELLING = threading.Lock()
 
-#: Whether the SDK has been started here, so that two entry points in one process -- the
-#: interface, and a flow it runs -- start it once. A list rather than a name that is rebound,
-#: since what it holds is a thing that happens rather than a constant.
 _started: list[bool] = []
 
-#: What was written down about reporting, read once. The same shape and the same reason: this
-#: is asked wherever a report might be made, which includes every key that did nothing.
 _answered: list[bool | None] = []
 
-
 def enabled() -> bool | None:
-    """Whether humanize reports its own failures, and None while nobody has been asked.
-
-    Read once and kept, since this is asked on paths that are hot: every key that does
-    nothing is a `snag`, and a settings file parsed per keystroke is a settings file parsed
-    per keystroke. What is written down is settled for the life of the process, which is
-    what :func:`asked` and the settings menu say when they change it.
-
-    Returns:
-      What the environment says for this process, else what was written down, else None --
-      which is a machine nobody has put the question to yet, and is not a no. Only the
-      interface turns that into a question; everything else reads it as silence and reports
-      nothing.
-    """
-    said = os.environ.get(SAYS, "").strip().lower()
-    if said in ("on", "1", "true", "yes"):
-        return True
-    if said in ("off", "0", "false", "no"):
-        return False
-    if not _answered:
-        from hmz.settings import Settings
-
-        _answered.append(Settings().enable_sentry)
-    return _answered[0]
-
+    """Telemetry is disabled in the anonymous HMA package."""
+    return False
 
 def again() -> None:
     """Forgets what was read, for whoever has just written it down."""
     _answered.clear()
-
 
 def asked(*, enable_sentry: bool) -> None:
     """Writes down the answer, which is asked once and holds wherever humanize is run.
@@ -191,7 +134,6 @@ def asked(*, enable_sentry: bool) -> None:
     else:
         stop()
 
-
 def start() -> bool:
     """Starts reporting, if it is on and has not been started already.
 
@@ -206,45 +148,33 @@ def start() -> bool:
     try:
         import sentry_sdk
         from sentry_sdk.integrations.argv import ArgvIntegration
-    except ImportError:  # pragma: no cover -- an install missing its own dependency
+    except ImportError:  
         return False
     try:
         sentry_sdk.init(
             dsn=DSN,
-            # Off, though the quickstart line has it on. It attaches the address the report
-            # was sent from, the name of this machine and the user at it -- and, in this SDK,
-            # the variables of every frame of a stack, which here hold the task, the prompt,
-            # the answer and whatever an account was configured with. It is the one switch
-            # that would make a report say more about the person than about the failure.
+
             send_default_pii=False,
-            # The same, said again where the SDK reads it separately: what is in a frame is
-            # what humanize was working on, and what humanize works on is somebody's project.
+
             include_local_variables=False,
-            # Off for the same reason: what humanize logs is paths, commands and the odd line
-            # of what a backend wrote, and a log line is not a thing anybody consented to.
+
             enable_logs=False,
-            # The machine is not named, and nor is the directory: a hostname is a person at a
-            # company, and a working directory is the name of what they are building.
+
             server_name="",
             traces_sample_rate=1.0,
             profile_session_sample_rate=1.0,
-            # Profiled while something is running rather than for the life of the process:
-            # an interface sitting at a prompt is not work anybody needs a profile of.
+
             profile_lifecycle="trace",
-            # The one default integration that would break the promise above: it attaches
-            # `sys.argv`, and `hmz exec -f ralph_loop -a claude/... "$(cat TASK.md)"` puts the
-            # whole task on it. Taken out here, and taken off again in `_before_send`, since a
-            # switch this load-bearing is worth being wrong about twice.
+
             disabled_integrations=[ArgvIntegration()],
             release=_version(),
             before_send=_before_send,
             before_send_transaction=_before_send,
         )
-    except Exception:  # noqa: BLE001 -- a reporter that cannot start reports nothing
+    except Exception:  
         return False
     _started.append(True)
     return True
-
 
 def stop() -> None:
     """Stops reporting for the rest of this process, whatever was started earlier.
@@ -258,15 +188,13 @@ def stop() -> None:
     _started.clear()
     try:
         import sentry_sdk
-    except ImportError:  # pragma: no cover -- an install missing its own dependency
+    except ImportError:  
         return
-    # Closed rather than left holding a transport: an SDK that is still initialised is one
-    # that would go on collecting whatever its integrations collect.
+
     with contextlib.suppress(Exception):
         sentry_sdk.get_client().close(timeout=1.0)
     with contextlib.suppress(Exception):
         sentry_sdk.init(dsn="")
-
 
 def about(name: str, said: Callable[[], object]) -> None:
     """Says what to attach to a report, by handing over something that knows.
@@ -286,7 +214,6 @@ def about(name: str, said: Callable[[], object]) -> None:
     with _TELLING:
         _ABOUT[name] = said
 
-
 def held() -> dict[str, object]:
     """Everything registered, asked now, for whoever is about to send or show a report.
 
@@ -300,10 +227,9 @@ def held() -> dict[str, object]:
     for name, said in asking.items():
         try:
             found[name] = said()
-        except Exception:  # noqa: BLE001, S112 -- one that cannot say is one left out
+        except Exception:  
             continue
     return found
-
 
 def crash(why: BaseException, **said: object) -> None:
     """Reports one failure, with everything the layers said about the run it happened in.
@@ -322,7 +248,6 @@ def crash(why: BaseException, **said: object) -> None:
             scope.set_tag(name, _plainer(str(value)))
         _attaches(scope)
         sentry_sdk.capture_exception(why)
-
 
 def snag(name: str, **said: object) -> None:
     """Reports something that is not a failure and is not what anybody meant either.
@@ -348,7 +273,6 @@ def snag(name: str, **said: object) -> None:
         _attaches(scope)
         sentry_sdk.capture_message(f"snag: {name}", level="warning")
 
-
 def _attaches(scope: Any) -> None:
     """Puts what the layers said about the run onto one report.
 
@@ -363,9 +287,8 @@ def _attaches(scope: Any) -> None:
                 _plainly(value), sort_keys=False, allow_unicode=True
             )
         except yaml.YAMLError:
-            continue  # one that will not write is one left out of the report
+            continue  
         scope.add_attachment(bytes=written.encode("utf-8"), filename=f"{name}.yaml")
-
 
 def _plainly(said: object) -> object:
     """One thing to attach, with every string in it put through the scrubbing.
@@ -391,7 +314,6 @@ def _plainly(said: object) -> object:
         return [_plainly(one) for one in cast("list[object]", said)]
     return said
 
-
 def _before_send(event: Any, hint: Any) -> Any:
     """The last thing every report goes through, whoever made it.
 
@@ -408,9 +330,7 @@ def _before_send(event: Any, hint: Any) -> Any:
       The report to send, with what must not leave taken out of it.
     """
     del hint
-    # `extra` is where the SDK's own integrations leave what they collected -- `sys.argv`
-    # among them, which for `hmz exec` is the task. Nothing here puts anything in it, so the
-    # whole of it goes rather than the parts of it anybody has thought of.
+
     for gone in ("server_name", "user", "request", "modules", "extra"):
         event.pop(gone, None)
     for one in event.get("exception", {}).get("values", []):
@@ -421,11 +341,9 @@ def _before_send(event: Any, hint: Any) -> Any:
             frame.pop("context_line", None)
             _framed(frame)
         one["value"] = _plainer(str(one.get("value") or ""))
-    # Breadcrumbs are whatever anything logged on the way here, which is not a thing anybody
-    # answered a question about.
+
     event.pop("breadcrumbs", None)
     return event
-
 
 def _framed(frame: dict[str, Any]) -> None:
     """One frame of a traceback, named the way a report may name it.
@@ -444,14 +362,13 @@ def _framed(frame: dict[str, Any]) -> None:
     where = _under(said)
     if where is None:
         frame["abs_path"] = frame["filename"] = _THEIRS
-        # The module and the function are named by whoever wrote the file, so they go with it.
+        
         frame.pop("module", None)
         frame.pop("function", None)
         return
     frame["abs_path"] = frame["filename"] = where
     if frame.get("module"):
         frame["module"] = _plainer(str(frame["module"]))
-
 
 def _under(said: str) -> str | None:
     """One file, as the path under whichever root humanize knows it by.
@@ -467,13 +384,12 @@ def _under(said: str) -> str | None:
         return None
     try:
         at = Path(said).resolve()
-    except (OSError, ValueError):  # pragma: no cover -- a path the OS will not settle
+    except (OSError, ValueError):  
         return None
     for root in _ROOTS:
         if at.is_relative_to(root):
             return at.relative_to(root).as_posix()
     return None
-
 
 def _plainer(said: str) -> str:
     """One string, with what must not leave a machine taken out of it.
@@ -491,12 +407,11 @@ def _plainer(said: str) -> str:
     said = _KEYS.sub("…", said)
     return said if len(said) <= _LONG else said[:_LONG] + "…"
 
-
 def _version() -> str:
     """What humanize this is, as the release a report is filed under."""
     from importlib.metadata import PackageNotFoundError, version
 
     try:
         return f"hmz@{version('hmz')}"
-    except PackageNotFoundError:  # pragma: no cover -- a tree nobody installed
+    except PackageNotFoundError:  
         return "hmz@unknown"

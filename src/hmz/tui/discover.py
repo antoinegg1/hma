@@ -27,10 +27,7 @@ if TYPE_CHECKING:
 
 __all__ = ["installable", "installed", "machines", "ready_to_open"]
 
-#: How long the machines around here are given to name themselves before the list goes up
-#: without them. A docker daemon that is not answering is not a reason to sit at a sheet.
 _LOOKING_SECONDS = 2.0
-
 
 def installed() -> dict[str, tuple[Model, ...]]:
     """The backends on this machine, and what each last said it runs.
@@ -50,7 +47,6 @@ def installed() -> dict[str, tuple[Model, ...]]:
         if _is_installed(profile.name)
     }
 
-
 def installable() -> dict[str, tuple[Model, ...]]:
     """Optional backends that can be added to this humanize installation.
 
@@ -64,19 +60,16 @@ def installable() -> dict[str, tuple[Model, ...]]:
     """
     return {"dsh": Hmz().accounts.models("dsh")} if not _is_installed("dsh") else {}
 
-
 def _is_installed(backend: str) -> bool:
     """Whether a backend's executable or Python SDK is installed here."""
     if backend == "dsh":
         return importlib.util.find_spec("deepseek_harness") is not None
-    # A CLI somebody added is started by the command they gave rather than by its own name.
+    
     if (added := speaking().get(backend)) is not None:
         return bool(added) and program(added[0]) is not None
-    # And one humanize drives is started by the command it is installed as, which is its own
-    # name unless its profile says otherwise.
+
     profile = named(backend)
     return program(profile.runs() if profile is not None else backend) is not None
-
 
 def ready_to_open(backend: str, where: Path) -> bool:
     """Whether an installed backend may be chosen without somebody choosing it.
@@ -96,12 +89,9 @@ def ready_to_open(backend: str, where: Path) -> bool:
     if backend != "dsh":
         return True
 
-    # Local so discovering ordinary CLIs does not import any agent implementation. The SDK
-    # runtime itself remains lazy inside the dsh driver and is not started by this check.
     from hmz.agents.dsh import native_ready
 
     return native_ready(where)
-
 
 def machines() -> list[tuple[str, str]]:
     """Where an agent's turns could land, besides this machine.
@@ -123,7 +113,6 @@ def machines() -> list[tuple[str, str]]:
     found.extend((f"ssh://{host}", "ssh config") for host in _hosts())
     return found
 
-
 def _containers() -> list[str]:
     """The containers running here, which are the ones a turn could be run in."""
     try:
@@ -135,9 +124,8 @@ def _containers() -> list[str]:
             check=False,
         )
     except (OSError, subprocess.SubprocessError):
-        return []  # no docker here, or none that answered: no containers to offer
+        return []  
     return [named for named in listed.stdout.split() if named]
-
 
 def _hosts() -> list[str]:
     """The hosts named in this user's ssh config, in the order they are written there.

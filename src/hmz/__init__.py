@@ -7,7 +7,6 @@ import pathlib
 
 __all__ = ["home"]
 
-
 def home() -> pathlib.Path:
     """Where humanize keeps what outlives one run of one flow.
 

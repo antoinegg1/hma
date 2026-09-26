@@ -43,35 +43,18 @@ __all__ = [
     "where",
 ]
 
-#: What a provider may be called: a name that is one path component, holds nothing a shell or
-#: a filesystem reads as something else, and cannot climb out of the directory it names.
 _NAMED = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
-#: What the file a provider is written down in is called.
 _HELD = "provider.json"
 
-#: What the account this machine is already signed into is called, which is no name at all.
-#: It is the CLI as whoever is at this machine runs it -- humanize did not make it, keeps no
-#: credentials for it and cannot take it away -- and it is already the spelling an agent
-#: configured with no account uses, in `AgentConfig.provider` and in `Runs.provider`. So it is
-#: an account here too, and the one thing every backend has whether or not anybody made one.
 LOCAL = ""
 
-#: Where what is written down about it is kept: one file per backend under humanize's own
-#: home, beside the catalogue that machine's own sign-in answers with. Not under `providers/`,
-#: which is the tree of accounts humanize made -- taking every one of those away must not
-#: leave a stray file behind, and the account nobody made is not one of them.
 _ALONE = "local"
 
-#: The way in that every backend has, whatever else it offers: variables of your own. Every
-#: one of these CLIs reads a key out of the environment under some name of its own -- pi has
-#: one per provider it knows, opencode has one for each of a hundred and eighty -- and a list
-#: of all of them would be a list to keep in step with six vendors. So the names are typed.
 ENV = backends.Way(
     name="env",
     about="variables of your own: whatever this CLI reads a key or an endpoint under",
 )
-
 
 def ways(cli: str) -> tuple[backends.Way, ...]:
     """Every way there is of getting credentials into one backend.
@@ -90,7 +73,6 @@ def ways(cli: str) -> tuple[backends.Way, ...]:
     if profile.name == "dsh":
         return profile.ways
     return (*profile.ways, ENV)
-
 
 @dataclass(frozen=True, slots=True)
 class Provider:
@@ -151,19 +133,14 @@ class Provider:
           nothing at all for a backend that has none written down.
         """
         profile = backends.named(self.cli)
-        # Nothing at all for the account this machine is already signed into: what it reads is
-        # what the CLI reads, and answering those paths with themselves is a supervisor for
-        # nothing.
+
         if profile is None or not self.name:
             return ()
         held: list[tuple[str, str]] = []
         for real, under in profile.credentials():
             instead = str(self.at / under)
             held.append((real, instead))
-            # And the same path with the links in it followed, where that is a different
-            # spelling: a home reached through one -- `/home` pointing at `/homes` -- is the
-            # same file under two names, and a CLI that settles a path before opening it
-            # would otherwise name one this table had never heard of.
+
             settled = os.path.realpath(real)
             if settled != real:
                 held.append((settled, instead))
@@ -196,11 +173,9 @@ class Provider:
             "fallback": self.fallback,
         }
 
-
 def under() -> Path:
     """Where every provider is kept, which is one directory under humanize's own home."""
     return home() / "providers"
-
 
 def where(cli: str, name: str) -> Path:
     """The directory one provider's credentials are kept in.
@@ -225,7 +200,6 @@ def where(cli: str, name: str) -> Path:
             "starting with a letter or a digit"
         )
     return under() / profile.name / name
-
 
 def providers(cli: str = "") -> list[Provider]:
     """Every provider there is, or every one for a backend.
@@ -255,7 +229,6 @@ def providers(cli: str = "") -> list[Provider]:
         )
     return held
 
-
 def serves(one: Provider) -> tuple[str, ...]:
     """Which other backends this account could be run as.
 
@@ -277,10 +250,9 @@ def serves(one: Provider) -> tuple[str, ...]:
     return tuple(
         profile.name
         for profile in backends.profiles()
-        if profile.name != backends.named(one.cli).name  # pyright: ignore[reportOptionalMemberAccess]
+        if profile.name != backends.named(one.cli).name  
         and backends.serves(one.env, profile.name) is not None
     )
-
 
 def copies(one: Provider, cli: str, name: str = "") -> Provider:
     """Writes one account down for another backend, under the same name.
@@ -309,7 +281,6 @@ def copies(one: Provider, cli: str, name: str = "") -> Provider:
         )
     return add(cli, name or one.name, _as_made(cli, held), held)
 
-
 def _as_made(cli: str, env: Mapping[str, str]) -> str:
     """What to say a copied account was made by, on the backend it was copied to.
 
@@ -325,14 +296,13 @@ def _as_made(cli: str, env: Mapping[str, str]) -> str:
     wanted = set(env)
     for way in ways(cli):
         if way.argv:
-            continue  # a way with a command of its own is a login, and this is not one
+            continue  
         asked = {one.env for one in way.asks if one.keep} | {
             name for name, _ in way.sets
         }
         if asked == wanted:
             return way.name
     return ENV.name
-
 
 def find(cli: str, name: str) -> Provider | None:
     """The account of one backend that is called this.
@@ -350,17 +320,13 @@ def find(cli: str, name: str) -> Provider | None:
     """
     profile = backends.named(cli)
     if profile is None:
-        # Not a backend, so not an account of one. Said of the account this machine is signed
-        # into as well as of any other: a name nothing answers to must not be written down as
-        # though it were, or a line with a typo in it reports success and leaves a file
-        # nothing will ever read back.
+
         return None
     if name == LOCAL:
         return _alone(profile.name)
     if not _NAMED.match(name):
         return None
     return _read(profile.name, under() / profile.name / name)
-
 
 def alone(cli: str) -> Path:
     """Where what is written down about the account this machine is signed into is kept.
@@ -372,7 +338,6 @@ def alone(cli: str) -> Path:
       The file, whether or not anything has been written to it.
     """
     return home() / _ALONE / f"{cli}.json"
-
 
 def _alone(cli: str) -> Provider:
     """The account this machine is already signed into, as one.
@@ -397,7 +362,6 @@ def _alone(cli: str) -> Provider:
         way="",
         fallback=str(held.get("fallback") or ""),
     )
-
 
 def chain(provider: Provider) -> list[Provider]:
     """The accounts a turn under this one walks, in the order it walks them.
@@ -425,7 +389,6 @@ def chain(provider: Provider) -> list[Provider]:
         seen.add(instead.name)
         walked.append(instead)
     return walked
-
 
 def points(cli: str, name: str, at: str) -> bool:
     """Says which account a turn under this one carries on under when it fails.
@@ -460,7 +423,6 @@ def points(cli: str, name: str, at: str) -> bool:
     _write(replace(found, fallback=at))
     return True
 
-
 def _write(provider: Provider) -> None:
     """Writes one account down again, whole, where it is kept.
 
@@ -484,7 +446,6 @@ def _write(provider: Provider) -> None:
     at = provider.at
     _kept(at)
     _writes(at / _HELD, json.dumps(provider.held(), indent=2) + "\n")
-
 
 def _writes(at: Path, said: str) -> None:
     """Writes one of these files whole, kept to its owner alone from the moment it exists.
@@ -512,7 +473,6 @@ def _writes(at: Path, said: str) -> None:
     except OSError:
         Path(beside).unlink(missing_ok=True)
         raise
-
 
 def add(
     cli: str,
@@ -543,10 +503,8 @@ def add(
     """
     at = where(cli, name)
     profile = backends.named(cli)
-    assert profile is not None  # noqa: S101 -- `where` has already refused anything else
-    # What it does when it fails is not part of what it was made with: an account corrected --
-    # a key retyped, a gateway moved -- is the same account, and the chain and the tries
-    # somebody wrote against it are theirs rather than this line's to forget.
+    assert profile is not None  
+
     already = find(profile.name, name)
     provider = Provider(
         cli=profile.name,
@@ -557,17 +515,12 @@ def add(
         made=datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         fallback=already.fallback if already is not None else "",
     )
-    # The directory before the file: a login run under this provider writes into it, and
-    # 0700 is what every one of these CLIs keeps its own credential directory at. A level at
-    # a time, because `mkdir` gives the mode to the last of them and leaves the rest at
-    # whatever the umask says -- and what is being made here is a directory of credentials.
+
     _kept(at)
-    # Whole and then moved into place, and kept to its owner: it holds keys, and keys are not
-    # for the rest of the machine.
+
     _writes(at / _HELD, json.dumps(provider.held(), indent=2) + "\n")
     ready(provider)
     return provider
-
 
 def ready(provider: Provider) -> None:
     """Makes the places this provider's credentials will land, before anything writes one.
@@ -581,7 +534,6 @@ def ready(provider: Provider) -> None:
     """
     for _, instead in provider.swaps():
         _kept(Path(instead).parent)
-
 
 def _kept(at: Path) -> None:
     """Makes a directory and every one above it, each kept to its owner alone.
@@ -601,10 +553,8 @@ def _kept(at: Path) -> None:
         made.append(one)
     for one in reversed(made):
         one.mkdir(exist_ok=True)
-        # Set rather than passed: `mkdir` takes the umask off the mode it is given, and a
-        # group-writable directory of credentials is not what 0700 was asked for.
-        one.chmod(0o700)
 
+        one.chmod(0o700)
 
 def remove(cli: str, name: str) -> bool:
     """Takes a provider away, credentials and all.
@@ -625,7 +575,6 @@ def remove(cli: str, name: str) -> bool:
         return False
     shutil.rmtree(at)
     return True
-
 
 def _read(cli: str, at: Path) -> Provider | None:
     """Reads one provider back off its directory.
@@ -661,13 +610,11 @@ def _read(cli: str, at: Path) -> Provider | None:
         if isinstance(args, list)
         else (),
         made=str(held.get("made") or ""),
-        # A name, and never a mark: an account written down when a fallback was a yes or a no
-        # names nobody, so it is the end of its own chain until somebody says otherwise.
+
         fallback=str(held.get("fallback") or "")
         if isinstance(held.get("fallback"), str)
         else "",
     )
-
 
 def _directories(at: Path) -> list[Path]:
     """Every directory directly inside one, and nothing at all where there is no such place."""
@@ -675,7 +622,6 @@ def _directories(at: Path) -> list[Path]:
         return [path for path in at.iterdir() if path.is_dir()]
     except OSError:
         return []
-
 
 def env_of(said: str) -> dict[str, str]:
     """Reads variables of your own out of the lines they were typed as.
@@ -701,7 +647,6 @@ def env_of(said: str) -> dict[str, str]:
         held[name.strip()] = value.strip()
     return held
 
-
 def filled(said: str, answers: Mapping[str, str]) -> str:
     """Fills the answers into something written with `{VARIABLE}` in it.
 
@@ -716,7 +661,6 @@ def filled(said: str, answers: Mapping[str, str]) -> str:
     for name, value in answers.items():
         said = said.replace("{" + name + "}", value)
     return said
-
 
 def environ(provider: Provider | None) -> dict[str, str]:
     """What a turn under a provider is run with, on top of what it inherits.

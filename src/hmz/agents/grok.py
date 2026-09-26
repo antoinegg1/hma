@@ -24,26 +24,14 @@ if TYPE_CHECKING:
     import os
     from collections.abc import Iterator
 
-#: What the CLI is installed as.
 _COMMAND = "grok"
 
-#: What a turn at each rung of the ladder is given, by the tool ids Grok Build calls its own.
-#: An allowlist for the rung that may change nothing, since that is the only way to be sure a
-#: tool cannot run at all; a denylist above it, where what is taken away is the reaching
-#: outside the workspace. `--yolo` carries the rest: a flow watches its agent rather than
-#: gating it, and a turn waiting on an approval nobody is there to give is a flow that stopped.
 _ONLY = {"read-only": ("read_file", "grep", "list_dir")}
 _WITHHELD = {"workspace-write": ("web_search", "web_fetch")}
 
-#: And the same two where the reaching outside the workspace is refused on its own
-#: rather than as a rung: an agent told not to search the web is refused them at every
-#: rung, and one whose rung already refuses them is not refused them twice.
 _WEB_TOOLS = ("web_search", "web_fetch")
 
-#: What each kind of line reads as. A tool call that is only being updated is not shown
-#: again: it was shown when it started, and a row per status is a transcript of statuses.
 _SAYS = {"text": "text", "thought": "reasoning"}
-
 
 class GrokBuildSession(CommandSessionBase):
     """A Grok Build conversation, resumed by the id its first turn reported.
@@ -55,11 +43,8 @@ class GrokBuildSession(CommandSessionBase):
     reopened a session it had already run would fail on its second turn.
     """
 
-    #: What it writes on stdout is the turn as events rather than the agent talking.
     protocol: ClassVar[bool] = True
 
-    #: `--json-schema` is a setting of the run: the answer comes back validated by the agent
-    #: itself rather than asked for in the prompt.
     shapes: ClassVar[bool] = True
 
     def __init__(
@@ -72,12 +57,10 @@ class GrokBuildSession(CommandSessionBase):
           cwd: The directory this conversation works in, as for `SessionBase`.
         """
         super().__init__(agent, cwd)
-        #: What the agent has said so far in the turn now running, and what went wrong with it
-        #: if anything did. The text arrives in chunks, so the answer is what they come to.
+
         self._said: list[str] = []
         self._failed: str | None = None
-        #: What the turn now running has cost, added up as each response of it comes back, and
-        #: the tool calls already shown -- a call is shown as it starts and updated after.
+
         self._costing = Usage()
         self._shown: set[str] = set()
 
@@ -101,7 +84,7 @@ class GrokBuildSession(CommandSessionBase):
             self._agent.config.model,
             "--effort",
             self.effort,
-            # Everything the rung leaves is approved without being asked.
+            
             "--yolo",
         ]
         permission = self._agent.config.permission
@@ -116,8 +99,7 @@ class GrokBuildSession(CommandSessionBase):
             argv += ["--json-schema", json.dumps(schema.model_json_schema())]
         if self._id is not None:
             argv += ["--resume", self._id]
-        # Written onto the flag rather than after it: a prompt is a paragraph and may open
-        # with a dash, and a value given with an `=` is a value whatever it starts with.
+
         return [*argv, f"--single={prompt}"], None
 
     def _reads(self, line: str, *, error: bool) -> Iterator[Event]:
@@ -136,7 +118,7 @@ class GrokBuildSession(CommandSessionBase):
         try:
             said: dict[str, Any] = json.loads(line)
         except json.JSONDecodeError:
-            return  # not ours: the odd plain line among the JSON
+            return  
         kind = str(said.get("type") or "")
         if kind == "error":
             self._failed = str(said.get("message") or "") or json.dumps(said)
@@ -146,9 +128,7 @@ class GrokBuildSession(CommandSessionBase):
                 self._shown.add(marked)
                 yield Event(kind="tool", text=_called(said))
         elif kind == "usage":
-            # Told as each response lands rather than once the run is over, which is what a
-            # rate read while the turn is still running is made of. The line the turn ends on
-            # carries the same spending added up, so only these are counted.
+
             self._costing = self._costing + self._cost(
                 cast("dict[str, Any]", said.get("usage") or {})
             )
@@ -240,7 +220,6 @@ class GrokBuildSession(CommandSessionBase):
                 return str(named)
         raise ValueError(f"{_COMMAND} named no session")
 
-
 def _called(said: dict[str, Any]) -> str:
     """One tool call as the one line a row of a transcript has room for.
 
@@ -262,7 +241,6 @@ def _called(said: dict[str, Any]) -> str:
     named = said.get("toolName") or said.get("kind") or "tool"
     return f"{named} {about}".strip()[:120]
 
-
 @dataclass(frozen=True, kw_only=True)
 class GrokBuildAgentConfig(AgentConfig):
     """What Grok Build is configured with: the common model and effort, and nothing else.
@@ -270,7 +248,6 @@ class GrokBuildAgentConfig(AgentConfig):
     The model is written as Grok Build writes it, which is a name out of its own catalogue --
     `grok models` is what lists them.
     """
-
 
 class GrokBuildAgent(AgentBase):
     """Grok Build, driven through its own command line, one run per turn."""

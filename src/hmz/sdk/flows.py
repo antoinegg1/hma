@@ -22,15 +22,9 @@ if TYPE_CHECKING:
 
 __all__ = ["Flows", "Flowverses"]
 
-#: What is printed where the other flowverses print where they were fetched from. The flows
-#: humanize ships are not fetched from anywhere: they are in the package.
 _PACKAGE = "the flows humanize ships"
 
-#: For a directory under the flowverses home that is not a clone of anything, or is one whose
-#: origin cannot be read. Its flows are still offered, so it is still listed -- but where it
-#: came from is a question it has no answer to, which is not the same as having come from here.
 _NOWHERE = "-"
-
 
 class Flowverses:
     """Where flows come from: what places there are, and the three things that happen to one.
@@ -166,7 +160,6 @@ class Flowverses:
             return f"your own flows in {MINE[one.name]}"
         return plain(one.url) if one.url else nowhere
 
-
 class Flows:
     """The flows there are: what is offered, what one of them takes, and what one says it is."""
 
@@ -246,9 +239,7 @@ class Flows:
         )
         if static or any(one.severity == "error" for one in found):
             return tuple(found)
-        # By what each said and not by its code alone: the two readings make the same
-        # findings about different fields, and one dropped for sharing a code with another
-        # is a field nothing ever mentions.
+
         proof = proved(whole, name=inside(str(named)), scenarios=())
         said = {(one.code, one.said) for one in found}
         found.extend(one for one in proof.findings if (one.code, one.said) not in said)
@@ -299,8 +290,7 @@ class Flows:
         held = self.prophecy(named)
         if held is None:
             raise NotAFlow(f"{named}: not an atlas that compiles -- hmz check says why")
-        # "" for a flow that is a single file, which has no directory of its own: what is
-        # beside such a flow is the other flows, and none of it came with this one.
+
         beside = at(str(named))
         if not beside:
             raise NotAFlow(

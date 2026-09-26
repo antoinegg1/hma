@@ -24,7 +24,6 @@ _MAX_AGENTS = 64
 _MAX_HANDOVERS = 128
 _MAX_SPENDING = 32
 
-
 @dataclass(frozen=True, slots=True)
 class AgentProgress:
     """The observable state of one coding agent at snapshot time."""
@@ -35,7 +34,6 @@ class AgentProgress:
     working: bool
     role: str = ""
 
-
 @dataclass(frozen=True, slots=True)
 class Observation:
     """One bounded, human-readable event from a flow's agent stream."""
@@ -44,7 +42,6 @@ class Observation:
     kind: str
     text: str
     at: float
-
 
 @dataclass(frozen=True, slots=True)
 class FlowSnapshot:
@@ -62,14 +59,12 @@ class FlowSnapshot:
     spent: tuple[tuple[str, int, float], ...] = ()
     waiting_for_input: bool = False
 
-
 def compact(text: str, limit: int = _MAX_OBSERVATION_CHARS) -> str:
     """Normalizes an observation and keeps a single event bounded."""
     one = " ".join(text.split())
     if len(one) <= limit:
         return one
     return f"{one[: limit - 1]}…"
-
 
 def format_snapshot(snapshot: FlowSnapshot, question: str) -> str:
     """Builds the isolated prompt used by ``/btw``.

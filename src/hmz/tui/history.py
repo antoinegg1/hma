@@ -23,7 +23,6 @@ from hmz import home
 
 __all__ = ["History"]
 
-
 class History:
     """What was typed before, and where in it the editor has walked to."""
 
@@ -35,16 +34,13 @@ class History:
         """
         self._where = Path(workspace or Path.cwd()).resolve()
         self._file = home() / "history.jsonl"
-        #: Oldest first, and never the same thing twice running: a history is for finding
-        #: what was said, and one thing said twice is one thing to find.
+
         self._said: list[str] = []
         said = self._read()
         here = [text for where, text in said if where == str(self._where)]
         for line in here or [text for _, text in said]:
             self._remember(line)
-        #: Where the walk is, counting back from the newest, and what was being typed when it
-        #: started -- which is given back on the way out, so that a key pressed by mistake
-        #: cannot take a prompt with it.
+
         self._at = 0
         self._draft = ""
 
@@ -62,8 +58,7 @@ class History:
                 "at": datetime.datetime.now(datetime.UTC).strftime(
                     "%Y-%m-%dT%H:%M:%S.%fZ"
                 ),
-                # Which is what tells this directory's from everyone else's, there being one
-                # file and not one per project: a project is not a place to keep this.
+
                 "workdir": str(self._where),
                 "text": text,
             }
@@ -73,7 +68,7 @@ class History:
             with self._file.open("a", encoding="utf-8") as stream:
                 stream.write(said + "\n")
         except OSError:
-            return  # a history nobody can write is not a prompt to lose
+            return  
 
     def back(self, typed: str) -> str | None:
         """Walks one further back, keeping whatever was being typed to give back later.

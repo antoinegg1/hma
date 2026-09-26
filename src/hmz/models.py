@@ -37,51 +37,27 @@ if TYPE_CHECKING:
 
 __all__ = ["ask", "asked", "offered", "where"]
 
-#: How long a backend is given to say what it runs. Generous, because this is a coding agent
-#: starting up and some of them take the better part of a minute over it. Nothing waits on
-#: this at a prompt, so the cost of waiting too long is a spinner rather than a lost answer.
 WAITING = 180.0
 
-#: Where the catalogue of the account nobody chose is kept, under humanize's own home. A
-#: provider's is kept in the provider's own directory instead.
 _UNDER = "models"
 
-#: What the file is called inside a provider's directory.
 _HELD = "models.json"
 
-#: The id the one thing said to Claude Code is sent under, which it answers by.
 _ASKS = "models"
 
-#: How Claude Code describes a model named by `ANTHROPIC_CUSTOM_MODEL_OPTION`, which is the
-#: one entry whose `value` is a name somebody chose rather than one Claude ships.
 _CUSTOM = "Custom model"
 
-#: What Claude Code writes on the end of a model to mean that model at its largest window. A
-#: way of running the model rather than a model, so it comes off the id: the backend asked for
-#: one under that spelling answers that there is no such model.
 _WINDOW = re.compile(r"\[[^\]]*\]$")
 
-#: What codex marks the models it offers with. It has others it does not offer, and a list of
-#: what can be chosen is the ones it lists.
 _LISTED = "list"
 
-#: What opencode and mimocode write after a model to say how much it holds.
 _ABOUT = " — "
 
-#: The advisory catalogue shipped by the official DeepSeek adapter. Its preview SDK has no
-#: model-list request, so this is both what asking it answers and what a first prompt offers
-#: before there is a cache to read.
 _DSH_MODELS = ("deepseek-v4-flash", "deepseek-v4-pro")
 
-#: The same for Qwen Code, which has no command that lists what it runs: it is a client of an
-#: OpenAI-compatible endpoint, so the catalogue belongs to the account rather than to the CLI.
-#: These are what it ships pointed at; any other id that endpoint serves may be named instead.
 _QWEN_MODELS = ("qwen3-coder-plus", "qwen3-coder-flash")
 
-#: The backends whose catalogue is written down here rather than asked for, which is what a
-#: prompt offers before either has been asked.
 _ADVISORY = {"dsh": _DSH_MODELS, "qwen": _QWEN_MODELS}
-
 
 def where(cli: str, provider: str = "") -> Path:
     """Where what this backend said it runs is kept, for one account.
@@ -105,7 +81,6 @@ def where(cli: str, provider: str = "") -> Path:
         return providers.where(profile.name, provider) / _HELD
     return home() / _UNDER / f"{profile.name}.json"
 
-
 def offered(cli: str, provider: str = "") -> tuple[Model, ...]:
     """What this backend last said it runs for one account, which is what a prompt reads.
 
@@ -127,9 +102,7 @@ def offered(cli: str, provider: str = "") -> tuple[Model, ...]:
     )
     profile = named(cli)
     if not found and profile is not None and profile.name in speaking():
-        # The protocol says nothing about which models an agent runs: that is the agent's own
-        # to know, and it runs as whoever installed it configured it. One row so that an
-        # agent can be configured at all.
+
         return (Model(profile.efforts[0], profile.efforts, profile.swarms),)
     if not found and profile is not None and profile.name in _ADVISORY:
         return tuple(
@@ -137,7 +110,6 @@ def offered(cli: str, provider: str = "") -> tuple[Model, ...]:
             for name in _ADVISORY[profile.name]
         )
     return found
-
 
 def asked(cli: str, provider: str = "") -> str:
     """When this backend was last asked what it runs, for one account.
@@ -152,7 +124,6 @@ def asked(cli: str, provider: str = "") -> str:
     held = _kept(cli, provider)
     said = held.get("asked")
     return said if isinstance(said, str) else ""
-
 
 def ask(cli: str, provider: str = "", seconds: float = WAITING) -> tuple[Model, ...]:
     """Asks the backend itself what it runs as this account, writes it down, and answers.
@@ -184,15 +155,12 @@ def ask(cli: str, provider: str = "", seconds: float = WAITING) -> tuple[Model, 
     found: list[Model] = []
     seen: set[str] = set()
     for model in reading(profile, _asking(profile, provider, seconds)):
-        # A backend may name one model twice -- Claude Code offers the default under its own
-        # name as well as under `default` -- and a list with a model in it twice is a list
-        # somebody reads as two models.
+
         if model.name and model.name not in seen:
             seen.add(model.name)
             found.append(model)
     _write(where(profile.name, provider), found)
     return tuple(found)
-
 
 def _asking(profile: Profile, provider: str, seconds: float) -> Callable[..., str]:
     """How to put a question to one backend as one account.
@@ -212,21 +180,16 @@ def _asking(profile: Profile, provider: str, seconds: float) -> Callable[..., st
     held = providers.find(profile.name, provider) if provider else None
     if provider and held is None:
         raise ValueError(f"{profile.name} has no account called {provider}")
-    # As a turn of that account is run: what the provider sets, and none of what its backend
-    # would take another account from -- a key in somebody's shell profile outranks the
-    # credentials a provider was signed in with, and the answer would be the wrong account's.
+
     hushed = profile.hushes() - set(held.env) if held is not None else frozenset[str]()
     environ = {name: value for name, value in os.environ.items() if name not in hushed}
     environ |= dict(held.env) if held is not None else {}
 
     def run(args: list[str], said: str = "") -> str:
-        # Started as a turn of it is started, which is by name where PATH names one and by
-        # the path it is installed at where it does not: a backend found somewhere this
-        # machine's PATH does not name is still a backend to ask.
+
         command = profile.runs()
         argv = [elsewhere(command) or command, *args]
-        # Under the provider's own credential paths, which is the whole of what makes the
-        # answer that account's rather than this machine's.
+
         done = subprocess.run(
             held.command(argv) if held is not None else argv,
             input=said,
@@ -237,8 +200,7 @@ def _asking(profile: Profile, provider: str, seconds: float) -> Callable[..., st
             env=environ,
         )
         if done.returncode != 0:
-            # The last line it said, which is where these put the reason: a CLI that is not
-            # signed in says so, and that is the whole of what somebody needs to read.
+
             why = done.stderr.strip().splitlines()
             raise ValueError(
                 f"{profile.name} exited {done.returncode}"
@@ -247,7 +209,6 @@ def _asking(profile: Profile, provider: str, seconds: float) -> Callable[..., st
         return done.stdout
 
     return run
-
 
 def _rungs(profile: Profile, said: object) -> tuple[str, ...]:
     """The efforts one model takes, out of what its backend said of that model.
@@ -275,7 +236,6 @@ def _rungs(profile: Profile, said: object) -> tuple[str, ...]:
         rung for rung in profile.efforts if rung in spoken or rung in profile.beyond
     )
     return kept or profile.efforts
-
 
 def _claude(profile: Profile, run: Callable[..., str]) -> list[Model]:
     """Claude Code's catalogue, which is what its own `/model` list is drawn from.
@@ -321,7 +281,6 @@ def _claude(profile: Profile, run: Callable[..., str]) -> list[Model]:
         for one in _answered(said)
     ]
 
-
 def _claude_name(model: dict[str, Any]) -> str:
     """The name a Claude model may be asked for, preserving an explicit custom alias.
 
@@ -341,7 +300,6 @@ def _claude_name(model: dict[str, Any]) -> str:
     )
     return _WINDOW.sub("", str(chosen or ""))
 
-
 def _answered(said: str) -> list[dict[str, Any]]:
     """The models out of a stream of control responses, which is what Claude Code answers in.
 
@@ -358,7 +316,7 @@ def _answered(said: str) -> list[dict[str, Any]]:
         try:
             message = json.loads(line)
         except ValueError:
-            continue  # a line of something else, which a stream of these may carry
+            continue  
         if not isinstance(message, dict):
             continue
         held = cast("dict[str, Any]", message)
@@ -377,7 +335,6 @@ def _answered(said: str) -> list[dict[str, Any]]:
         ]
     raise ValueError("it said nothing about what it runs")
 
-
 def _codex(profile: Profile, run: Callable[..., str]) -> list[Model]:
     """Codex's own catalogue, which it renders as JSON and says the efforts in.
 
@@ -395,8 +352,7 @@ def _codex(profile: Profile, run: Callable[..., str]) -> list[Model]:
     found: list[Model] = []
     for one in cast("list[Any]", said.get("models") or []):
         model = cast("dict[str, Any]", one)
-        # It has models it does not offer -- a review model of its own, the open ones -- and
-        # a list of what can be chosen is the ones it says can be.
+
         if model.get("visibility") != _LISTED:
             continue
         levels = [
@@ -407,7 +363,6 @@ def _codex(profile: Profile, run: Callable[..., str]) -> list[Model]:
             Model(str(model.get("slug") or ""), _rungs(profile, levels), profile.swarms)
         )
     return found
-
 
 def _kimi(profile: Profile, run: Callable[..., str]) -> list[Model]:
     """Kimi Code's models, which are the ones its providers between them front.
@@ -432,7 +387,6 @@ def _kimi(profile: Profile, run: Callable[..., str]) -> list[Model]:
         for name, one in cast("dict[str, Any]", said.get("models") or {}).items()
     ]
 
-
 def _dsh(profile: Profile, _run: Callable[..., str]) -> list[Model]:
     """The advisory catalogue shipped by the official DeepSeek Harness adapter.
 
@@ -448,7 +402,6 @@ def _dsh(profile: Profile, _run: Callable[..., str]) -> list[Model]:
       The official adapter's advisory models, in its own order.
     """
     return [Model(name, profile.efforts, profile.swarms) for name in _ADVISORY["dsh"]]
-
 
 def _pi(profile: Profile, run: Callable[..., str]) -> list[Model]:
     """Pi's models, which it prints as a table of the providers it has credentials for.
@@ -467,15 +420,13 @@ def _pi(profile: Profile, run: Callable[..., str]) -> list[Model]:
     found: list[Model] = []
     for line in run(["--list-models"]).splitlines():
         columns = line.split()
-        # The line that names the columns is not a model, and neither is a line with no room
-        # for a provider and an id in it.
-        if len(columns) < 2 or columns[:2] == ["provider", "model"]:  # noqa: PLR2004
+
+        if len(columns) < 2 or columns[:2] == ["provider", "model"]:  
             continue
         found.append(
             Model(f"{columns[0]}/{columns[1]}", profile.efforts, profile.swarms)
         )
     return found
-
 
 def _agy(profile: Profile, run: Callable[..., str]) -> list[Model]:
     """What Antigravity CLI runs, which it lists as a slug and the name a person reads.
@@ -497,12 +448,11 @@ def _agy(profile: Profile, run: Callable[..., str]) -> list[Model]:
     found: list[Model] = []
     for line in run(["models"]).splitlines():
         columns = line.split()
-        # A line with nothing on it, and the line that says to sign in, are not models.
-        if not columns or len(columns) < 2:  # noqa: PLR2004
+        
+        if not columns or len(columns) < 2:  
             continue
         name = columns[0]
-        # The end of the name rather than a word of it, unlike Cursor's: these ids are the
-        # model and then the rung, `gemini-3.7-flash-high`, with nothing written after it.
+
         carried = next(
             (rung for rung in profile.efforts if name.endswith(f"-{rung}")), ""
         )
@@ -510,7 +460,6 @@ def _agy(profile: Profile, run: Callable[..., str]) -> list[Model]:
             Model(name, (carried,) if carried else profile.efforts, profile.swarms)
         )
     return found
-
 
 def _grok(profile: Profile, run: Callable[..., str]) -> list[Model]:
     """Grok Build's catalogue, which it prints as a list with the default marked.
@@ -531,15 +480,13 @@ def _grok(profile: Profile, run: Callable[..., str]) -> list[Model]:
     found: list[Model] = []
     for line in run(["models"]).splitlines():
         said = line.strip()
-        # The lines about a model are the only marked ones; the banner and the default are
-        # sentences, and a sentence is not a model.
+
         if not said.startswith(("* ", "- ")):
             continue
         name = said[2:].removesuffix(" (default)").strip()
         if name:
             found.append(Model(name, profile.efforts, profile.swarms))
     return found
-
 
 def _cursor(profile: Profile, run: Callable[..., str]) -> list[Model]:
     """What Cursor Agent runs, which it prints under a heading with a tip under it.
@@ -562,23 +509,17 @@ def _cursor(profile: Profile, run: Callable[..., str]) -> list[Model]:
     found: list[Model] = []
     for line in run(["--list-models"]).splitlines():
         said = _plain(line).strip()
-        # A model line is the id, and then either nothing, the name a person reads behind a
-        # dash, or the brackets that mark the one it is at. The heading above the list and
-        # the tip below it are sentences, and a sentence is not a model.
+
         name, _, rest = said.partition(" ")
         if not name or (rest and not rest.startswith(("- ", "("))):
             continue
-        # A rung is a word of the name rather than the end of it: `gpt-5-low-fast` is the
-        # `low` model asked for over the faster service, and `-fast` is not a rung.
+
         words = name.split("-")
         carried = next((rung for rung in profile.efforts if rung in words), "")
         found.append(Model(name, (carried,) if carried else profile.efforts))
     return found
 
-
-#: What a CLI wraps a word in to colour it, which is not part of what the word says.
 _COLOURED = re.compile(r"\x1b\[[0-9;]*m")
-
 
 def _plain(said: str) -> str:
     """One line with whatever colour a CLI put round it taken off.
@@ -590,7 +531,6 @@ def _plain(said: str) -> str:
       The words alone.
     """
     return _COLOURED.sub("", said)
-
 
 def _qwen(profile: Profile, _run: Callable[..., str]) -> list[Model]:
     """What Qwen Code runs, which is whatever the endpoint behind it serves.
@@ -607,7 +547,6 @@ def _qwen(profile: Profile, _run: Callable[..., str]) -> list[Model]:
       The advisory models, in the order Qwen Code offers them.
     """
     return [Model(name, profile.efforts, profile.swarms) for name in _ADVISORY["qwen"]]
-
 
 def _zcode(profile: Profile, run: Callable[..., str]) -> list[Model]:
     """What ZCode's app server says the providers it is configured with front.
@@ -642,7 +581,7 @@ def _zcode(profile: Profile, run: Callable[..., str]) -> list[Model]:
         try:
             frame = _loaded(line)
         except (TypeError, ValueError):
-            continue  # the server asks things of its client on the same stream
+            continue  
         if frame.get("id") != 1 or "result" not in frame:
             continue
         held = cast("dict[str, Any]", frame.get("result") or {})
@@ -666,7 +605,6 @@ def _zcode(profile: Profile, run: Callable[..., str]) -> list[Model]:
         return found
     raise ValueError("it said nothing about what it runs")
 
-
 def _listed(profile: Profile, run: Callable[..., str]) -> list[Model]:
     """What opencode and mimocode list, which is a model a line and its size after it.
 
@@ -681,12 +619,10 @@ def _listed(profile: Profile, run: Callable[..., str]) -> list[Model]:
     found: list[Model] = []
     for line in run(["models"]).splitlines():
         name = line.split(_ABOUT)[0].strip()
-        # Every model of these is a provider's, so a line with no provider in it is a line
-        # about something else -- a banner, a warning, a blank.
+
         if "/" in name:
             found.append(Model(name, profile.efforts, profile.swarms))
     return found
-
 
 def _loaded(said: str) -> dict[str, Any]:
     """One JSON object out of what a backend printed.
@@ -706,7 +642,6 @@ def _loaded(said: str) -> dict[str, Any]:
         raise TypeError("expected an object saying what it runs")
     return cast("dict[str, Any]", held)
 
-
 def _kept(cli: str, provider: str) -> dict[str, Any]:
     """What was written down for one account, or nothing where nothing readable was."""
     try:
@@ -714,7 +649,6 @@ def _kept(cli: str, provider: str) -> dict[str, Any]:
     except (OSError, ValueError):
         return {}
     return cast("dict[str, Any]", held) if isinstance(held, dict) else {}
-
 
 def _read(held: dict[str, Any]) -> list[tuple[str, list[str], bool]]:
     """The models out of what was written down, less anything that is not one."""
@@ -733,7 +667,6 @@ def _read(held: dict[str, Any]) -> list[tuple[str, list[str], bool]]:
                 )
             )
     return found
-
 
 def _write(at: Path, models: list[Model]) -> None:
     """Writes a catalogue down, whole, beside the moment it was asked for.
@@ -769,10 +702,6 @@ def _write(at: Path, models: list[Model]) -> None:
     )
     beside.replace(at)
 
-
-#: How each backend is asked what it runs. One entry per backend that has a way of being
-#: asked, which is every one of them: a backend nobody can ask is a backend nobody can choose
-#: a model of, and there would be nothing to offer at the prompt.
 _READING: dict[str, Callable[[Profile, Callable[..., str]], list[Model]]] = {
     "agy": _agy,
     "claude": _claude,

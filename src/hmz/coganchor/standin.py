@@ -39,15 +39,11 @@ __all__ = ["STUB_PROGRAM", "park"]
 
 log = logging.getLogger(__name__)
 
-#: ``AT_FDCWD`` as an unsigned word, for redirecting ``execveat``.
 _AT_FDCWD = 0xFFFFFFFFFFFFFF9C
 
-#: Scratch space in the tracee's stack red zone, which the exec discards anyway.
 _RED_ZONE_OFFSET = 512
 
-#: Syscall stops to walk through before giving up on finding an entry stop.
 _MAX_STEPS_TO_ENTRY = 4
-
 
 def _choose_stub() -> str:
     """Pick a program the tracee can exec that is guaranteed never to run.
@@ -61,9 +57,7 @@ def _choose_stub() -> str:
             return candidate
     return "/proc/self/exe"
 
-
 STUB_PROGRAM = _choose_stub()
-
 
 def park(pid: int, registers: Registers) -> bool:
     """Redirect a stopped ``execve`` at the stub and catch the process after it.
@@ -85,7 +79,7 @@ def park(pid: int, registers: Registers) -> bool:
     try:
         if registers.syscall_number == NR.EXECVE:
             registers.set_arg(0, address)
-        else:  # execveat(dirfd, path, ...)
+        else:  
             registers.set_arg(0, _AT_FDCWD)
             registers.set_arg(1, address)
         ptrace.setregs(pid, registers)
@@ -99,7 +93,6 @@ def park(pid: int, registers: Registers) -> bool:
         os.kill(pid, signal.SIGKILL)
     return False
 
-
 def _plant_stub_path(pid: int, registers: Registers) -> int | None:
     """Write the stub's path into the tracee's stack red zone, and verify it."""
     blob = STUB_PROGRAM.encode() + b"\0"
@@ -112,11 +105,9 @@ def _plant_stub_path(pid: int, registers: Registers) -> int | None:
         return None
     return address
 
-
 def _await_exec_event(pid: int) -> bool:
     _, status = os.waitpid(pid, ptrace.WALL)
     return os.WIFSTOPPED(status) and (status >> 16) == ptrace.EVENT_EXEC
-
 
 def _step_to_syscall_entry(pid: int) -> bool:
     """Leave the tracee where a syscall number can still be rewritten.
@@ -132,7 +123,6 @@ def _step_to_syscall_entry(pid: int) -> bool:
         if ptrace.getregs(pid).result == -errno.ENOSYS:
             return True
     return False
-
 
 def _step(pid: int) -> bool:
     """Resume to the tracee's next syscall stop and confirm it got there."""

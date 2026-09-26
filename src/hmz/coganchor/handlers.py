@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Literal
 from hmz.coganchor.linux import procfs
 from hmz.coganchor.linux.syscalls import NR, syscall_name
 
-if TYPE_CHECKING:  # pragma: no cover - import cycle only matters for typing
+if TYPE_CHECKING:  
     from collections.abc import Callable
 
     from hmz.coganchor.linux.ptrace import Registers
@@ -53,31 +53,13 @@ O_ACCMODE = 0o3
 
 _CREAT_FLAGS = O_CREAT | O_WRONLY | O_TRUNC
 
-#: The flags field of ``struct open_how``, which is the first ``u64`` of it.
 _OPEN_HOW_FLAGS = 8
 
-#: Where the same structure keeps the resolution the call insists on, and the two
-#: settings of it an answered path cannot honour: one says the file must be under
-#: the descriptor given, the other that the descriptor is the root.  A call asking
-#: for either is failed rather than answered, since answering it would either break
-#: the promise or quietly re-root the path somewhere else.
 _OPEN_HOW_RESOLVE = 16
 _RESOLVE_CONFINED = 0x08 | 0x10
 
-#: What a redirected path is kept clear of: the red zone, which a leaf function of
-#: the tracee may be using this moment.  Only as many bytes as the paths themselves
-#: take are written below it -- a thread with a stack of its own may have very
-#: little left, and a fixed few kilobytes would be written past the end of it.
 _RED_ZONE = 128
 
-#: Where each syscall keeps the paths it names, as ``(descriptor argument, path
-#: argument)`` pairs -- the descriptor being ``None`` for a call that has none and
-#: resolves against the process's own directory.  Read off the manual pages, one
-#: line per call, and the same table :mod:`hmz.providers._trace` redirects
-#: against when a turn is run under a provider without being anchored.
-#:
-#: ``execve`` is deliberately absent: what a process becomes is the exec bridge's
-#: business, and a redirected path is a credential rather than a program.
 _REDIRECTABLE: dict[int, tuple[tuple[int | None, int], ...]] = {
     NR.OPEN: ((None, 0),),
     NR.CREAT: ((None, 0),),
@@ -92,9 +74,7 @@ _REDIRECTABLE: dict[int, tuple[tuple[int | None, int], ...]] = {
     NR.CHMOD: ((None, 0),),
     NR.TRUNCATE: ((None, 0),),
     NR.UTIMES: ((None, 0),),
-    # The link itself, not what it says: what a symlink points at is text the
-    # kernel does not resolve here, and rewriting it would answer a question
-    # nobody asked.
+
     NR.SYMLINK: ((None, 1),),
     NR.LINK: ((None, 0), (None, 1)),
     NR.RENAME: ((None, 0), (None, 1)),
@@ -115,7 +95,6 @@ _REDIRECTABLE: dict[int, tuple[tuple[int | None, int], ...]] = {
     NR.LINKAT: ((0, 1), (2, 3)),
 }
 
-
 @dataclass(frozen=True, slots=True)
 class Action:
     """What the supervisor should do with a stopped syscall."""
@@ -123,15 +102,12 @@ class Action:
     kind: Literal["allow", "errno", "stall"]
     errno: int = 0
 
-
 ALLOW = Action("allow")
 STALL = Action("stall")
-
 
 def fails(code: int) -> Action:
     """The action that fails a syscall with this errno, or EIO when it names none."""
     return Action("errno", code or errno.EIO)
-
 
 class SyscallDispatcher:
     """Routes each trapped syscall to its handler."""
@@ -195,8 +171,6 @@ class SyscallDispatcher:
             )
             return fails(exc.errno or errno.EIO)
 
-    # ---------------------------------------------------------- answered paths
-
     def _answer(self, tracee: Tracee, registers: Registers) -> Action | None:
         """Point a syscall's paths at whatever this session answers them with.
 
@@ -213,9 +187,9 @@ class SyscallDispatcher:
         """
         router = self._sup.router
         if not router.redirects:
-            # A session that answers nothing reads no path out of a tracee twice.
+            
             return None
-        taken = 0  # what the paths already planted used, so two do not overwrite one
+        taken = 0  
         for descriptor, argument in _REDIRECTABLE.get(registers.syscall_number, ()):
             dirfd = AT_FDCWD if descriptor is None else registers.signed_arg(descriptor)
             named = self._path(tracee.pid, dirfd, registers.arg(argument))
@@ -240,8 +214,6 @@ class SyscallDispatcher:
                 return fails(errno.EIO)
             taken += room
         return None
-
-    # ------------------------------------------------------------------ opening
 
     def _open(self, tracee: Tracee, registers: Registers) -> Action:
         path = self._path(tracee.pid, AT_FDCWD, registers.arg(0))
@@ -271,15 +243,12 @@ class SyscallDispatcher:
             shadow.ensure_directory(path)
             return ALLOW
         writable = bool(flags & (O_WRONLY | O_RDWR | O_CREAT))
-        # A truncating write never needs the old bytes; everything else does,
-        # including O_APPEND and read-modify-write editing.
+
         if not (flags & O_TRUNC and (flags & O_ACCMODE) == O_WRONLY):
             shadow.ensure_content(path)
         if writable:
             shadow.note_write(path)
         return ALLOW
-
-    # ----------------------------------------------------- metadata and lookups
 
     def _peek_path0(self, tracee: Tracee, registers: Registers) -> Action:
         """Materialise the directory holding ``arg0`` and let the syscall run."""
@@ -300,8 +269,6 @@ class SyscallDispatcher:
         if path is not None and self._sup.router.is_remote_path(path):
             self._sup.shadow.ensure_directory(path)
         return ALLOW
-
-    # -------------------------------------------------------------- mutations
 
     def _mkdir(self, tracee: Tracee, registers: Registers) -> Action:
         return self._make_dir(
@@ -379,8 +346,7 @@ class SyscallDispatcher:
         if not router.is_remote_path(source) and not router.is_remote_path(target):
             return ALLOW
         if router.is_remote_path(source) != router.is_remote_path(target):
-            # Crossing the boundary would need a copy; refuse the way the
-            # kernel refuses a cross-device rename, so callers fall back.
+
             return fails(errno.EXDEV)
         self._sup.shadow.ensure_path(source)
         self._sup.shadow.ensure_path(target)
@@ -446,8 +412,7 @@ class SyscallDispatcher:
         path = self._path(tracee.pid, AT_FDCWD, registers.arg(0))
         if path is None or not self._sup.router.is_remote_path(path):
             return ALLOW
-        # Truncation reshapes local content, which the next flush pushes; no
-        # separate remote call is needed.
+
         self._sup.shadow.ensure_content(path)
         self._sup.shadow.note_write(path)
         return ALLOW
@@ -468,13 +433,11 @@ class SyscallDispatcher:
         if path is None or not self._sup.router.is_remote_path(path):
             return ALLOW
         if times == (None, None):
-            return ALLOW  # both omitted: the syscall asks for no change at all
+            return ALLOW  
         self._sup.shadow.ensure_path(path)
         return self._replay(
             lambda: self._sup.client.utime(self._virtual(path), times[0], times[1])
         )
-
-    # ------------------------------------------------------------------ execve
 
     def _execve(self, tracee: Tracee, registers: Registers) -> Action:
         program = procfs.read_cstring(tracee.pid, registers.arg(0))
@@ -509,8 +472,6 @@ class SyscallDispatcher:
             tracee, registers, resolved, argv or [resolved], env
         )
 
-    # ----------------------------------------------------------------- network
-
     def _connect(self, tracee: Tracee, registers: Registers) -> Action:
         proxy = self._sup.netproxy
         if proxy is None:
@@ -527,8 +488,6 @@ class SyscallDispatcher:
             return ALLOW
         registers.set_arg(2, len(blob))
         return ALLOW
-
-    # --------------------------------------------------------------- utilities
 
     def _replay(self, operation: Callable[[], object]) -> Action:
         """Perform a mutation on the target, mapping its errno onto the syscall."""
@@ -547,7 +506,7 @@ class SyscallDispatcher:
         if raw is None:
             return None
         if raw == "":
-            # AT_EMPTY_PATH: the descriptor itself names the target.
+            
             return None if dirfd == AT_FDCWD else _fd_path(pid, dirfd)
         if raw.startswith("/"):
             return os.path.normpath(raw)
@@ -589,14 +548,10 @@ class SyscallDispatcher:
             )
         return (_timespec_ns(atime_s, atime_frac), _timespec_ns(mtime_s, mtime_frac))
 
-
-#: The pair of times ``utimensat`` takes, sixteen bytes apiece.
 _TIMES_PAIR = 32
 
-#: ``UTIME_NOW``/``UTIME_OMIT`` sentinels from <sys/stat.h>.
 _UTIME_NOW = (1 << 30) - 1
 _UTIME_OMIT = (1 << 30) - 2
-
 
 def _timespec_ns(seconds: int, nanoseconds: int) -> int | None:
     """Nanoseconds for one ``timespec``, or ``None`` where it says to omit.
@@ -613,7 +568,6 @@ def _timespec_ns(seconds: int, nanoseconds: int) -> int | None:
         return time.time_ns()
     return seconds * 1_000_000_000 + nanoseconds
 
-
 def _confined(pid: int, registers: Registers) -> bool:
     """Whether this call asked for a resolution an answered path cannot be given."""
     if registers.syscall_number != NR.OPENAT2:
@@ -623,7 +577,6 @@ def _confined(pid: int, registers: Registers) -> bool:
     except OSError:
         return False
     return bool(int.from_bytes(raw[_OPEN_HOW_RESOLVE:], "little") & _RESOLVE_CONFINED)
-
 
 def _plant(
     pid: int, registers: Registers, taken: int, argument: int, path: str
@@ -640,8 +593,7 @@ def _plant(
     the call was also given, so pointing the argument at it is the whole of the
     rewrite.
     """
-    # As the tracee named it: a path is bytes, and one that is not valid text
-    # came back through the surrogates ``read_cstring`` escapes it with.
+
     blob = os.fsencode(path) + b"\0"
     address = registers.stack_pointer - _RED_ZONE - taken - len(blob)
     try:
@@ -653,14 +605,12 @@ def _plant(
     registers.set_arg(argument, address)
     return len(blob)
 
-
 def _fd_path(pid: int, dirfd: int) -> str | None:
     try:
         target = procfs.fd_target(pid, dirfd)
     except OSError:
         return None
     return target if target.startswith("/") else None
-
 
 def _as_mapping(entries: list[str]) -> dict[str, str]:
     env: dict[str, str] = {}
@@ -670,14 +620,9 @@ def _as_mapping(entries: list[str]) -> dict[str, str]:
             env[name] = value
     return env
 
-
-#: What a ``sockaddr`` holds up to the part read here: family, port and four bytes of
-#: address for IPv4; the same past a flow label and sixteen bytes for IPv6, which is
-#: twenty-eight bytes whole.
 _SOCKADDR_IN = 8
 _SOCKADDR_IN6 = 24
 _SOCKADDR_IN6_SIZE = 28
-
 
 def _read_sockaddr(pid: int, address: int, length: int) -> tuple[int, str, int] | None:
     """Decode an IPv4/IPv6 ``connect`` target, ignoring anything else."""
@@ -697,7 +642,6 @@ def _read_sockaddr(pid: int, address: int, length: int) -> tuple[int, str, int] 
         return family, socket.inet_ntop(socket.AF_INET6, raw[8:24]), port
     return None
 
-
 def _encode_sockaddr(family: int, host: str, port: int) -> bytes:
     """Build a replacement address in the family the tracee's socket already has.
 
@@ -708,13 +652,13 @@ def _encode_sockaddr(family: int, host: str, port: int) -> bytes:
         return (
             struct.pack("<H", socket.AF_INET6)
             + struct.pack("!H", port)
-            + bytes(4)  # sin6_flowinfo
+            + bytes(4)  
             + socket.inet_pton(socket.AF_INET6, host)
-            + bytes(4)  # sin6_scope_id
+            + bytes(4)  
         )
     return (
         struct.pack("<H", socket.AF_INET)
         + struct.pack("!H", port)
         + socket.inet_aton(host)
-        + bytes(8)  # sin_zero
+        + bytes(8)  
     )

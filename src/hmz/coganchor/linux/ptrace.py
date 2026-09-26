@@ -42,7 +42,6 @@ _libc = ctypes.CDLL("libc.so.6", use_errno=True)
 _libc.ptrace.restype = ctypes.c_long
 _libc.ptrace.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p]
 
-# Requests.
 _TRACEME: Final = 0
 _CONT: Final = 7
 _SYSCALL: Final = 24
@@ -53,37 +52,28 @@ _SETREGSET: Final = 0x4205
 
 _NT_PRSTATUS: Final = 1
 
-# ``PTRACE_EVENT_*`` codes, delivered in the high bits of a wait status.
-# Events the supervisor does not name (exec, exit, vfork-done) are resumed
-# generically, so only these are spelled out.
 EVENT_FORK: Final = 1
 EVENT_VFORK: Final = 2
 EVENT_CLONE: Final = 3
 EVENT_EXEC: Final = 4
 EVENT_SECCOMP: Final = 7
 
-#: Options installed on every tracee: follow the whole process tree, report
-#: seccomp traps, distinguish group-stops, and kill everything if we die.
 OPTIONS: Final = (
-    0x00000001  # TRACESYSGOOD
-    | 0x00000002  # TRACEFORK
-    | 0x00000004  # TRACEVFORK
-    | 0x00000008  # TRACECLONE
-    | 0x00000010  # TRACEEXEC
-    | 0x00000080  # TRACESECCOMP
-    | 0x00100000  # EXITKILL
+    0x00000001  
+    | 0x00000002  
+    | 0x00000004  
+    | 0x00000008  
+    | 0x00000010  
+    | 0x00000080  
+    | 0x00100000  
 )
 
-#: Bit set in ``WSTOPSIG`` for syscall stops when ``TRACESYSGOOD`` is enabled.
 SYSCALL_STOP_SIG: Final = 0x80
 
-#: ``__WALL``: wait for clone children whose exit signal is not SIGCHLD.
 WALL: Final = 0x40000000
-
 
 class _Iovec(ctypes.Structure):
     _fields_ = [("base", ctypes.c_void_p), ("len", ctypes.c_size_t)]
-
 
 def _ptrace(request: int, pid: int, addr: int, data: int) -> int:
     ctypes.set_errno(0)
@@ -95,7 +85,6 @@ def _ptrace(request: int, pid: int, addr: int, data: int) -> int:
                 code, os.strerror(code), f"ptrace request {request} on pid {pid}"
             )
     return int(result)
-
 
 class Registers:
     """Mutable view over a tracee's ``user_regs_struct``."""
@@ -149,31 +138,25 @@ class Registers:
         self._buffer[ARCH.arg_indices[index]] = _as_unsigned(value)
         self._dirty = True
 
-
 def _as_unsigned(value: int) -> int:
     return value & 0xFFFFFFFFFFFFFFFF
-
 
 def _as_signed(value: int) -> int:
     value &= 0xFFFFFFFFFFFFFFFF
     return value - (1 << 64) if value >= (1 << 63) else value
-
 
 def _as_signed_int(value: int) -> int:
     """Interpret the low 32 bits as a C ``int`` (used for ``dirfd`` arguments)."""
     value &= 0xFFFFFFFF
     return value - (1 << 32) if value >= (1 << 31) else value
 
-
 def traceme() -> None:
     """Called in the forked child to request tracing by its parent."""
     _ptrace(_TRACEME, 0, 0, 0)
 
-
 def setoptions(pid: int, options: int = OPTIONS) -> None:
     """Set what the tracer is told about, which holds until it is set again."""
     _ptrace(_SETOPTIONS, pid, 0, options)
-
 
 def getregs(pid: int) -> Registers:
     """Read the registers of a tracee that is stopped."""
@@ -182,23 +165,19 @@ def getregs(pid: int) -> Registers:
     _ptrace(_GETREGSET, pid, _NT_PRSTATUS, ctypes.addressof(iov))
     return Registers(buffer)
 
-
 def setregs(pid: int, registers: Registers) -> None:
     """Write registers back, which is how a syscall is answered or redirected."""
     buffer = registers.buffer
     iov = _Iovec(ctypes.cast(buffer, ctypes.c_void_p), ctypes.sizeof(buffer))
     _ptrace(_SETREGSET, pid, _NT_PRSTATUS, ctypes.addressof(iov))
 
-
 def cont(pid: int, signal: int = 0) -> None:
     """Resume until the next stop, delivering a signal on the way if one is given."""
     _ptrace(_CONT, pid, 0, signal)
 
-
 def syscall(pid: int, signal: int = 0) -> None:
     """Resume until the next syscall entry or exit stop."""
     _ptrace(_SYSCALL, pid, 0, signal)
-
 
 def get_event_message(pid: int) -> int:
     """Return the ``PTRACE_EVENT_*`` payload, e.g. a new child's pid."""

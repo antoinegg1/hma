@@ -37,7 +37,6 @@ __all__ = ["Server"]
 
 log = logging.getLogger(__name__)
 
-#: Filesystem operations that complete in one round trip.
 _SIMPLE_OPS: dict[Op, Callable[[ExportTable, dict[str, Any]], dict[str, Any]]] = {
     Op.STAT: lambda t, m: fsops.stat(t, m["path"]),
     Op.LISTDIR: lambda t, m: fsops.listdir(t, m["path"]),
@@ -59,7 +58,6 @@ _SIMPLE_OPS: dict[Op, Callable[[ExportTable, dict[str, Any]], dict[str, Any]]] =
     ),
 }
 
-
 class _WriteSink:
     """Streams an inbound file write to disk, replying once END arrives."""
 
@@ -68,10 +66,10 @@ class _WriteSink:
         self._channel = channel
         self._writer = writer
 
-    def feed(self, stream: Stream, data: bytes) -> None:  # noqa: ARG002
+    def feed(self, stream: Stream, data: bytes) -> None:  
         self._writer.feed(data)
 
-    def end_input(self, stream: Stream) -> None:  # noqa: ARG002
+    def end_input(self, stream: Stream) -> None:  
         try:
             result = self._writer.finish()
         except OSError as exc:
@@ -82,10 +80,7 @@ class _WriteSink:
     def shutdown(self) -> None:
         self._writer.abort()
 
-
-#: Receives the CHUNK/END frames that follow a streaming request.
 _Sink = _WriteSink | Session
-
 
 class Server:
     """Serves one coganchor connection until the peer disconnects."""
@@ -130,8 +125,7 @@ class Server:
                 if isinstance(sink, _WriteSink):
                     self._release(frame.msg_id)
         except OSError as exc:
-            # Tear the sink down before dropping it: a half-written file would
-            # otherwise keep its temporary sibling for good.
+
             sink.shutdown()
             self._channel.send(Frame.error(frame.msg_id, exc))
             self._release(frame.msg_id)
@@ -184,11 +178,7 @@ class Server:
             return
         version = frame.meta.get("version")
         if version != PROTOCOL_VERSION:
-            # Both ends check, because either may be the older build: a client
-            # that never hears our version would otherwise proceed regardless.
-            # The connection goes with it -- an untokened session starts out
-            # authenticated, so merely failing the handshake would leave every
-            # following request working.
+
             self._fail(
                 frame,
                 OSError(

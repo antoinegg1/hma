@@ -57,14 +57,11 @@ __all__ = [
 
 PROTOCOL_VERSION = 1
 
-#: Body size used when splitting large payloads into stream chunks.
 CHUNK_SIZE = 1 << 16
 
-#: Hard ceiling on a single frame, to bound memory use on malformed input.
 MAX_FRAME_BYTES = 1 << 30
 
 _HEADER = struct.Struct("<IIQ")
-
 
 class Kind(enum.Enum):
     """Frame kind."""
@@ -75,14 +72,11 @@ class Kind(enum.Enum):
     CHUNK = "c"
     END = "z"
 
-
 class Op(enum.Enum):
     """Remote operations understood by :mod:`hmz.coganchor.serve`."""
 
-    # Handshake.
     HELLO = "hello"
 
-    # Filesystem.
     LISTDIR = "listdir"
     STAT = "stat"
     READ = "read"
@@ -98,14 +92,10 @@ class Op(enum.Enum):
     TRUNCATE = "truncate"
     UTIME = "utime"
 
-    # Process execution.  EXEC opens a stream that CHUNK/END frames feed;
-    # SIGNAL is a separate request naming that stream.
     EXEC = "exec"
     SIGNAL = "signal"
 
-    # TCP tunnelling.  CONNECT opens a stream carried by CHUNK/END frames.
     CONNECT = "connect"
-
 
 class Stream(enum.IntEnum):
     """Identifies which byte stream a :attr:`Kind.CHUNK` frame belongs to.
@@ -119,10 +109,8 @@ class Stream(enum.IntEnum):
     STDERR = 2
     DATA = 3
 
-
 class ProtocolError(Exception):
     """Raised on malformed frames or an unexpected end of stream."""
-
 
 class RemoteOSError(OSError):
     """An :class:`OSError` that happened on the other machine.
@@ -138,7 +126,6 @@ class RemoteOSError(OSError):
             str(meta.get("strerror", "remote error")),
             meta.get("filename"),
         )
-
 
 @dataclass(slots=True)
 class Frame:
@@ -199,7 +186,6 @@ class Frame:
     def stream(self) -> Stream:
         return Stream(self.meta.get("s", int(Stream.DATA)))
 
-
 class Channel:
     """A framed, bidirectional connection.
 
@@ -240,7 +226,7 @@ class Channel:
         if meta_len > payload_len or payload_len > MAX_FRAME_BYTES:
             raise ProtocolError(f"implausible frame header: {payload_len}/{meta_len}")
         payload = self._read_exactly(payload_len)
-        assert payload is not None  # noqa: S101
+        assert payload is not None  
         try:
             meta = json.loads(payload[:meta_len])
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -300,17 +286,13 @@ class Channel:
             remaining -= len(data)
         return chunks[0] if len(chunks) == 1 else b"".join(chunks)
 
-
-#: Characters that can precede or follow a path inside a command line.
 _BOUNDARY = r"\s'\"=:,;()\[\]<>|&"
-
 
 @functools.lru_cache(maxsize=64)
 def _prefix_pattern(prefix: str) -> re.Pattern[str]:
     return re.compile(
         rf"(?:^|(?<=[{_BOUNDARY}])){re.escape(prefix)}(?=[/{_BOUNDARY}]|$)"
     )
-
 
 def rewrite_path_prefix(text: str, prefix: str, replacement: str) -> str:
     """Replace ``prefix`` with ``replacement`` where it names a path.

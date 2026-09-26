@@ -33,33 +33,22 @@ if TYPE_CHECKING:
 
 __all__ = ["attaches", "reads", "size"]
 
-#: How much is read at a time, off the terminal and off the socket alike.
 _READ = 1 << 16
 
-#: What a terminal that has not been told its own size is drawn for.
 _WIDE, _TALL = 80, 24
 
-#: The terminal, which is the two descriptors a terminal is rather than the two streams
-#: Python wraps them in: what is being carried is bytes, and something else may have put a
-#: stream of its own where `sys.stdout` was without the terminal having moved.
 _IN, _OUT = 0, 1
 
-#: What a terminal is put back to, whichever way the reading ended: out of the alternate
-#: screen, cursor shown, mouse reporting off, bracketed paste off, focus reporting off, the
-#: keyboard protocol popped and line wrapping back on. The run writes these itself when it
-#: closes; a run that has only let go of this terminal never will, and a terminal left in a
-#: full-screen program's modes is a shell nobody can use.
 _BACK = (
-    b"\x1b[<u"  # pop whatever keyboard protocol was pushed
-    b"\x1b[?2004l"  # bracketed paste off
-    b"\x1b[?1004l"  # focus reporting off
-    b"\x1b[?1000l\x1b[?1003l\x1b[?1015l\x1b[?1006l\x1b[?1016l"  # mouse reporting off
-    b"\x1b[?2048l"  # in-band resize reports off
-    b"\x1b[?7h"  # line wrapping back on
-    b"\x1b[?25h"  # cursor shown
-    b"\x1b[?1049l"  # and out of the alternate screen, last
+    b"\x1b[<u"  
+    b"\x1b[?2004l"  
+    b"\x1b[?1004l"  
+    b"\x1b[?1000l\x1b[?1003l\x1b[?1015l\x1b[?1006l\x1b[?1016l"  
+    b"\x1b[?2048l"  
+    b"\x1b[?7h"  
+    b"\x1b[?25h"  
+    b"\x1b[?1049l"  
 )
-
 
 def attaches(at: os.PathLike[str] | str) -> socket.socket:
     """Opens the socket a run is reached through.
@@ -82,7 +71,6 @@ def attaches(at: os.PathLike[str] | str) -> socket.socket:
         raise
     return one
 
-
 def reads(one: socket.socket) -> int:
     """Reads a run from this terminal, until it ends or lets go.
 
@@ -102,13 +90,10 @@ def reads(one: socket.socket) -> int:
         return 1
     with _raw():
         said = _pumps(one)
-    # After the terminal has been put back, and not before: a line drawn on the alternate
-    # screen is a line thrown away with it, and why this terminal was let go of is the one
-    # thing somebody is looking at when it happens.
+
     if said:
         _says(said)
     return 0
-
 
 def _pumps(one: socket.socket) -> str:
     """Carries the keys one way and the screen the other, until either end goes.
@@ -136,7 +121,7 @@ def _pumps(one: socket.socket) -> str:
         while True:
             for key, _ in selector.select():
                 if key.fd == woken_r:
-                    # A signal arrived: the only one hooked is the terminal changing size.
+                    
                     with contextlib.suppress(OSError):
                         os.read(woken_r, _READ)
                     columns, rows = size()
@@ -144,9 +129,9 @@ def _pumps(one: socket.socket) -> str:
                 elif key.fd == reading:
                     read = _taken(one)
                     if read is None:
-                        continue  # nothing had arrived after all
+                        continue  
                     if not read:
-                        return said  # the run has gone
+                        return said  
                     for kind, payload in frames.feed(read):
                         if kind == OUTPUT:
                             _draws(payload)
@@ -158,8 +143,7 @@ def _pumps(one: socket.socket) -> str:
                         return said
                     one.sendall(frame(INPUT, typed))
     except (OSError, ValueError):
-        # The run has gone, this terminal has, or what came off the socket is not this
-        # protocol: either way there is nothing left to read.
+
         return said
     finally:
         signal.set_wakeup_fd(was)
@@ -171,10 +155,8 @@ def _pumps(one: socket.socket) -> str:
         with contextlib.suppress(OSError):
             one.close()
 
-
 def _noticed(_signal: int, _frame: FrameType | None) -> None:
     """Notices that this terminal has changed size, which the wakeup descriptor carries."""
-
 
 def _taken(one: socket.socket) -> bytes | None:
     """What has arrived off the socket.
@@ -193,14 +175,12 @@ def _taken(one: socket.socket) -> bytes | None:
             return None
         return b""
 
-
 def _taken_from(fd: int) -> bytes:
     """What has been typed, and nothing at all for a terminal that has gone."""
     try:
         return os.read(fd, _READ)
     except OSError:
         return b""
-
 
 def _draws(payload: bytes) -> None:
     """Puts what the run drew onto this terminal, whole."""
@@ -213,12 +193,10 @@ def _draws(payload: bytes) -> None:
             return
         payload = payload[written:]
 
-
 def _says(what: str) -> None:
     """Says why the reading ended, on the terminal that is now back to being a terminal."""
     with contextlib.suppress(OSError):
         os.write(_OUT, f"{what}\r\n".encode())
-
 
 def size() -> tuple[int, int]:
     """How big this terminal is, as the run is to draw for it.
@@ -233,7 +211,6 @@ def size() -> tuple[int, int]:
     except OSError:
         return _WIDE, _TALL
     return size.columns or _WIDE, size.lines or _TALL
-
 
 @contextlib.contextmanager
 def _raw() -> Generator[None]:

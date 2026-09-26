@@ -1,0 +1,77 @@
+{
+  "root": "/REPRO_ROOT/runs/new/task",
+  "task_file": "/REPRO_ROOT/task/task.md",
+  "agent_image": "LOCAL_HMA_AGENT_IMAGE",
+  "evaluator_image": "LOCAL_HMA_EVALUATOR_IMAGE",
+  "evaluator_seed_home": "/REPRO_ROOT/task/evaluator-home",
+  "uid": 1000,
+  "gid": 1000,
+  "actors": [
+    {
+      "spec": "cli=claude,model=claude-opus-5,effort=max,permission=bypass,web_search=on",
+      "environment_names": [],
+      "seed_files": [
+        {
+          "source": "/REPRO_ROOT/credentials/claude-settings.json",
+          "target": ".claude/settings.json"
+        },
+        {
+          "source": "/REPRO_ROOT/credentials/claude-credentials.json",
+          "target": ".claude/.credentials.json"
+        }
+      ]
+    },
+    {
+      "spec": "cli=codex,model=gpt-5.6-sol,effort=max,permission=bypass,web_search=on",
+      "environment_names": [],
+      "seed_files": [
+        {
+          "source": "/REPRO_ROOT/credentials/codex-auth.json",
+          "target": ".codex/auth.json"
+        },
+        {
+          "source": "/REPRO_ROOT/credentials/codex-config.toml",
+          "target": ".codex/config.toml"
+        }
+      ]
+    }
+  ],
+  "agent_data": [
+    {
+      "source": "/REPRO_ROOT/task/public",
+      "target": "/home/user/.flowbench-data/input"
+    }
+  ],
+  "evaluator_data": [
+    {
+      "source": "/REPRO_ROOT/task/private",
+      "target": "/home/user/.flowbench-data/prepared"
+    },
+    {
+      "source": "/REPRO_ROOT/task/control",
+      "target": "/home/user/.flowbench-data/control"
+    }
+  ],
+  "active_time_limit_seconds": 21600,
+  "max_valid_submissions_per_session": 5,
+  "review_reserve_seconds": 900,
+  "review_turn_seconds": 600,
+  "cpus": 26,
+  "memory": "200000m",
+  "shm_size": "65536m",
+  "gpu": "0",
+  "evaluator": {
+    "schema_version": 1,
+    "experiment_id": "hma-local",
+    "suite": "mlebench_full",
+    "slug": "REPLACE_WITH_TASK_SLUG",
+    "higher_is_better": true,
+    "feedback_mode": "blind",
+    "submission_limit": null,
+    "max_artifact_bytes": 10737418240,
+    "score_timeout_seconds": 3600,
+    "upstream_path": "/opt/mlebench",
+    "dataset_path": "/home/user/.flowbench-data/prepared",
+    "control_path": "/home/user/.flowbench-data/control"
+  }
+}

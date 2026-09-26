@@ -21,7 +21,6 @@ if TYPE_CHECKING:
 
 __all__ = ["Accounts"]
 
-
 class Accounts:
     """Every account there is, how a backend is signed into, and what one of them runs."""
 

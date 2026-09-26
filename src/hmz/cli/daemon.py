@@ -21,7 +21,6 @@ if TYPE_CHECKING:
 
 __all__ = ["daemon"]
 
-
 def daemon(argv: list[str]) -> int:
     """Carries out one `hmz daemon` line.
 
@@ -88,7 +87,6 @@ def daemon(argv: list[str]) -> int:
         return _attach(args.workspace)
     return _stop(args.workspace, kill=args.kill)
 
-
 def _list(*, quiet: bool) -> int:
     """Prints every run being held on this machine, oldest first."""
     from hmz.cli import many
@@ -112,7 +110,6 @@ def _list(*, quiet: bool) -> int:
         )
     return 0
 
-
 def _status(workspace: str | None) -> int:
     """Prints what one held run is doing."""
     from hmz.cli import many
@@ -126,14 +123,11 @@ def _status(workspace: str | None) -> int:
     print(f"pid         {one.pid}")
     print(f"started     {one.started}")
     print(f"socket      {one.at}")
-    # What the run is drawing for, which is the terminal it was started from: a run holds
-    # one pseudoterminal for its whole life, and a terminal of another kind that reads it
-    # later is read at that one's size and told in that one's language.
+
     print(f"drawing for {said.get('term') or 'an unnamed terminal'}")
     print(f"reading     {many(said.get('attached') or 0, 'terminal')}")
     print(f"running     {', '.join(flows) if flows else 'nothing'}")
     return 0
-
 
 def _attach(workspace: str | None) -> int:
     """Reads one held run from this terminal, which is what `hmz` alone does."""
@@ -141,7 +135,6 @@ def _attach(workspace: str | None) -> int:
     if one is None:
         return 1
     return one.attach()
-
 
 def _start(flow: str, agents: list[str], parser: ArgumentParser) -> int:
     """Holds a run here without reading it, for a machine being set up rather than sat at."""
@@ -165,7 +158,6 @@ def _start(flow: str, agents: list[str], parser: ArgumentParser) -> int:
     print(f"holding a run in {one.workspace} as pid {one.pid}; `hmz` reads it")
     return 0
 
-
 def _stop(workspace: str | None, *, kill: bool) -> int:
     """Stops the flow and closes the interface, or ends the process holding both."""
     one = _found(workspace)
@@ -180,7 +172,6 @@ def _stop(workspace: str | None, *, kill: bool) -> int:
         return 1
     print(f"the run in {one.workspace} is over")
     return 0
-
 
 def _found(workspace: str | None) -> Daemon | None:
     """The run being held in one directory, saying so where none is."""

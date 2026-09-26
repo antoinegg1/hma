@@ -1,4 +1,4 @@
-"""Opt-in guarded native evaluator; never modifies the original evaluator file."""
+'Opt-in guarded native evaluator; never modifies the original evaluator file.'
 
 from __future__ import annotations
 
@@ -19,11 +19,10 @@ from typing import Any
 
 from .handoff import atomic_json
 
-
 def guarded_types(
     base: ModuleType, control_file: Path, admin_key: str
 ) -> tuple[type, type]:
-    """Wrap native scoring/ledger semantics with durable per-session admission."""
+    'Wrap native scoring/ledger semantics with durable per-session admission.'
     request_context = threading.local()
 
     class State(base.State):
@@ -34,7 +33,7 @@ def guarded_types(
                 or config["submission_limit"] is not None
             ):
                 raise ValueError(
-                    "submit3 requires blind evaluation and no cell-wide quota"
+                    "hma requires blind evaluation and no cell-wide quota"
                 )
             self.turns = (
                 json.loads(control_file.read_text()) if control_file.exists() else []
@@ -69,14 +68,7 @@ def guarded_types(
                     turn.get("deadline_epoch"), (int, float)
                 ) or not math.isfinite(turn["deadline_epoch"]):
                     raise ValueError("invalid protected deadline")
-                # Two classes of turn, and only one of them owns the budget
-                # clock. Every turn that can accept a submission must carry the
-                # SAME deadline -- that is the original guarantee, and moving it
-                # would buy an actor working time. A turn with limit 0 cannot
-                # accept anything, so it may carry a later one: that is what
-                # makes this variant's post-cutoff selection phase honest rather
-                # than a way to extend the budget. It may never carry an EARLIER
-                # one, which would let a turn outlive the clock it was opened on.
+
                 if turn["limit"] > 0:
                     if deadline is not None and deadline != turn["deadline_epoch"]:
                         raise ValueError("protected deadline changed")
@@ -123,8 +115,7 @@ def guarded_types(
                     or limit < 0
                 ):
                     raise ValueError("invalid turn contract")
-                # A zero-limit turn is a reading turn, and a cell cannot open
-                # with one: there would be nothing accepted to read.
+
                 if limit == 0 and not self.turns:
                     raise ValueError("selection turn before any submission turn")
                 if not math.isfinite(deadline) or deadline <= time.time():
@@ -144,10 +135,7 @@ def guarded_types(
                     budget = min(
                         t["deadline_epoch"] for t in self.turns if t["limit"] > 0
                     )
-                    # Same rule as the reload check, enforced here so it can
-                    # never be written in the first place: the budget clock is
-                    # fixed for anything that can submit, and only a turn that
-                    # cannot submit may be given a later one.
+
                     if limit > 0 and deadline != budget:
                         raise ValueError("global deadline cannot be reset")
                     if limit == 0 and deadline < budget:
@@ -175,8 +163,7 @@ def guarded_types(
                 return self.turn_status()
 
         def turn_status(self) -> dict[str, Any]:
-            # Do not acquire the score lock: long scorers must not block the
-            # supervisor from enforcing its absolute deadline.
+
             turn = dict(self.current())
             count = len(self.records) - turn["baseline"]
             return {
@@ -184,13 +171,7 @@ def guarded_types(
                 "accepted": count,
                 "limit": turn["limit"],
                 "closed": turn["closed"],
-                # A zero-limit turn is NEVER "exhausted". The word is the actor
-                # container's stop signal -- actor_entry returns the moment it
-                # sees it -- and count >= limit is true from the first poll when
-                # limit is 0, which would kill every selection turn about 100 ms
-                # in and leave a blank ballot on every cell. The turn is not
-                # over; what it owes is a file, not a submission. Submissions
-                # are refused by submit() on its own check, not by this word.
+
                 "exhausted": turn["limit"] > 0 and count >= turn["limit"],
                 "selection": turn["limit"] == 0,
                 "last_submission_id": self.records[-1]["submission_id"]
@@ -211,26 +192,13 @@ def guarded_types(
                 return super().validate(artifact)
 
         def _record(self, result: dict[str, Any], artifact_hash: str) -> dict[str, Any]:
-            # A grader started before the deadline may finish after it.
-            # finalize() runs on the control plane after the last turn closed, so
-            # it holds no turn token and authorize() would refuse it; the flag is
-            # set only inside finalize() and only for the duration of that call.
+
             if not getattr(request_context, "finalizing", False):
                 self.authorize()
             return super()._record(result, artifact_hash)
 
         def finalize(self, submission_id: str) -> dict[str, Any]:
-            """Re-state an already-accepted candidate as the last ledger record.
-
-            The winner of a blind cell is the highest-sequence record
-            (mle_native/reconcile.py `_select`), and the ledger is hash-chained,
-            so a consensus nomination can only be honoured by appending -- never
-            by reordering or rewriting.  The bytes are the ones the grader
-            already accepted, so it returns the identical score: the cell's
-            result either stays put or becomes the nominated submission, and can
-            never get worse.  The duplicate-artifact guard is the only thing
-            bypassed, and only on this path, which no agent can reach.
-            """
+            'Re-state an already-accepted candidate as the last ledger record.'
             with self.lock:
                 if not self.turns or not self.current()["closed"]:
                     raise ValueError("finalize requires the last turn to be closed")
@@ -268,9 +236,7 @@ def guarded_types(
                     request_context.finalizing = False
                 self._append(record)
                 self._append_flowbench_score(record)
-                # The closed turn keeps its own end_sequence, so the journal's
-                # baseline <= end_sequence <= len(records) reload check still
-                # holds with one more record than the turn ever accepted.
+
                 self.turns[-1]["finalized"] = True
                 atomic_json(control_file, self.turns)
                 return {
@@ -332,23 +298,7 @@ def guarded_types(
                     self._send(
                         HTTPStatus.OK,
                         {
-                            # actor_entry.py supervises the turn with "exhausted",
-                            # so this projection cannot drop it.  "accepted" is not
-                            # a leak either: an actor can count its own accepted
-                            # submits.
-                            #
-                            # "limit" and "selection" ARE.  This comment used to say
-                            # the cap is hidden from the model by the prompt -- true
-                            # of the sibling variant whose prompt DISCLOSES the cap,
-                            # false here.  In this variant the undisclosed cap is the
-                            # measurement, and route.json is injected 0o444 inside
-                            # the agent's own container, so any bearer of its token
-                            # could read the number out of this endpoint and the arm
-                            # would no longer be measuring behaviour under an
-                            # unannounced cut.  Nothing consumes either key over this
-                            # plane: actor_entry.py reads only exhausted/closed, and
-                            # the supervisor reads the full status over the control
-                            # plane with X-Control-Key, which is unchanged.
+
                             key: current[key]
                             for key in ("accepted", "closed", "exhausted")
                         },
@@ -360,10 +310,8 @@ def guarded_types(
             finally:
                 request_context.token = ""
 
-    # Test hook without importing any provider or exposing control to actors.
     State.request_context = request_context
     return State, Handler
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -372,7 +320,7 @@ def main() -> None:
     parser.add_argument("--key-file", type=Path, required=True)
     parser.add_argument("--port", type=int, default=80)
     args = parser.parse_args()
-    spec = importlib.util.spec_from_file_location("submit3_native_evaluator", args.base)
+    spec = importlib.util.spec_from_file_location("hma_native_evaluator", args.base)
     if spec is None or spec.loader is None:
         raise ValueError("native evaluator module unavailable")
     base = importlib.util.module_from_spec(spec)
@@ -383,7 +331,6 @@ def main() -> None:
     state_type, handler = guarded_types(base, args.control, key)
     base._STATE = state_type(base._CONFIG)
     ThreadingHTTPServer(("0.0.0.0", args.port), handler).serve_forever()
-
 
 if __name__ == "__main__":
     main()

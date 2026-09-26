@@ -32,7 +32,6 @@ if TYPE_CHECKING:
 
 __all__ = ["trace"]
 
-
 def trace(argv: list[str]) -> int:
     """Carries out one `hmz trace` line.
 
@@ -94,7 +93,6 @@ def trace(argv: list[str]) -> int:
         return 2
     return _collect(args, parser)
 
-
 def _collect(said: Namespace, parser: ArgumentParser) -> int:
     """Writes what one run left behind as one trace file.
 
@@ -125,13 +123,11 @@ def _collect(said: Namespace, parser: ArgumentParser) -> int:
         found = [one for one in found if one.name.startswith(said.epic)]
         if not found:
             parser.error(f"no run of this workspace is called {said.epic!r}")
-    # A run to trace, unless the line asked for what a run is not: the last of the workspace
-    # where none was named, and none at all in a directory nothing has been run in.
+
     epic = None if wider else found[-1] if found else None
     try:
         if epic is not None:
-            # A trace of a run is the run's own to gather: which sessions it opened, which
-            # agent opened each, the profile beside them, and where it goes.
+
             output, document = runs.traced(
                 epic, output=said.output, start=said.start, end=said.end
             )
@@ -150,7 +146,6 @@ def _collect(said: Namespace, parser: ArgumentParser) -> int:
         f"{many(summary.get('slices', '0'), 'slice')}{programs}"
     )
     return 0
-
 
 def _elsewhere(runs: Epics, said: Namespace) -> tuple[Path, dict[str, Any]]:
     """Gathers what a directory holds whoever opened it, which is a trace of no run.

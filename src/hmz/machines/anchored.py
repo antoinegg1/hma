@@ -14,7 +14,6 @@ from .base import MachineBase, MachineConfig
 if TYPE_CHECKING:
     from hmz.coganchor import AnchorConfig
 
-
 @dataclass(frozen=True, kw_only=True)
 class AnchoredConfig(MachineConfig):
     """The machine an anchor names.
@@ -28,7 +27,6 @@ class AnchoredConfig(MachineConfig):
     def create(self) -> Anchored:
         """Builds the machine, which is one that is already up."""
         return Anchored(self)
-
 
 class Anchored(MachineBase):
     """The machine an anchor reaches, which was running before this and stays after it."""

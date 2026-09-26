@@ -25,13 +25,10 @@ __all__ = ["serve_forever"]
 
 log = logging.getLogger(__name__)
 
-
 class _ConnectionHandler(socketserver.BaseRequestHandler):
     table: ExportTable
     token: str | None
-    #: Servers currently serving a connection, so the listener can tear them
-    #: down on its way out.  Handler threads are daemons and do not get to
-    #: finish on their own.
+
     live: set[Server]
     lock: threading.Lock
 
@@ -50,11 +47,9 @@ class _ConnectionHandler(socketserver.BaseRequestHandler):
             channel.close()
             log.info("connection from %s closed", peer)
 
-
 class _ThreadedServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
     daemon_threads = True
-
 
 def serve_forever(host: str, port: int, table: ExportTable, token: str | None) -> None:
     """Serves every connection to this address, until interrupted.
@@ -85,9 +80,8 @@ def serve_forever(host: str, port: int, table: ExportTable, token: str | None) -
     )
     with server_type((host, port), handler) as server:
         bound = server.server_address
-        # Not a message but a handshake: whoever started this reads the port it landed on
-        # off this line, a port of 0 having been the way to ask for any free one.
-        print(  # noqa: T201
+
+        print(  
             f"hmz anchor serve listening {bound[0]} {bound[1]}",
             file=sys.stderr,
             flush=True,

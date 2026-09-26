@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from hmz.coganchor import AnchorConfig
 
-
 @dataclass(frozen=True, kw_only=True)
 class MachineConfig(ABC):
     """Which machine an agent's turns land on, as a setting rather than as a machine.
@@ -28,7 +27,6 @@ class MachineConfig(ABC):
         Returns:
           A machine that has yet to be started.
         """
-
 
 class MachineBase(ABC):
     """One machine, from the turn that needs it until the agent holding it is gone."""
@@ -49,7 +47,7 @@ class MachineBase(ABC):
           The anchor that reaches it, which is what an agent's turns run under.
         """
 
-    def stop(self) -> None:  # noqa: B027  -- empty on purpose, and so not abstract
+    def stop(self) -> None:  
         """Takes down whatever :meth:`start` brought up, leaving the workspace behind.
 
         Does nothing by default: a machine that was already running when it was named is one

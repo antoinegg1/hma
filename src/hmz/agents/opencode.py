@@ -24,29 +24,17 @@ if TYPE_CHECKING:
     import os
     from collections.abc import Iterator
 
-#: What each kind of event reads as. A step beginning or ending is the turn's own plumbing,
-#: and is read for what it cost rather than shown.
 _SAYS = {"text": "text", "reasoning": "reasoning"}
 
-#: What the tokens of one step are called, and what each of them is here. `reasoning` is
-#: counted beside the output rather than inside it, so it is a kind of its own; the cache
-#: counts arrive under `cache` rather than beside these.
 _COUNTED = ("input", "output", "reasoning")
 _CACHED = ("read", "write")
 
-#: What each rung of the ladder is, said the way opencode takes it: a permission apiece for
-#: editing a file, running a command and fetching a page, each `allow`, `ask` or `deny`. A
-#: `deny` here is the tool not being offered at all, which is what makes `read-only` real; there
-#: is no sandbox, so `workspace-write` is the same agent with nothing outside the workspace to reach
-#: for, and `auto` and `bypass` are that agent with the reaching allowed. `ask` is never
-#: used: a run per turn has nobody to answer it.
 _PERMITTED = {
     "read-only": {"edit": "deny", "bash": "deny", "webfetch": "allow"},
     "workspace-write": {"edit": "allow", "bash": "allow", "webfetch": "deny"},
     "auto": {"edit": "allow", "bash": "allow", "webfetch": "allow"},
     "bypass": {"edit": "allow", "bash": "allow", "webfetch": "allow"},
 }
-
 
 class OpencodeSession(CommandSessionBase):
     """An opencode conversation, resumed by the id the first turn's events name it with.
@@ -56,11 +44,8 @@ class OpencodeSession(CommandSessionBase):
     conversation rather than a new one per run.
     """
 
-    #: What it writes on stdout is the turn as events rather than the agent talking.
     protocol: ClassVar[bool] = True
 
-    #: The command this backend is installed as, and the variable it is told what the agent
-    #: may do in -- the two things mimocode differs by on the way in.
     command: ClassVar[str] = "opencode"
     permits: ClassVar[str] = "OPENCODE_PERMISSION"
 
@@ -74,13 +59,10 @@ class OpencodeSession(CommandSessionBase):
           cwd: The directory this conversation works in, as for `SessionBase`.
         """
         super().__init__(agent, cwd)
-        #: What the agent has said so far in the turn now running, and what went wrong with
-        #: it if anything did.
+
         self._said = ""
         self._failed: str | None = None
-        #: What the turn now running has cost, added up as each step of it comes back, and
-        #: which parts of it have already been shown -- a part is written once here, but a
-        #: turn that saw it twice would show it twice.
+
         self._spent = 0
         self._costing = Usage()
         self._shown: set[str] = set()
@@ -137,9 +119,7 @@ class OpencodeSession(CommandSessionBase):
             _PERMITTED.get(self._agent.config.permission, _PERMITTED["bypass"])
         )
         if not self._agent.config.web_search:
-            # `webfetch` is the one tool opencode reaches the web with, so it is the one to
-            # deny. A rung that already denies it is not asked twice: the two say the same
-            # thing here, and either of them saying it is enough.
+
             allowed["webfetch"] = "deny"
         return {
             **super()._environment(),
@@ -162,15 +142,14 @@ class OpencodeSession(CommandSessionBase):
         try:
             said: dict[str, Any] = json.loads(line)
         except json.JSONDecodeError:
-            return  # not ours: the odd plain line among the JSON
+            return  
         part: dict[str, Any] = said.get("part") or {}
         kind = str(said.get("type") or "")
         if kind == "error":
             failed: dict[str, Any] = said.get("error") or {}
             self._failed = json.dumps(failed) if failed else "the turn failed"
         elif kind == "step_finish":
-            # Told as the step lands rather than once the run is over, which is what a rate
-            # read while the turn is still running is made of.
+
             counted = self._cost(cast("dict[str, Any]", part.get("tokens") or {}))
             self._spent += int(counted.total)
             self._costing = self._costing + counted
@@ -181,11 +160,10 @@ class OpencodeSession(CommandSessionBase):
             words = str(part.get("text") or "")
             marked = str(part.get("id") or "")
             if not words.strip() or (marked and marked in self._shown):
-                return  # a part already shown is not the agent saying it twice
+                return  
             self._shown.add(marked)
             if says == "text":
-                # The last thing it says is what the turn answers with; the reasoning on the
-                # way there is shown and nothing more.
+
                 self._said = words
             yield Event(kind=says, text=words)
 
@@ -297,7 +275,6 @@ class OpencodeSession(CommandSessionBase):
                 return str(named)
         raise ValueError(f"{type(self).command} named no session")
 
-
 @dataclass(frozen=True, kw_only=True)
 class OpencodeAgentConfig(AgentConfig):
     """What opencode is configured with: the common model and effort, and nothing else.
@@ -305,7 +282,6 @@ class OpencodeAgentConfig(AgentConfig):
     The model is written as opencode writes it, `provider/id`, since a model here belongs to
     the provider that serves it and opencode is asked for the pair.
     """
-
 
 class OpencodeAgent(AgentBase):
     """opencode, driven through its own command line, one run per turn."""

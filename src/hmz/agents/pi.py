@@ -22,22 +22,12 @@ if TYPE_CHECKING:
     import os
     from collections.abc import Iterator
 
-#: What each kind of thing pi says a turn did reads as. A message is a list of parts and pi
-#: says each of them twice -- once as it starts and once with the whole of it -- so only the
-#: ends are read: they are the only ones that carry any words.
 _PARTS = {"text_end": "text", "thinking_end": "reasoning", "toolcall_end": "tool"}
 
-#: The ways an extension may stop a turn to ask the person at the prompt something. The rest
-#: of what one may put on the screen -- a notice, a status, a widget -- is told rather than
-#: asked, and pi waits on none of it.
 _ASKS = ("select", "confirm", "input", "editor")
 
-#: What pi offers for a question that is a yes or a no, so that it reads as a question
-#: wherever it is shown rather than as one with nothing to answer it with.
 _YES_NO = ("yes", "no")
 
-#: What each kind of token is called in the usage pi reports on every message. Reasoning is
-#: counted inside the output rather than beside it, which is why it is not a kind of its own.
 _KINDS = {
     "input": "input",
     "output": "output",
@@ -45,12 +35,7 @@ _KINDS = {
     "cache_write": "cacheWrite",
 }
 
-#: The tools of pi's own that change something rather than look at something, which is the
-#: whole of what an agent that may change nothing is refused. pi has no permission gate and no
-#: sandbox -- what it takes is which tools to load -- so `read-only` is the only rung it can be
-#: held to, and the three above it are one and the same agent.
 _CHANGING = ("bash", "edit", "write")
-
 
 def _about(called: dict[str, Any]) -> str:
     """What a tool was called with, as the one line a row of a transcript has room for.
@@ -70,7 +55,6 @@ def _about(called: dict[str, Any]) -> str:
         "",
     )
 
-
 @dataclass(frozen=True, kw_only=True)
 class PiAgentConfig(AgentConfig):
     """What pi is configured with: the common model and effort, and nothing else.
@@ -78,7 +62,6 @@ class PiAgentConfig(AgentConfig):
     The model is written as pi writes it, `provider/id`, since a model here belongs to the
     provider that serves it and pi is asked for the pair.
     """
-
 
 class PiSession(StreamSessionBase):
     """A pi conversation, addressed by an id chosen up front.
@@ -100,18 +83,15 @@ class PiSession(StreamSessionBase):
           cwd: The directory this conversation works in, as for `SessionBase`.
         """
         super().__init__(agent, cwd)
-        #: The id pi says this session has, taken only once a turn has landed in it.
+        
         self._named: str | None = None
-        #: What the agent has said so far in the turn now running, and what went wrong with
-        #: it if anything did. Both are cleared as the turn's answer is given.
+
         self._said = ""
         self._failed: str | None = None
-        #: What the turn now running has cost, added up as pi reports each request: as one
-        #: number for the model it ran on, and by the kind each token went on.
+
         self._spent = 0
         self._costing = Usage()
-        #: What the process now up was last told to think at, so that a flow moving the
-        #: effort mid-session is told to pi rather than left on the flag it was started with.
+
         self._at: str | None = None
 
     @property
@@ -127,9 +107,7 @@ class PiSession(StreamSessionBase):
         what an anchored session needs: its process ends with each turn, so the next one has a
         conversation to rejoin.
         """
-        # A fresh id per attempt: an opening turn that failed may still have left pi holding
-        # the session it was given, and retrying under that one would resume a turn that never
-        # happened.
+
         pinned = self._id or str(uuid.uuid4())
         self._named = pinned
         argv = [
@@ -144,8 +122,7 @@ class PiSession(StreamSessionBase):
             pinned,
         ]
         if self._agent.config.permission == "read-only":
-            # Not a mode it is put in but tools it is not given: an agent without the three
-            # that change anything is one that can only look, which is the rung asked for.
+
             argv += ["--exclude-tools", ",".join(_CHANGING)]
         return argv
 
@@ -166,9 +143,7 @@ class PiSession(StreamSessionBase):
             said["id"] = ticket
         line = json.dumps(said) + "\n"
         if self._at is not None and self._at != self.effort:
-            # How hard to think is a command here rather than a flag to restart under: pi
-            # takes it on the session it is already holding, so a flow that moves the effort
-            # is answered by telling it, ahead of the prompt the new effort is for.
+
             self._at = self.effort
             line = (
                 json.dumps({"type": "set_thinking_level", "level": self._at})
@@ -193,13 +168,12 @@ class PiSession(StreamSessionBase):
         """
         if self._proc is None or self._proc.poll() is not None:
             raise RuntimeError("no turn is running to be talked to")
-        # Named by its own words: pi splices a steered message into the conversation as the
-        # user saying it, and the words are what both ends have to go on.
+
         self.steering(text, ticket=text)
         try:
             self._send(json.dumps({"type": "steer", "message": text}) + "\n")
         except BaseException:
-            self.unsteered(text)  # nothing is coming back for a word that never went in
+            self.unsteered(text)  
             raise
 
     def _restarted(self) -> None:
@@ -221,15 +195,13 @@ class PiSession(StreamSessionBase):
         try:
             said: dict[str, Any] = json.loads(line)
         except json.JSONDecodeError:
-            return  # not ours: pi prints the odd plain line among the JSON
+            return  
         match said.get("type"):
             case "session":
-                # Noted, not taken: this is said before anything can go wrong, and a session
-                # is only opened by a turn that lands in it.
+
                 self._named = str(said.get("id") or "") or self._named
             case "response" if said.get("success") is False:
-                # A command pi would not take. The one that matters is the prompt: a turn that
-                # was never started is a failed turn, and there is no `agent_settled` coming.
+
                 if said.get("command") == "prompt":
                     yield Event(
                         kind="failed", text=str(said.get("error") or "the turn failed")
@@ -241,10 +213,7 @@ class PiSession(StreamSessionBase):
                     cast("dict[str, Any]", said.get("assistantMessageEvent") or {})
                 )
             case "message_start":
-                # A word put into the turn, come back around: pi splices it into the
-                # conversation at the step that takes it in, and that splice is the agent
-                # saying it has it. The turn's own prompt arrives the same way and was never
-                # put into anything, so it is not on the book and says nothing here.
+
                 message: dict[str, Any] = said.get("message") or {}
                 if message.get("role") == "user":
                     words = "".join(
@@ -257,10 +226,9 @@ class PiSession(StreamSessionBase):
             case "message_end":
                 self._message(cast("dict[str, Any]", said.get("message") or {}))
             case "agent_settled":
-                # The whole of the run pi was told to make, the words put into it included:
-                # it says this once it has stopped and has nothing queued behind.
+
                 yield self._answered()
-            case _:  # every other event is a step of a turn already read another way
+            case _:  
                 pass
 
     def _part(self, event: dict[str, Any]) -> Iterator[Event]:
@@ -278,8 +246,7 @@ class PiSession(StreamSessionBase):
         if kind == "tool":
             called: dict[str, Any] = event.get("toolCall") or {}
             arguments: dict[str, Any] = called.get("arguments") or {}
-            # The name and what it was called on, which is what a tool call reads as:
-            # `bash echo hi`, `read src/x.py`. Only what will fit on a row.
+
             yield Event(
                 kind="tool",
                 text=f"{called.get('name') or 'tool'} {_about(arguments)}".strip()[
@@ -304,9 +271,7 @@ class PiSession(StreamSessionBase):
         if message.get("role") != "assistant":
             return
         usage: dict[str, Any] = message.get("usage") or {}
-        # Every kind of token counts: what a rate is measuring is the traffic, and a cache
-        # read crosses the wire like anything else. Told as it lands rather than once the run
-        # is over, since that is what a rate read while the turn runs is made of.
+
         counted = Usage(
             {
                 kind: float(usage.get(named) or 0)
@@ -343,7 +308,7 @@ class PiSession(StreamSessionBase):
         if failed is not None and not said:
             return Event(kind="failed", text=failed, tokens=tokens, spent=turn)
         if self._named is not None:
-            self._adopt(self._named)  # a turn has landed, so the session is open
+            self._adopt(self._named)  
         return Event(kind="result", text=said.strip(), tokens=tokens, spent=turn)
 
     def _answer(self, said: dict[str, Any]) -> None:
@@ -358,7 +323,7 @@ class PiSession(StreamSessionBase):
         """
         method = str(said.get("method") or "")
         if method not in _ASKS:
-            return  # told rather than asked: a notice, a status, a widget, a title
+            return  
         offers: list[Any] = said.get("options") or []
         answer = self._agent.asked(
             Question(
@@ -389,7 +354,6 @@ class PiSession(StreamSessionBase):
         else:
             answered["value"] = answer
         self._send(json.dumps(answered) + "\n")
-
 
 class PiAgent(AgentBase):
     """pi, driven over its RPC protocol so a turn can be talked to while it runs.

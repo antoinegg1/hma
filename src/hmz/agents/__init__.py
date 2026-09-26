@@ -54,10 +54,6 @@ from .qwen import QwenCodeAgent, QwenCodeAgentConfig, QwenCodeSession
 from .tools import Tool, Toolbox
 from .zcode import ZcodeAgent, ZcodeAgentConfig, ZcodeSession
 
-#: What each coding agent CLI is driven by here, under the name a command line calls it.
-#: One table rather than one apiece: whoever reads an `-a` builds an agent from it, and
-#: whoever offers the backends at a prompt asks what each of them can do, and neither should
-#: have to know that `kimi` is a `KimiCodeCLIAgent` for itself.
 DRIVEN: dict[str, tuple[type[AgentBase], type[AgentConfig]]] = {
     "agy": (AntigravityCLIAgent, AntigravityCLIAgentConfig),
     "claude": (ClaudeCodeAgent, ClaudeCodeAgentConfig),
@@ -72,7 +68,6 @@ DRIVEN: dict[str, tuple[type[AgentBase], type[AgentConfig]]] = {
     "qwen": (QwenCodeAgent, QwenCodeAgentConfig),
     "zcode": (ZcodeAgent, ZcodeAgentConfig),
 }
-
 
 def driver(backend: str) -> tuple[type[AgentBase], type[AgentConfig]]:
     """What drives one backend, whether humanize wrote the driver or somebody added the CLI.
@@ -96,7 +91,6 @@ def driver(backend: str) -> tuple[type[AgentBase], type[AgentConfig]]:
     if backend in backends.speaking():
         return (AcpAgent, AcpAgentConfig)
     raise KeyError(backend)
-
 
 __all__ = [
     "ANYONE",

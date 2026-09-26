@@ -26,7 +26,6 @@ _STEP_FIELDS = (
     "llmStreamDurationMs",
 )
 
-
 def collect(
     home: pathlib.Path,
     workspace: pathlib.Path | None,
@@ -77,7 +76,7 @@ def collect(
                 Session(
                     key=key,
                     backend="kimi",
-                    # Every agent of a session shares the id `kimi -r` resumes it by.
+                    
                     ident=ident,
                     label="main"
                     if agent_id == "main"
@@ -93,7 +92,6 @@ def collect(
                 )
             )
     return collected
-
 
 def _parse(
     path: pathlib.Path, window: tuple[float, float]
@@ -156,7 +154,6 @@ def _parse(
         turn.end = max(turn.end, prev)
         actions.append(turn)
     return actions, info
-
 
 def _add_event(
     actions: list[Action],

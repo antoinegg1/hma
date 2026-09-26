@@ -29,7 +29,6 @@ _HEADER_FIELDS = (
     "agentPreset",
 )
 
-
 def collect(
     home: pathlib.Path,
     workspace: pathlib.Path | None,
@@ -101,7 +100,6 @@ def collect(
         )
     return collected
 
-
 def _header(path: pathlib.Path) -> dict[str, Any]:
     """Reads a session header without letting one damaged log stop collection."""
     try:
@@ -113,7 +111,6 @@ def _header(path: pathlib.Path) -> dict[str, Any]:
         return {}
     header = cast("dict[str, Any]", loaded)
     return header if header.get("type") == "session" else {}
-
 
 def _parse(
     path: pathlib.Path, window: tuple[float, float]
@@ -230,7 +227,6 @@ def _parse(
         actions.append(turn)
     return actions, info
 
-
 def _message(
     actions: list[Action],
     data: dict[str, Any],
@@ -294,7 +290,6 @@ def _message(
         )
     return max(prev, at)
 
-
 def _arguments(value: Any) -> Any:
     """Reads a tool's JSON arguments while preserving non-JSON input verbatim."""
     if not isinstance(value, str):
@@ -303,7 +298,6 @@ def _arguments(value: Any) -> Any:
         return json.loads(value)
     except json.JSONDecodeError:
         return value
-
 
 def _tool_result(data: dict[str, Any]) -> tuple[str, str, bool]:
     """Extracts the call id, readable output and failure flag from a tool result."""

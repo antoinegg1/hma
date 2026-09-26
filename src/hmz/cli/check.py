@@ -22,7 +22,6 @@ if TYPE_CHECKING:
 
 __all__ = ["check"]
 
-
 def check(argv: list[str]) -> int:
     """Carries out one `hmz check` line.
 
@@ -85,8 +84,7 @@ def check(argv: list[str]) -> int:
 
     flows = Hmz().flows
     for named in args.flow:
-        # A name nothing answers to is a line to correct, refused the way argparse refuses
-        # one -- before anything is read, and for every name on the line at once.
+
         if not Path(flows.find(named)).is_file():
             parser.error(f"no flow called {named!r}")
     if args.prophecy or args.ship:
@@ -98,7 +96,6 @@ def check(argv: list[str]) -> int:
     errors = sum(one.severity == "error" for one in found)
     warned = len(found) - errors
     return 1 if errors or (args.strict and warned) else 0
-
 
 def _foretold(held: Flows, flows: list[str], *, ship: bool) -> int:
     """Prints or writes what each atlas on the line compiles to.
@@ -134,7 +131,6 @@ def _foretold(held: Flows, flows: list[str], *, ship: bool) -> int:
         print(canonical(prophecy))
     return worst
 
-
 def _said(found: list[Finding], *, as_json: bool, flows: int) -> None:
     """Prints what the readings found, for a person or for a script.
 
@@ -147,8 +143,7 @@ def _said(found: list[Finding], *, as_json: bool, flows: int) -> None:
         import json
 
         for one in found:
-            # Off the tuple itself rather than field by field, so a field added to a
-            # finding later is a field a script reading this is handed.
+
             print(json.dumps(one._asdict() | {"where": str(one.where)}))
         return
     from . import many

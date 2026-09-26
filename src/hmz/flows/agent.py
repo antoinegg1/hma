@@ -47,7 +47,6 @@ if TYPE_CHECKING:
 
 __all__ = ["Agent", "Driven", "Person", "Session"]
 
-
 class Session(Protocol):
     """One conversation with one agent, kept alive across turns.
 
@@ -56,15 +55,8 @@ class Session(Protocol):
     which is what a Ralph loop is made of.
     """
 
-    #: Whether this backend can be held to a shape rather than asked to keep to one. A flow
-    #: that reads an answer as an object gets one either way; this is how sure it can be. A
-    #: fact of the backend, so it is written on the class -- a stand-in for one says it the
-    #: same way, `shapes: ClassVar[bool] = True`.
     shapes: ClassVar[bool]
 
-    #: Whether this backend can be given a tool the flow wrote. A fact of the backend, said
-    #: the same way, so a flow that offers a callback can be written to ask first rather than
-    #: to catch the refusal.
     takes_tools: ClassVar[bool]
 
     @property
@@ -212,7 +204,6 @@ class Session(Protocol):
         """Ends this conversation, and takes away whatever it put in the workspace."""
         ...
 
-
 class Agent(Protocol):
     """A coding agent behind a uniform interface: structure only, and no history.
 
@@ -223,22 +214,10 @@ class Agent(Protocol):
     across turns is a stateful one.
     """
 
-    #: The moments of a turn a hook may be hung on here. A flow that needs one only some
-    #: backends reach says so where it declares the place, and is then given an agent that
-    #: runs it rather than finding out from a hook that raised hours in.
     moments: ClassVar[frozenset[Moment]]
 
-    #: Whether this backend has a goal feature of its own, which is what :meth:`pursue`
-    #: reaches for. A flow that runs an agent under one says so where it declares the place.
-    #:
-    #: Both are facts of the backend rather than of any one agent, so both are written on the
-    #: class -- and a stand-in written for a test says them the same way, annotation and all:
-    #: `pursues: ClassVar[bool] = True`.
     pursues: ClassVar[bool]
 
-    #: Where the run this agent is being driven in is written down, or None for an agent
-    #: nobody is keeping a record of -- one driven from a test, or by a flow that was called
-    #: from nothing. Set by whatever started the run rather than by the flow.
     epic: Journal | None
 
     @property
@@ -510,7 +489,6 @@ class Agent(Protocol):
         """Waits for the next thing to say to it, for a flow that is a conversation."""
         ...
 
-
 class Driven(Agent, Protocol):
     """An agent as whoever hands it to a flow holds it: everything above, and settling it.
 
@@ -551,7 +529,6 @@ class Driven(Agent, Protocol):
         """Switches its backend's own goal feature off for the rest of the run."""
         ...
 
-
 class Person(Agent, Protocol):
     """The person at the prompt, driven as an agent so that a flow can talk to them.
 
@@ -582,16 +559,9 @@ class Person(Agent, Protocol):
         """
         ...
 
-
 if TYPE_CHECKING:
     from hmz.agents import AgentBase, HumanAgent, SessionBase
 
-    #: The one line that says :mod:`hmz.agents` answers to the interfaces above. Written as
-    #: an assignment rather than as inheritance because the arrow points the other way: a
-    #: flow names what it drives, and a driver is written without ever naming a flow -- so
-    #: what joins the two is checked here, where a type checker reads it, and a driver that
-    #: stops answering to this reads as a driver to correct rather than as a flow that fails
-    #: on its first turn.
     _implemented: tuple[type[Agent], type[Driven], type[Session], type[Person]] = (
         AgentBase,
         AgentBase,

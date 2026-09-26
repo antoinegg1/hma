@@ -17,15 +17,13 @@ if TYPE_CHECKING:
 
 __all__ = ["Agents", "Taken"]
 
-
-class Taken(ValueError):  # noqa: N818  -- what the name is, not what went wrong
+class Taken(ValueError):  
     """A name already written down, raised rather than quietly written over.
 
     Its own class because what to say about it is whoever asked's: a command line says which
     flag writes over one, and a menu that has already asked which name to save over says
     nothing at all.
     """
-
 
 class Agents:
     """The agents kept under a name: what there is, and the two things that happen to one."""
@@ -107,8 +105,7 @@ class Agents:
         already = any(one.name == name for one in held)
         if already and not force:
             raise Taken(f"there is already an agent called {name}")
-        # Whole, as the menu writes them: one written over keeps its place in the list, and
-        # one that is new goes on the end, which is the order they were written down in.
+
         one = Kept(name, runs)
         templates.keep(
             [one if each.name == name else each for each in held]
@@ -164,8 +161,7 @@ class Agents:
                 overrides,
             ) = read(spec)
         except ValueError as why:
-            # Said against the spelling that was refused: a line with four agents on it is
-            # one where the message has to say which of them was the one to correct.
+
             raise ValueError(f"{spec}: {why}") from why
         if service_tier != "default":
             raise ValueError(

@@ -21,15 +21,12 @@ if TYPE_CHECKING:
     from .profile import Process
     from .session import Session
 
-#: Which reader reads which backend's logs. Where those logs are, and in what order the
-#: backends are gone through, is :mod:`hmz.backends`.
 _READERS = {
     "claude": claude.collect,
     "codex": codex.collect,
     "dsh": dsh.collect,
     "kimi": kimi.collect,
 }
-
 
 def _profiled(
     said: str | os.PathLike[str] | Iterable[Process] | None,
@@ -55,7 +52,6 @@ def _profiled(
     else:
         held = list(said)
     return [one for one in held if one.ended >= window[0] and one.began <= window[1]]
-
 
 def collect(
     workspace: str | os.PathLike[str] | None = None,
@@ -123,9 +119,7 @@ def collect(
 
     if isinstance(sessions, str):
         sessions = (sessions,)
-    # Sessions named at all is a filter, and no sessions named at all is a filter that keeps
-    # nothing -- which is what a trace of a run that opened none is. Only `None`, nothing
-    # said about sessions, is every session there is.
+
     listed = (
         None
         if sessions is None
@@ -137,9 +131,8 @@ def collect(
     root = (
         None
         if workspace is None and names is not None
-        # `abspath` rather than `Path.resolve`: sessions are matched against the path a
-        # flow was run under, which is the name it was given rather than what it links to.
-        else pathlib.Path(os.path.abspath(workspace or "."))  # noqa: PTH100
+
+        else pathlib.Path(os.path.abspath(workspace or "."))  
     )
 
     window = (bounds[0], bounds[1])
@@ -147,18 +140,14 @@ def collect(
     for each in backends.PROFILES:
         reader = _READERS.get(each.name)
         home = each.directory()
-        # Only the backends whose logs somebody has written a reader for: the rest keep their
-        # sessions somewhere this cannot read -- rows of a database, a format nobody has taken
-        # apart yet -- and a home directory being there is not a reason to fail the whole
-        # trace.
+
         if reader is not None and home.is_dir():
             collected += reader(home, root, names, window)
 
     named = {ident: name for name, opened in (agents or {}).items() for ident in opened}
     known = {item.key: item for item in collected}
     for item in collected:
-        # Whatever ran a session ran every sub-agent under it, whatever those were
-        # configured with themselves, so each is named after the root it hangs from.
+
         root_of, seen = item, {item.key}
         while root_of.parent in known and root_of.parent not in seen:
             root_of = known[root_of.parent]

@@ -21,7 +21,6 @@ if TYPE_CHECKING:
 
 __all__ = ["Epics"]
 
-
 class Epics:
     """Every run of one workspace, newest last, and what can be read back out of one."""
 
@@ -115,7 +114,7 @@ class Epics:
             stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
             where = epic / TRACES / f"{stamp}.trace.json"
         where.parent.mkdir(parents=True, exist_ok=True)
-        # No workspace at all: the ids are exactly this run's, wherever they were logged.
+        
         document = Epics().trace(
             sessions=[ident for ids in agents.values() for ident in ids],
             agents=agents or None,

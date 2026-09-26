@@ -31,15 +31,9 @@ if TYPE_CHECKING:
 
 __all__ = ["Swaps", "command", "read", "run"]
 
-#: `AT_FDCWD`, the directory descriptor that means "wherever the process is".
 _AT_FDCWD = -100
 
-#: Where a rewritten path is written in the tracee: below the red zone, in stack the process
-#: has not reached yet, one whole path per slot so that a syscall naming two of them can be
-#: given both. The exec that would use this space discards it, and every other syscall here
-#: reads its arguments out before returning, so nothing outlives the call it was planted for.
 _SCRATCH = 4096
-
 
 @dataclass(frozen=True, slots=True)
 class Swaps:
@@ -89,7 +83,6 @@ class Swaps:
                 return instead + path[len(named) :]
         return None
 
-
 def read(said: Iterable[str]) -> Swaps:
     """Reads the swaps off a command line that named them.
 
@@ -109,7 +102,6 @@ def read(said: Iterable[str]) -> Swaps:
             raise ValueError(f"{one!r} is not FROM=TO, of two absolute paths")
         pairs.append((named, instead))
     return Swaps.of(pairs)
-
 
 def command(
     swaps: Iterable[tuple[str, str]], argv: Sequence[str] | list[str]
@@ -136,7 +128,6 @@ def command(
     mapped = [f"--map={named}={instead}" for named, instead in held.pairs]
     return [sys.executable, "-m", "hmz", "cred", *mapped, "--", *argv]
 
-
 def run(swaps: Swaps, argv: Sequence[str]) -> int:
     """Runs a program with those paths answered by others, and waits for it.
 
@@ -151,8 +142,7 @@ def run(swaps: Swaps, argv: Sequence[str]) -> int:
       OSError: If the supervisor cannot be started, which is a turn that must not run: an
         agent whose credentials were not pointed anywhere would sign in as somebody else.
     """
-    # Imported here rather than above: this half needs ptrace and an x86-64 register map,
-    # which reading a provider and rendering a command line do not.
+
     from hmz.coganchor.linux import ptrace, seccomp
 
     from ._trace import Tracing
@@ -166,16 +156,13 @@ def run(swaps: Swaps, argv: Sequence[str]) -> int:
             ptrace.traceme()
             seccomp.install(tracing.trapped())
             os.kill(os.getpid(), signal.SIGSTOP)
-            # Becoming the program is the whole errand of this fork, and it is an argv
-            # rather than a command line, so there is no shell for one to go through.
-            os.execvp(argv[0], list(argv))  # noqa: S606
-        # Everything, deliberately: this is the forked child, and anything that escapes here
-        # would run the parent's code a second time rather than report a failed launch.
-        except BaseException as why:  # noqa: BLE001
+
+            os.execvp(argv[0], list(argv))  
+
+        except BaseException as why:  
             os.write(2, f"hmz: cannot run {argv[0]}: {why}\n".encode())
         os._exit(127)
     return tracing.watch(pid)
-
 
 def failed(status: int) -> int:
     """What a program's wait status comes to as an exit status."""
@@ -183,8 +170,4 @@ def failed(status: int) -> int:
         return os.WEXITSTATUS(status)
     return 128 + os.WTERMSIG(status) if os.WIFSIGNALED(status) else 1
 
-
-#: What a syscall that could not be given its new path is answered with. A visible failure,
-#: because the alternative is the agent quietly reading the credentials of whoever is at this
-#: machine -- a turn that ran as the wrong account is worse than a turn that did not run.
 UNSWAPPABLE = errno.EIO

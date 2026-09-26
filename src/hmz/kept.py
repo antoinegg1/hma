@@ -31,7 +31,6 @@ if TYPE_CHECKING:
 
 __all__ = ["Kept", "Runs", "Templates", "read_back", "written"]
 
-
 class Runs(NamedTuple):
     """What one agent of a flow was set up to run, and where its turns land.
 
@@ -56,7 +55,6 @@ class Runs(NamedTuple):
     goals: bool = True
     web_search: bool = True
 
-
 class Kept(NamedTuple):
     """One agent written down under a name, to be imported from any flow that wants one.
 
@@ -71,7 +69,6 @@ class Kept(NamedTuple):
 
     name: str
     runs: Runs
-
 
 def written(runs: Runs) -> dict[str, Any]:
     """One agent as it goes into a file, which is the shape both of these files hold.
@@ -96,13 +93,10 @@ def written(runs: Runs) -> dict[str, Any]:
         held["permission"] = runs.permission
     if runs.provider:
         held["provider"] = runs.provider
-    # Both values are material: on may be an override of a workflow whose default is off, so
-    # what is written down always records the explicit two-way choice. Web search is written
-    # the same way and for the same reason.
+
     held["goals"] = runs.goals
     held["web_search"] = runs.web_search
     return held
-
 
 def read_back(held: dict[str, Any], *, goals: bool = True) -> Runs | None:
     """One agent as it comes back off a file, or None where what is there is not one.
@@ -118,9 +112,7 @@ def read_back(held: dict[str, Any], *, goals: bool = True) -> Runs | None:
     cli, model, effort = held.get("cli"), held.get("model"), held.get("effort")
     if not (cli and model and effort):
         return None
-    # An entry that says nothing about what it may do runs at what an agent nobody has been
-    # asked about has always run at; one that names no account runs as this machine is signed
-    # in. A `skills` an older file holds is the CLI's own business now, and is read past.
+
     said = held.get("goals")
     searches = held.get("web_search")
     return Runs(
@@ -129,11 +121,9 @@ def read_back(held: dict[str, Any], *, goals: bool = True) -> Runs | None:
         str(held.get("permission") or ""),
         str(held.get("provider") or ""),
         said if isinstance(said, bool) else goals,
-        # An entry written before there was such a setting is one whose agent searched the
-        # web, that being what every agent did then.
+
         searches if isinstance(searches, bool) else True,
     )
-
 
 class Templates:
     """The agents written down under a name, read once and written whole as they change.

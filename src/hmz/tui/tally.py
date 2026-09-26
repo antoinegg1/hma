@@ -31,10 +31,7 @@ if TYPE_CHECKING:
 
 __all__ = ["Tally"]
 
-#: How often the logs are looked at. Often enough that a turn's spending shows while the turn
-#: is still running, and cheap because only what has been appended since is ever read.
 _EVERY = 1.0
-
 
 def _spent(backend: str, row: dict[str, Any]) -> tuple[str | None, int]:
     """What one row of a log says was spent, read as that backend writes it.
@@ -84,9 +81,7 @@ def _spent(backend: str, row: dict[str, Any]) -> tuple[str | None, int]:
             )
         )
     if backend == "zcode":
-        # One row per request the turn made, the whole of what was sent and what came back.
-        # Its `usage` is that request's, and the model beside it is the one it ran on -- which
-        # is how a title or a sub-agent on the lite model is counted as itself.
+
         answered: dict[str, Any] = row.get("response") or {}
         counting: dict[str, Any] = answered.get("usage") or {}
         ran: dict[str, Any] = row.get("model") or {}
@@ -106,14 +101,12 @@ def _spent(backend: str, row: dict[str, Any]) -> tuple[str | None, int]:
         for name in ("inputOther", "output", "inputCacheRead", "inputCacheCreation")
     )
 
-
 @dataclass
 class _Reading:
     """One log being read: how far into it we are, and what it has come to so far."""
 
     at: int = 0
     spent: Counter[str] = field(default_factory=Counter[str])
-
 
 class Tally:
     """The logs of the sessions a flow has open, read as the agents write them."""
@@ -140,7 +133,7 @@ class Tally:
         def reading() -> None:
             while not self._stop.wait(_EVERY):
                 self.read()
-            self.read()  # once more, for what the last turn wrote on its way out
+            self.read()  
 
         threading.Thread(target=reading, daemon=True).start()
 
@@ -160,9 +153,7 @@ class Tally:
             if profile is None:
                 continue
             home = profile.directory()
-            # Every session this agent has going, named as the backend names it -- which it
-            # does as the turn starts rather than when the turn lands -- and every one it has
-            # let go of, whose last rows are still worth reading.
+
             idents = {
                 session.named for session in agent.sessions if session.named is not None
             } | set(agent.opened)
@@ -190,8 +181,8 @@ class Tally:
                 stream.seek(reading.at)
                 written = stream.read()
         except OSError:
-            return  # not there yet, or not ours to read
-        # To the last full line: a row being written is a row to read next time round.
+            return  
+        
         written = written[: written.rfind(b"\n") + 1]
         reading.at += len(written)
         for line in written.splitlines():

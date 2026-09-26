@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 
 __all__ = ["Fallbacks"]
 
-
 class Fallbacks:
     """Every step written down, and the three things that can happen to one."""
 

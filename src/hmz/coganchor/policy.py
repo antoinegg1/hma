@@ -24,7 +24,6 @@ from hmz.coganchor.proto import rewrite_path_prefix
 
 __all__ = ["Layout", "Router"]
 
-
 @dataclass(frozen=True, slots=True)
 class Layout:
     """One ``local shadow directory <-> remote path`` correspondence."""
@@ -46,29 +45,24 @@ class Layout:
             posixpath.join(self.virtual_root, suffix) if suffix else self.virtual_root
         )
 
-
 @dataclass(slots=True)
 class Router:
     """Routes paths and programs between this machine and the target."""
 
     layouts: tuple[Layout, ...]
-    #: Paths kept on this machine even when nested inside a layout, such as
-    #: the agent's own state directory.
+
     local_paths: tuple[str, ...] = ()
-    #: Program paths (prefix match) that must run on this machine.
+    
     local_programs: tuple[str, ...] = ()
-    #: Paths answered with others, as ``(what the agent names, what it gets)``.
-    #: A directory stands for everything inside it, because a credential is
-    #: often one file of several kept together.
+
     redirects: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
-        # Longest root first, so nested layouts win over their parents.
+        
         self.layouts = tuple(
             sorted(self.layouts, key=lambda item: -len(item.local_root))
         )
-        # And longest named path first, so a path under two redirects takes the
-        # one that says most about it.
+
         self.redirects = tuple(
             sorted(
                 (
@@ -141,11 +135,9 @@ class Router:
                 return instead + path[len(named) :]
         return None
 
-
 def _normalise(path: str) -> str:
     expanded = os.path.abspath(os.path.expanduser(path))
     return expanded.rstrip("/") or "/"
-
 
 def _within(path: str, root: str) -> bool:
     if root == "/":

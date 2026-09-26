@@ -34,14 +34,9 @@ if TYPE_CHECKING:
 
 __all__ = ["PROFILE", "Process", "Profiler", "Thread", "read"]
 
-#: What a run's profile is written to, inside the epic it was taken in.
 PROFILE = "profile.jsonl"
 
-#: How often the processes under a run are looked at. Fast enough to catch a `grep` and slow
-#: enough to cost a run nothing: reading a process tree is a directory listing and a handful
-#: of small files, and twenty of those a second is not what makes an agent slow.
 EVERY = 0.05
-
 
 class Thread(NamedTuple):
     """One thread of one program a run ran.
@@ -58,7 +53,6 @@ class Thread(NamedTuple):
     began: float
     ended: float
     cpu: float = 0.0
-
 
 class Process(NamedTuple):
     """One program a run ran, as the sampler saw it.
@@ -94,7 +88,6 @@ class Process(NamedTuple):
         """What to call it where it is drawn: what it is, and which one it was."""
         return f"{self.name} · {self.pid}"
 
-
 class Profiler:
     """Samples the programs running under this process, and writes down what it saw.
 
@@ -125,10 +118,9 @@ class Profiler:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._writing = threading.Lock()
-        #: What has been seen so far, by the pid and the moment it started -- a pid alone is
-        #: a name the operating system hands out again, and a run of hours will see it twice.
+
         self._seen: dict[tuple[int, float], Process] = {}
-        #: Which of those have been written down as gone.
+        
         self._left: set[tuple[int, float]] = set()
 
     def start(self) -> None:
@@ -163,8 +155,7 @@ class Profiler:
         """Looks at what is running, over and over, until it is told to stop."""
         while not self._stop.is_set():
             with contextlib.suppress(Exception):
-                # Anything at all: a process tree read while it is changing raises whatever
-                # the platform raises, and a profile is not a thing to fail a run over.
+
                 self._sample()
             self._stop.wait(self._every)
         with contextlib.suppress(Exception):
@@ -194,7 +185,7 @@ class Profiler:
                         ended=now, threads=threads or self._seen[held].threads
                     )
             except (psutil.Error, OSError):
-                continue  # a process that went while it was being read is one that went
+                continue  
         self._gone()
 
     def _under(self) -> list[psutil.Process]:
@@ -287,7 +278,6 @@ class Profiler:
             with self._at.open("a", encoding="utf-8") as stream:
                 stream.write(json.dumps(said) + "\n")
 
-
 def read(at: str | os.PathLike[str]) -> list[Process]:
     """The programs one profile holds, in the order they started.
 
@@ -312,7 +302,6 @@ def read(at: str | os.PathLike[str]) -> list[Process]:
         if one is not None:
             held[one.pid, one.began] = one
     return _lined_up(sorted(held.values(), key=lambda one: (one.began, one.pid)))
-
 
 def _lined_up(held: list[Process]) -> list[Process]:
     """The same programs, timed against the clock rather than against the boot time.
@@ -341,7 +330,6 @@ def _lined_up(held: list[Process]) -> list[Process]:
         for one in held
     ]
 
-
 def _lines(at: Path) -> Iterator[dict[str, Any]]:
     """Every record one profile holds, skipping whatever is not one."""
     try:
@@ -352,10 +340,9 @@ def _lines(at: Path) -> Iterator[dict[str, Any]]:
         try:
             said = json.loads(line)
         except ValueError:
-            continue  # a run that died mid-line, which is a line and not a profile
+            continue  
         if isinstance(said, dict):
             yield said
-
 
 def _read(said: dict[str, Any]) -> Process | None:
     """One program, read back off the line it was written as."""

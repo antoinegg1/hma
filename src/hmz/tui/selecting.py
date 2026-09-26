@@ -40,11 +40,7 @@ if TYPE_CHECKING:
     from textual.geometry import Region
     from textual.widget import Widget
 
-#: How many clicks in a row take the word under them, and how many take the whole line. What a
-#: terminal gives for each, and what somebody clicking twice on a path or three times on a
-#: wrapped line is asking for.
 _WORD, _LINE = 2, 3
-
 
 class _Row(NamedTuple):
     """One row of a transcript as it is drawn, and which line of it the row is a piece of.
@@ -58,7 +54,6 @@ class _Row(NamedTuple):
     strip: Strip
     line: int
 
-
 class _Written(NamedTuple):
     """Something put in a transcript, kept as it was given so that it can be drawn again.
 
@@ -69,7 +64,6 @@ class _Written(NamedTuple):
 
     content: object
     shrink: bool
-
 
 class Transcript(ScrollView, can_focus=False):
     """What has been shown, kept as the text it was written as rather than as what it drew.
@@ -109,28 +103,25 @@ class Transcript(ScrollView, can_focus=False):
                  background: $surface; color: $foreground; }
     """
 
-    def __init__(self, id: str | None = None) -> None:  # noqa: A002 -- textual's own name
+    def __init__(self, id: str | None = None) -> None:  
         """Initializes an empty transcript.
 
         Args:
           id: What to call it in the stylesheet and in a query.
         """
         super().__init__(id=id)
-        #: What has been written, oldest first, kept so that a resize can draw it again.
+        
         self._written: list[_Written] = []
-        #: The rows as they are drawn now, one per row of the screen.
+        
         self._rows: list[_Row] = []
-        #: The text behind them, a line apiece: what a selection over the rows gives back.
+        
         self._lines: list[str] = []
         self._joined: str | None = None
-        #: The width the rows were drawn to, so that a resize is noticed. Nothing is drawn
-        #: before the interface has been laid out, which is what -1 says.
+
         self._drawn_at = -1
-        #: The widest row there is, which is what a thing Rich drew too wide to fit can be
-        #: scrolled sideways to reach.
+
         self._widest = 0
-        #: How a selection is marked, which is a theme away and is read once rather than per
-        #: row drawn.
+
         self._marking: RichStyle | None = None
 
     @property
@@ -195,9 +186,7 @@ class Transcript(ScrollView, can_focus=False):
         """
         super().watch_scroll_y(old_value, new_value)
         if new_value >= self.max_scroll_y:
-            # Said as a scroll to the end it is already at, that being what takes the anchor
-            # up. Down the page only: a box Rich drew too wide for the terminal is read by
-            # scrolling across it, and reaching the end is no reason to be taken back.
+
             self.scroll_end(animate=False, immediate=True, x_axis=False)
 
     def on_resize(self) -> None:
@@ -256,8 +245,7 @@ class Transcript(ScrollView, can_focus=False):
         at = self.scroll_offset.y + event.y
         if event.chain < _WORD or at >= len(self._rows):
             return
-        # Textual's own is on the class this one comes from, and would run after this one and
-        # select everything over the top of it.
+
         event.prevent_default()
         row = self._rows[at]
         _took(
@@ -265,8 +253,7 @@ class Transcript(ScrollView, can_focus=False):
             row.line,
             _wanted(
                 self._lines[row.line],
-                # Less the room drawn round it, since a click is where it landed on the
-                # widget and a row begins where the widget's own padding ends.
+
                 _under(row.strip, self.scroll_offset.x + event.x - self.gutter.left),
                 event.chain,
             ),
@@ -285,10 +272,7 @@ class Transcript(ScrollView, can_focus=False):
         width = self.scrollable_content_region.width
         at = scroll_y + y
         if at >= len(self._rows):
-            # Under the last line there is: pointed at the end of it, so that a drag begun in
-            # the empty room below the text is a drag from the end of the text. Said rather
-            # than left blank, since a row that says nothing about itself is one Textual can
-            # only take to mean the whole widget.
+
             ending = len(self._lines) - 1
             return Strip.blank(width, self.rich_style).apply_offsets(
                 len(self._lines[ending]) if ending >= 0 else 0, max(ending, 0)
@@ -301,15 +285,12 @@ class Transcript(ScrollView, can_focus=False):
                 self._marking = Style.from_styles(
                     self.screen.get_component_styles("screen--selection")
                 ).rich_style
-            # Marked before it is cut, the span being a span of the line rather than of the
-            # part of the line that is on the screen.
+
             row = row._replace(strip=_marked(row.strip, span, self._marking))
         strip = row.strip.crop_extend(scroll_x, scroll_x + width, self.rich_style)
         begins = _begins(row.strip)
         if scroll_x or begins is None:
-            # Two rows that have to be said again from scratch: one cut from the left, whose
-            # cells are no longer where they were, and one with nothing on it to have been
-            # said by -- a line with no text on it is still a place a drag can begin.
+
             strip = strip.apply_offsets(
                 _under(row.strip, scroll_x) if begins is not None else 0, row.line
             )
@@ -324,7 +305,7 @@ class Transcript(ScrollView, can_focus=False):
         self._widest = 0
         self._drawn_at = self.scrollable_content_region.width
         if self._drawn_at <= 0:
-            return  # nothing is laid out yet, and a line has no width to be wrapped to
+            return  
         for written in self._written:
             self._drew(written)
         self._measured()
@@ -342,8 +323,7 @@ class Transcript(ScrollView, can_focus=False):
         """
         width, style = self._drawn_at, self.visual_style
         if not isinstance(written.content, str):
-            # Something Rich draws. What it draws is a picture of its own, so each row it
-            # comes out as is a line to itself: there is no text under a border.
+
             visual = visualize(self, written.content)
             asked = visual.get_optimal_width(self.styles.get_rules(), width)
             for strip in Visual.to_strips(
@@ -360,9 +340,7 @@ class Transcript(ScrollView, can_focus=False):
                 self._rows.append(_Row(strip.apply_offsets(0, at), at))
             self._joined = None
             return
-        # Markup, taken as Rich's -- which is what it was written as, and what says which of
-        # the sixteen colours it is in. Line by line, so that each row knows which line it
-        # belongs to however many rows that line turns out to need.
+
         for line in Content.from_rich_text(written.content).split(allow_blank=True):
             at = len(self._lines)
             self._lines.append(line.plain)
@@ -377,7 +355,6 @@ class Transcript(ScrollView, can_focus=False):
                     )
                 )
         self._joined = None
-
 
 class Choices(OptionList):
     """A list of things to pick from, whose rows can be read off the screen as well as picked.
@@ -396,20 +373,19 @@ class Choices(OptionList):
 
     ALLOW_SELECT: ClassVar[bool] = True
 
-    def __init__(self, id: str | None = None) -> None:  # noqa: A002 -- textual's own name
+    def __init__(self, id: str | None = None) -> None:  
         """Initializes an empty list.
 
         Args:
           id: What to call it in the stylesheet and in a query.
         """
         super().__init__(id=id)
-        #: The text of the options, a line apiece, and where each option's lines start in it.
+        
         self._text: list[str] = []
         self._starts: list[int] = []
-        #: Which options that was counted for, so that a list which has not changed is not
-        #: counted again for every row of it that is drawn.
+
         self._counted_for: tuple[int, int, int] = (0, 0, 0)
-        #: How a selection is marked, as the transcript keeps it.
+        
         self._marking: RichStyle | None = None
 
     def notify_style_update(self) -> None:
@@ -445,10 +421,9 @@ class Choices(OptionList):
         strip = self.render_line(event.y)
         begins = _begins(strip)
         if begins is None:
-            return  # a row with nothing on it: a spacer between two groups of options
+            return  
         line = begins[1]
-        # Less the room drawn round it: a list is indented by its own padding, and a click is
-        # where it landed on the widget rather than where the row it landed on begins.
+
         at = _under(strip, event.x - self.gutter.left)
         _took(self, line, _wanted(self._text[line], at, event.chain))
 
@@ -477,7 +452,7 @@ class Choices(OptionList):
         strip = super().render_line(y)
         at = self.scroll_offset.y + y
         if at >= len(self._lines):
-            # Under the last option, in a list drawn taller than what is in it.
+            
             ending = len(self._text) - 1
             return strip.apply_offsets(
                 len(self._text[ending]) if ending >= 0 else 0, max(ending, 0)
@@ -485,8 +460,7 @@ class Choices(OptionList):
         option, _ = self._lines[at]
         begins = _begins(strip)
         line = self._starts[option] + (0 if begins is None else begins[1])
-        # A row with nothing said on it is a row Textual can only take to mean the whole list,
-        # so a spacer between two groups of options is said to be the blank line it is.
+
         strip = _numbered(strip, line) if begins else strip.apply_offsets(0, line)
         selection = self.text_selection
         span = None if selection is None else selection.get_span(line)
@@ -506,8 +480,7 @@ class Choices(OptionList):
         line is what a drag across both of them is asking for.
         """
         options = self.options
-        # By what the options are rather than by what they say: a sheet puts its list up again
-        # by making every row of it over, so the ends of it change whenever any of it does.
+
         seen = (
             len(options),
             id(options[0]) if options else 0,
@@ -520,11 +493,10 @@ class Choices(OptionList):
         for option in options:
             self._starts.append(len(self._text))
             drawn = visualize(self, option.prompt)
-            # Anything else is a picture rather than a line, and has no text to be read off.
+            
             self._text.extend(
                 drawn.plain.split("\n") if isinstance(drawn, Content) else [""]
             )
-
 
 def _begins(strip: Strip) -> tuple[int, int] | None:
     """Where in the text a drawn row begins: the character, and the line.
@@ -546,7 +518,6 @@ def _begins(strip: Strip) -> tuple[int, int] | None:
             return int(offset[0]), int(offset[1])
     return None
 
-
 def _under(strip: Strip, column: int) -> int:
     """Which character of the line a row is a piece of is under a column of the screen.
 
@@ -566,8 +537,7 @@ def _under(strip: Strip, column: int) -> int:
         style = segment.style
         offset = None if style is None else style.meta.get("offset")
         if offset is None:
-            # Something drawn rather than written: the padding a row is filled out to the
-            # edge with, or the room a list is indented by. It is columns and no characters.
+
             cells += segment.cell_length
             continue
         at = int(offset[0])
@@ -577,7 +547,6 @@ def _under(strip: Strip, column: int) -> int:
             cells += get_character_cell_size(character)
             at += 1
     return at
-
 
 def _numbered(strip: Strip, line: int) -> Strip:
     """One row, saying it is a piece of the line it is a piece of.
@@ -602,7 +571,6 @@ def _numbered(strip: Strip, line: int) -> Strip:
         renumbered = RichStyle.from_meta({**style.meta, "offset": (offset[0], line)})
         segments.append(Segment(text, style + renumbered, control))
     return Strip(segments, strip.cell_length)
-
 
 def _marked(strip: Strip, span: tuple[int, int], marking: RichStyle) -> Strip:
     """One row with the selected part of it drawn as selected.
@@ -643,7 +611,6 @@ def _marked(strip: Strip, span: tuple[int, int], marking: RichStyle) -> Strip:
         segments.extend(Segment(part, marks, control) for part, marks in cut if part)
     return Strip(segments, strip.cell_length)
 
-
 def _wanted(line: str, at: int, chain: int) -> tuple[int, int]:
     """What clicking on a line twice takes of it, and what clicking three times takes.
 
@@ -662,7 +629,6 @@ def _wanted(line: str, at: int, chain: int) -> tuple[int, int]:
     end = line.find(" ", at)
     return line.rfind(" ", 0, at) + 1, len(line) if end < 0 else end
 
-
 def _took(widget: Widget, line: int, span: tuple[int, int]) -> None:
     """Selects part of one line of a widget, and says that a selection was made.
 
@@ -677,7 +643,7 @@ def _took(widget: Widget, line: int, span: tuple[int, int]) -> None:
     """
     start, end = span
     if start >= end:
-        return  # a click on the spaces between two words, or on a line with nothing on it
+        return  
     widget.screen.selections = {
         widget: Selection(Offset(start, line), Offset(end, line))
     }

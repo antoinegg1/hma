@@ -20,7 +20,6 @@ from typing import ClassVar
 from .config import AgentConfig
 from .opencode import OpencodeAgent, OpencodeSession
 
-
 class MimoCodeSession(OpencodeSession):
     """A mimocode conversation, held and resumed exactly as an opencode one is."""
 
@@ -35,7 +34,6 @@ class MimoCodeSession(OpencodeSession):
         """
         return ["--dangerously-skip-permissions"]
 
-
 @dataclass(frozen=True, kw_only=True)
 class MimoCodeAgentConfig(AgentConfig):
     """What mimocode is configured with: the common model and effort, and nothing else.
@@ -43,7 +41,6 @@ class MimoCodeAgentConfig(AgentConfig):
     The model is written as mimocode writes it, `provider/id`, since a model here belongs to
     the provider that serves it and mimocode is asked for the pair.
     """
-
 
 class MimoCodeAgent(OpencodeAgent):
     """mimocode, driven through its own command line, one run per turn."""

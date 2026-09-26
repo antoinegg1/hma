@@ -24,18 +24,11 @@ if TYPE_CHECKING:
     import os
     from collections.abc import Iterator
 
-#: What the CLI is installed as. The tarball calls the file `antigravity` and the installer
-#: puts it down under this name, which is what a command line reaches for.
 _COMMAND = "agy"
 
-#: The rungs it can actually be run at. There is one switch -- approve everything, or ask --
-#: and nobody is there to be asked, so a rung it cannot express is refused where the agent is
-#: made rather than silently run as something else.
 _TAKES = ("auto", "bypass")
 
-#: What a step says it is doing, as the one line a row of a transcript has room for.
 _THINKING = "THINKING"
-
 
 class AntigravityCLISession(CommandSessionBase):
     """An Antigravity conversation, resumed by the id its first turn reported.
@@ -45,11 +38,8 @@ class AntigravityCLISession(CommandSessionBase):
     it takes no id of its own choosing.
     """
 
-    #: What it writes on stdout is the turn as events rather than the agent talking.
     protocol: ClassVar[bool] = True
 
-    #: `--json-schema` is a setting of the run: the answer comes back under `structured_output`
-    #: rather than being asked for in the prompt.
     shapes: ClassVar[bool] = True
 
     def __init__(
@@ -62,10 +52,10 @@ class AntigravityCLISession(CommandSessionBase):
           cwd: The directory this conversation works in, as for `SessionBase`.
         """
         super().__init__(agent, cwd)
-        #: What the agent answered with, and what went wrong with it if anything did.
+        
         self._said = ""
         self._failed: str | None = None
-        #: What the turn now running has cost, which it reports once, at the end.
+        
         self._costing = Usage()
 
     def _turn(self, prompt: str) -> tuple[list[str], str | None]:
@@ -86,20 +76,15 @@ class AntigravityCLISession(CommandSessionBase):
             "stream-json",
             "--model",
             self._agent.config.model,
-            # Nobody is there to answer it: a flow watches its agent rather than gating it.
+            
             "--dangerously-skip-permissions",
         ]
-        # And no `--effort`: how hard to think is part of the model here. Antigravity lists
-        # `gemini-3.7-flash-high`, `-medium` and `-low` as three models, and refuses the flag
-        # beside every model it lists -- as `conflicts with --effort` where the name carries
-        # one that differs, and as `--effort is not supported for model` where the name
-        # carries none. The effort is chosen by choosing the model.
+
         if (schema := self._shaping) is not None:
             argv += ["--json-schema", json.dumps(schema.model_json_schema())]
         if self._id is not None:
             argv += ["--conversation", self._id]
-        # Its flags are Go's, which take the next word whatever it starts with, so a prompt
-        # opening with a dash is still a prompt.
+
         return [*argv, "--print", prompt], None
 
     def _reads(self, line: str, *, error: bool) -> Iterator[Event]:
@@ -118,9 +103,9 @@ class AntigravityCLISession(CommandSessionBase):
         try:
             said: dict[str, Any] = json.loads(line)
         except json.JSONDecodeError:
-            return  # not ours: the odd plain line among the JSON
+            return  
         kind = str(said.get("event") or "")
-        # The payload sits under a key of the event's own name rather than beside it.
+        
         told = cast("dict[str, Any]", said.get(kind) or {})
         if kind == "step_update":
             yield from self._step(told)
@@ -129,8 +114,7 @@ class AntigravityCLISession(CommandSessionBase):
             self._costing = self._costing + self._cost(
                 cast("dict[str, Any]", told.get("usage") or {})
             )
-            # It says how the run ended in a word rather than only in its exit status, and a
-            # run that was cancelled or refused is not a turn that landed.
+
             status = str(told.get("status") or "")
             if failed := str(told.get("error") or ""):
                 self._failed = failed
@@ -152,7 +136,7 @@ class AntigravityCLISession(CommandSessionBase):
             )
             yield Event(kind=kind, text=words)
             return
-        # A tool is shown as it starts rather than once per state it passes through.
+        
         named = str(told.get("tool_name") or "")
         if named and str(told.get("state") or "") != "DONE":
             about: dict[str, Any] = told.get("tool_info") or {}
@@ -234,14 +218,13 @@ class AntigravityCLISession(CommandSessionBase):
             if not isinstance(said, dict):
                 continue
             held = cast("dict[str, Any]", said)
-            # Named at the top of the line it opens with, and again inside the one it ends on.
+            
             named = held.get("conversation_id") or cast(
                 "dict[str, Any]", held.get("result") or {}
             ).get("conversation_id")
             if named:
                 return str(named)
         raise ValueError(f"{_COMMAND} named no conversation")
-
 
 @dataclass(frozen=True, kw_only=True)
 class AntigravityCLIAgentConfig(AgentConfig):
@@ -252,7 +235,6 @@ class AntigravityCLIAgentConfig(AgentConfig):
     the effort here is what a model was chosen at rather than something the CLI is told: it
     refuses the flag beside every model it lists.
     """
-
 
 class AntigravityCLIAgent(AgentBase):
     """Antigravity CLI, driven through its own command line, one run per turn."""

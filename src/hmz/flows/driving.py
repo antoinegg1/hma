@@ -75,25 +75,17 @@ __all__ = [
     "wanted",
 ]
 
-
-#: How many arguments a flow's entry point takes when it says it can be set up with
-#: something: the agents, the task, and the model that says what there is to set.
 _WITH_A_CONFIG = 3
 
-#: A flow's entry point: called with the agents and the task, and done when it returns --
-#: or, for one written as `async def run`, when what it returns has been awaited. Which of
-#: the two a flow is, is the flow's own business: `Runner.run` waits for it either way.
 type Entry = Callable[..., Awaitable[None] | None]
 
-
-class NotAFlow(ValueError):  # noqa: N818  -- the name SPEC.md gives it
+class NotAFlow(ValueError):  
     """What a command line named, when it was not a flow for the agents it was given.
 
     Its own kind of error, so that a flow failing as it is imported -- one that reads a prompt
     file beside it and does not find it -- is left to fail as it would anywhere, rather than
     being reported as a command line to correct.
     """
-
 
 class Running(NamedTuple):
     """One flow that is running now.
@@ -107,25 +99,10 @@ class Running(NamedTuple):
     flow: str
     since: float
 
-
-#: The flows running now, in the order they started: the one somebody ran, then whatever it
-#: called, then whatever that called, each beside the thread it is running on. Kept here
-#: rather than asked of the flows, which is the one thing a flow cannot be asked -- it is a
-#: Python file and may branch any way it likes -- and read by the interface to say what is
-#: running under what.
-#:
-#: A list rather than a stack, because a flow written as a coroutine may have two of them
-#: going at once, and both are running. Under a lock, since a flow runs on whichever thread
-#: took it and the interface reads while they run.
 _RUNNING: list[tuple[Running, threading.Thread]] = []
 _TELLING = threading.Lock()
 
-#: The agents each of those is being driven with, for a report of something that went wrong
-#: while they were. Keyed by the record `entered` made, so that it goes when the run does: a
-#: crash in the interface an hour after a flow ended must not be filed as a crash in that flow,
-#: and a flow that called another must not have the called one's agents put under its name.
 _DRIVEN: dict[int, Sequence[Agent]] = {}
-
 
 def running() -> tuple[Running, ...]:
     """Every flow running now, the one that was started first and whatever it called after it.
@@ -141,7 +118,6 @@ def running() -> tuple[Running, ...]:
     with _TELLING:
         _RUNNING[:] = [one for one in _RUNNING if one[1].is_alive()]
         return tuple(flow for flow, _ in _RUNNING)
-
 
 def entered(flow: str, agents: Sequence[Agent] = ()) -> Running:
     """Writes down that a flow has started, for whatever is watching the run.
@@ -159,7 +135,6 @@ def entered(flow: str, agents: Sequence[Agent] = ()) -> Running:
         _DRIVEN[id(one)] = agents
     return one
 
-
 def left(one: Running) -> None:
     """Writes down that a flow has ended, however it ended.
 
@@ -170,24 +145,11 @@ def left(one: Running) -> None:
         _RUNNING[:] = [held for held in _RUNNING if held[0] is not one]
         _DRIVEN.pop(id(one), None)
 
-
-#: The container this run is in, or None for a run on this machine. One per process rather
-#: than one per flow: a flow that called another is one run, working in one place, and two
-#: containers under one run would be two workspaces the second flow could not see the first's
-#: work in. Set by `contained` while the run is being got ready and taken down when it ends.
 _INSIDE: list[tuple[MachineBase, MachineConfig, Mapped]] = []
 
-#: Held over every look at the list above and every change to it, so that one run at a time
-#: is settled rather than raced: two started at once would otherwise both have found nothing
-#: there and gone ahead. Held for the look and not for the bringing up, which is a pull of
-#: minutes -- the image below is what says the place is taken while that is going on.
 _ENTERING = threading.Lock()
 
-#: The image of a container that is on its way up, for as long as that takes. A run is in one
-#: from the moment another would have to wait for it rather than from the moment it answers,
-#: so that the second of two is refused at once instead of at the end of the first's pull.
 _COMING: list[str] = []
-
 
 def container() -> Mapped | None:
     """The container this run is working in, as the flow's own code reaches it.
@@ -207,7 +169,6 @@ def container() -> Mapped | None:
       machine's either way.
     """
     return _INSIDE[0][2] if _INSIDE else None
-
 
 @contextlib.contextmanager
 def contained(image: str, workspace: str = "") -> Generator[MachineConfig | None]:
@@ -257,8 +218,7 @@ def contained(image: str, workspace: str = "") -> Generator[MachineConfig | None
         _COMING.append(image)
     try:
         machine = DockerConfig(image=image, workspace=workspace or None).create()
-        # Started once and named by the anchor that reaches it, so that every agent of the
-        # run is pointed at the container that is already up rather than starting one apiece.
+
         anchor = machine.start()
         held = Mapped(anchor)
         where_ = AnchoredConfig(anchor=anchor)
@@ -276,7 +236,6 @@ def contained(image: str, workspace: str = "") -> Generator[MachineConfig | None
             _INSIDE[:] = [one for one in _INSIDE if one[0] is not machine]
         held.close()
         machine.stop()
-
 
 def lands_in(agents: Sequence[Agent], where_: MachineConfig) -> None:
     """Puts every agent of a run in the container the run is working in.
@@ -303,7 +262,6 @@ def lands_in(agents: Sequence[Agent], where_: MachineConfig) -> None:
             continue
         cast("Driven", one).runs_on(where_)
 
-
 class Writing(NamedTuple):
     """Where one called flow is being written down, and what its agents wrote to before it.
 
@@ -317,7 +275,6 @@ class Writing(NamedTuple):
 
     record: Sub | None
     before: tuple[Journal | None, ...]
-
 
 class Place(NamedTuple):
     """One of the agents a flow drives, as the flow's own annotation declared it.
@@ -349,7 +306,6 @@ class Place(NamedTuple):
     goal: bool = False
     goals_default: bool = True
 
-
 def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]:
     """What a flow calls each of the coding agents it drives, in the order it takes them.
 
@@ -369,7 +325,6 @@ def drives(flow: str | os.PathLike[str]) -> tuple[str, ...]:
       NotAFlow: If the file is not there, or is not a flow.
     """
     return tuple(place.name for place in wanted(flow))
-
 
 def configures(flow: str | os.PathLike[str]) -> type[BaseModel] | None:
     """What a flow can be set up with before it is run, if it takes anything at all.
@@ -391,7 +346,6 @@ def configures(flow: str | os.PathLike[str]) -> type[BaseModel] | None:
     """
     return declares(flow)[3]
 
-
 def resumes(flow: str | os.PathLike[str]) -> bool:
     """Whether a flow says it can be picked up where the last run of it left off.
 
@@ -411,7 +365,6 @@ def resumes(flow: str | os.PathLike[str]) -> bool:
     """
     return declares(flow)[4].resumable
 
-
 def _marked(run: Entry) -> Marked:
     """What a flow said about itself where it was marked.
 
@@ -426,7 +379,6 @@ def _marked(run: Entry) -> Marked:
 
     held = getattr(run, "__humanize_flow__", None)
     return held if isinstance(held, Said) else Said()
-
 
 def wanted(flow: str | os.PathLike[str]) -> tuple[Place, ...]:
     """Every agent a flow needs chosen for it, and what each of them has to be able to do.
@@ -445,7 +397,6 @@ def wanted(flow: str | os.PathLike[str]) -> tuple[Place, ...]:
       NotAFlow: If the file is not there, or is not a flow.
     """
     return tuple(place for place in declares(flow)[1] if not place.person)
-
 
 def declares(
     flow: str | os.PathLike[str],
@@ -474,22 +425,17 @@ def declares(
     from . import find, inside, loaded
 
     named = str(flow)
-    # Which of the file's flows was asked for, before the name is resolved to a file: a file
-    # may hold several, and `humanize1:gen-plan` is one of them.
+
     wanted = inside(named)
-    # Resolved here rather than by whoever is starting one, so that a name works wherever a
-    # flow is named -- a command line, an interface, a `Runner` written by hand.
+
     flow = find(named)
-    # The same test `find` applies, and for the same reason: a place that cannot be read
-    # holds no flow, which `Path.is_file` would raise about rather than answer.
-    if not os.path.isfile(flow):  # noqa: PTH113
+
+    if not os.path.isfile(flow):  
         raise NotAFlow(f"{flow}: {_unfetched(str(flow))}")
     read = loaded(flow)
     run = _entry(read, wanted)
     if run is None:
-        # A file that holds several flows names each of them after itself, so whoever asked
-        # for the file alone -- or for one of them under a name it does not have -- is a
-        # colon away from what they meant, and saying which ones is what ends it.
+
         holds = [f"{_called(flow)}:{one}" for one in _holds(read)]
         missing = f"{flow}: nothing in it is a flow called {wanted!r}"
         if wanted and holds:
@@ -506,23 +452,18 @@ def declares(
             "it, which is how a file says which of the functions in it is one"
         )
     try:
-        # A function, so that what is read below is what the entry point will be called
-        # with: a class or a partial answers with annotations that are somebody else's.
-        # Extras and all: what a flow wrote beside the type is what it asks of the agent.
+
         hinted = (
             get_type_hints(run, include_extras=True) if inspect.isfunction(run) else {}
         )
         declared = hinted.get("agents")
     except NameError as unresolved:
-        # A flow whose agents are imported under TYPE_CHECKING states how many it drives
-        # where nothing can read it back, which is the one thing a flow is asked to say.
+
         raise NotAFlow(
             f"{flow}: the flow's agents cannot be read here ({unresolved}) -- import what "
             "the annotation names at runtime, so the count it states can be checked"
         ) from unresolved
-    # A named tuple is a tuple that also says what each of its places is for, and `_fields`
-    # is where it says it. `_make` builds one from a sequence, exactly as `tuple` does, so
-    # the flow is handed the type it asked for either way.
+
     if (
         run is not None
         and declared is not None
@@ -536,7 +477,7 @@ def declares(
             _setting(run, hinted),
             _marked(run),
         )
-    # `tuple[Agent, ...]` is any number of them, which is no answer to the question.
+    
     declares = get_args(declared)
     if run is None or get_origin(declared) is not tuple or Ellipsis in declares:
         raise NotAFlow(
@@ -551,7 +492,6 @@ def declares(
         _setting(run, hinted),
         _marked(run),
     )
-
 
 def _compiled(named: str, read: dict[str, Any], run: Entry) -> Entry:
     """One flow's entry point, or -- for an atlas -- something that runs its prophecy.
@@ -575,7 +515,6 @@ def _compiled(named: str, read: dict[str, Any], run: Entry) -> Entry:
     if getattr(run, ATLAS, None) is None:
         return run
     return _Walked(named, read, run)
-
 
 class _Walked:
     """An atlas's entry point, compiled when the run reaches it and not before.
@@ -604,8 +543,7 @@ class _Walked:
         self._read = read
         self._entry = entry
         self._walk: Entry | None = None
-        # What the entry point was marked with, so that whatever reads a flow off what
-        # `declares` answered reads what it would have read off the entry point itself.
+
         self.__dict__.update(entry.__dict__)
 
     def __call__(self, *said: Any) -> Awaitable[None] | None:
@@ -638,7 +576,6 @@ class _Walked:
             self._walk = walking(self._named, self._read, self._entry)
         return self._walk
 
-
 def readies(run: Entry) -> Entry:
     """Compiles whatever a flow has to have compiled before a run of it starts.
 
@@ -662,7 +599,6 @@ def readies(run: Entry) -> Entry:
         run.ready()
     return run
 
-
 def _settles(agent: Agent) -> Driven:
     """One agent as whoever hands it to a flow holds it, rather than as a flow does.
 
@@ -680,7 +616,6 @@ def _settles(agent: Agent) -> Driven:
       The same agent, as whoever hands it over holds it.
     """
     return cast("Driven", agent)
-
 
 def carries(flow: str | os.PathLike[str], agents: Sequence[Agent]) -> None:
     """Gives every agent of a flow the skills that flow works by.
@@ -705,12 +640,9 @@ def carries(flow: str | os.PathLike[str], agents: Sequence[Agent]) -> None:
     where = directory(str(flow))
     declared: tuple[str, ...] = ()
     with contextlib.suppress(Exception):
-        # What the flow said where it was declared, which is read off the flow that was asked
-        # for. A flow that will not load is left to the loading to report.
+
         declared = _brings(flow)
-    # A flow that is one file has no directory of its own and so brings no skills of its own
-    # -- but it may still name skills that live somewhere else, and those are as much what it
-    # works by as a directory flow's are.
+
     if not where and not declared:
         return
     try:
@@ -719,7 +651,6 @@ def carries(flow: str | os.PathLike[str], agents: Sequence[Agent]) -> None:
         raise NotAFlow(f"{flow}: {unreachable}") from unreachable
     for agent in agents:
         _settles(agent).loads(loaded)
-
 
 def _brings(flow: str | os.PathLike[str]) -> tuple[str, ...]:
     """The skills one flow named where it was declared, which live somewhere else.
@@ -741,7 +672,6 @@ def _brings(flow: str | os.PathLike[str]) -> tuple[str, ...]:
             return said.skills
     return ()
 
-
 def _called(flow: str | os.PathLike[str]) -> str:
     """What a flow is called, given the file its entry point is in.
 
@@ -757,7 +687,6 @@ def _called(flow: str | os.PathLike[str]) -> str:
 
     said = Path(flow)
     return said.parent.name if said.name == ENTRY else said.stem
-
 
 class _CalledSkills:
     """Template for handing agents into a called flow and restoring them afterwards."""
@@ -777,7 +706,6 @@ class _CalledSkills:
         del parent
         return child
 
-
 class _InheritedCalledSkills(_CalledSkills):
     """Carries a child's skills plus parent skills whose names the child did not replace."""
 
@@ -788,10 +716,8 @@ class _InheritedCalledSkills(_CalledSkills):
         child_names = {one.name for one in child}
         return child + tuple(one for one in parent if one.name not in child_names)
 
-
 _ISOLATED_SKILLS = _CalledSkills()
 _INHERITED_SKILLS = _InheritedCalledSkills()
-
 
 def load(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry:
     """One flow, ready for another flow to run: what it marked, found by name.
@@ -853,8 +779,7 @@ def load(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry
         asked for rather than an hour into a loop -- and again at each call, for a flow that
         was rewritten into something that is no longer one.
     """
-    # Said now, so a name that is wrong -- or an atlas whose body will not compile -- is
-    # wrong where it was written rather than an hour into a loop.
+
     readies(declares(flow)[0])
     named = str(flow)
     skill_policy = _INHERITED_SKILLS if inherit_skills else _ISOLATED_SKILLS
@@ -864,30 +789,18 @@ def load(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry
         task: str,
         config: BaseModel | dict[str, Any] | None = None,
     ) -> Awaitable[None] | None:
-        # Read afresh, which is what makes a flow rewritten since the last call the flow that
-        # runs now: a flow is a directory, and reading one is running its entry point.
+
         run, places, make, setting, mark = declares(flow)
         driven = _handed(named, places, make, agents)
-        # Read back through the flow's own model, which is what refuses a config a flow does
-        # not take and one it takes another of -- and what puts the settings through its own
-        # validators at the moment it is about to run, exactly as a run of it does. Before the
-        # skills below, because a refusal here is a call that never happened: a caller that
-        # catches it -- to try another config, or to go on without this flow -- must not be
-        # left driving agents that are carrying the skills of a flow that never ran.
+
         given = None if config is None else set_up(named, setting, config)
         settings = () if setting is None else (given,)
-        # And what it left behind last time, for a flow that says it can be picked up: kept
-        # under its own name in the epic of the run that called it, since a flow that called
-        # another is two flows and neither writes the other's.
+
         held = () if not mark.resumable else (_holding(driven, named),)
-        # And the skills it works by, which are the flow's rather than the agents': a called
-        # flow brings its own, mounted onto whatever sessions it opens, and hands the agents
-        # back as it found them so that the flow which called it goes on carrying its own.
+
         before = skill_policy.carry(named, driven)
         started = entered(named, driven)
-        # And a record of its own to write into, in the epic of the run that called it: a
-        # called flow opens sessions and calls flows of its own, and what it did is its own
-        # rather than a run's that happened to start it.
+
         writing = _opened(driven, named, task, resumable=mark.resumable)
         try:
             answered = run(driven, task, *settings, *held)
@@ -895,14 +808,12 @@ def load(flow: str | os.PathLike[str], *, inherit_skills: bool = False) -> Entry
             _ended(driven, started, before, writing, type(why))
             raise
         if inspect.isawaitable(answered):
-            # A flow written as a coroutine has not run yet: it is running while whoever
-            # called it awaits it, so what says it is running has to last that long too.
+
             return _awaited(answered, driven, started, before, writing)
         _ended(driven, started, before, writing)
         return None
 
     return calling
-
 
 async def _awaited(
     answered: Awaitable[None],
@@ -926,7 +837,6 @@ async def _awaited(
         _ended(driven, started, before, writing, type(why))
         raise
     _ended(driven, started, before, writing)
-
 
 def _opened(
     driven: tuple[Agent, ...],
@@ -956,16 +866,13 @@ def _opened(
     Returns:
       The record and what to hand the agents back.
     """
-    # Asked what it is rather than taken as read: what an agent asks of a journal is that it
-    # can be told a session was opened, and this is asking it for something else.
+
     from hmz.epic import Epic
 
     under = next((one.epic for one in driven if isinstance(one.epic, Epic)), None)
     if under is None:
         return Writing(None, ())
-    # Cast because a flow sees its agents through `Agent`, which says what a flow may ask
-    # of one and nothing about what it was configured with -- and what a record says it
-    # was driven by is exactly that. They are the run's own agents either way.
+
     record = under.called(
         named, cast("Sequence[AgentBase]", driven), task, resumable=resumable
     )
@@ -973,7 +880,6 @@ def _opened(
     for agent in driven:
         agent.epic = record
     return Writing(record, was)
-
 
 def _ended(
     driven: tuple[Agent, ...],
@@ -998,7 +904,6 @@ def _ended(
         writing.record.ended(kind)
     for agent, held in zip(driven, before, strict=True):
         _settles(agent).loads(held)
-
 
 def _handed(
     flow: str,
@@ -1034,7 +939,7 @@ def _handed(
     if len(given) == len(places):
         driven = given
     elif len(given) == len(asked):
-        # The person is made rather than chosen, exactly as a run of the flow makes one.
+        
         taking = iter(given)
         driven = [HumanAgent() if place.person else next(taking) for place in places]
     else:
@@ -1047,10 +952,7 @@ def _handed(
                 f"{flow}: {place.name or 'the agent'} has to run "
                 f"{', '.join(sorted(short))}, which {agent.backend} does not"
             )
-        # The same as a run of this flow asks, and asked here for the same reason: a place
-        # run under a goal, filled by an agent that has no goal feature or has had it
-        # switched off, is a call that fails at its first `pursue` -- hours in, from inside
-        # the called flow, rather than where the call was written.
+
         if place.goal and not type(agent).pursues:
             raise NotAFlow(
                 f"{flow}: {place.name or 'the agent'} is run under a goal, which "
@@ -1063,7 +965,6 @@ def _handed(
             )
         lands(flow, agent, place)
     return make(driven)
-
 
 def _holding(driven: tuple[Agent, ...], named: str) -> dict[str, Any]:
     """The dict a called flow that can be picked up writes what it wants back into.
@@ -1088,7 +989,6 @@ def _holding(driven: tuple[Agent, ...], named: str) -> dict[str, Any]:
             at = resumed(named, agent.epic.workspace)
             return agent.epic.state(named, state(at, named) if at is not None else None)
     return {}
-
 
 def lands(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None:
     """Settles where one agent's turns land, and refuses a machine the flow did not allow.
@@ -1130,16 +1030,13 @@ def lands(flow: str | os.PathLike[str], agent: Agent, place: Place) -> None:
         except RuntimeError as opened:
             raise NotAFlow(f"{flow}: {called} {opened}") from opened
         return
-    # The container the whole run works in, which is a convenience rather than a second way
-    # of saying where an agent works -- so a flow this one called must not read it as one.
-    # By identity, since what is exempt is that container and not the idea of a machine.
+
     inside = bool(_INSIDE) and agent.config.machine is _INSIDE[0][1]
     if place.where is None and agent.config.machine is not None and not inside:
         raise NotAFlow(
             f"{flow}: {called} runs on this machine -- this flow does not say it works "
             "anywhere else, so it cannot be pointed at one"
         )
-
 
 def _unfetched(named: str) -> str:
     """Why a flow that was named is not there, as far as that can be told.
@@ -1164,7 +1061,6 @@ def _unfetched(named: str) -> str:
             )
     return "no flow to read: a flow is a directory with an __init__.py in it"
 
-
 def _entry(inside: dict[str, Any], wanted: str) -> Callable[..., Any] | None:
     """The flow a file was asked for, out of everything in it.
 
@@ -1187,7 +1083,6 @@ def _entry(inside: dict[str, Any], wanted: str) -> Callable[..., Any] | None:
             return cast("Callable[..., Any]", one)
     return None
 
-
 def _holds(inside: dict[str, Any]) -> list[str]:
     """What a file calls each of the flows it holds under a name of its own.
 
@@ -1202,7 +1097,6 @@ def _holds(inside: dict[str, Any]) -> list[str]:
 
     said = (getattr(one, "__humanize_flow__", None) for one in inside.values())
     return [one.name for one in said if isinstance(one, Flow) and one.name]
-
 
 def set_up(
     flow: str | os.PathLike[str],
@@ -1245,7 +1139,6 @@ def set_up(
     except ValidationError as refused:
         raise NotAFlow(f"{flow}: {refused}") from refused
 
-
 def _setting(run: Entry, hinted: dict[str, object]) -> type[BaseModel] | None:
     """The model a flow says it can be set up with, read off its third argument.
 
@@ -1267,13 +1160,11 @@ def _setting(run: Entry, hinted: dict[str, object]) -> type[BaseModel] | None:
     if len(taken) < _WITH_A_CONFIG:
         return None
     kind = hinted.get(taken[_WITH_A_CONFIG - 1])
-    # `Model | None` is the annotation a flow writes, and is two arguments to a union; one
-    # written as the model alone is the same question with no way to answer it as unasked.
+
     for said in (*get_args(kind), kind):
         if isinstance(said, type) and issubclass(said, BaseModel):
             return said
     return None
-
 
 def _kinds(declared: type, run: Entry) -> dict[str, object]:
     """What a flow annotated each place of its agents with, resolved where it can be.
@@ -1298,7 +1189,6 @@ def _kinds(declared: type, run: Entry) -> dict[str, object]:
         )
     except (NameError, TypeError):
         return dict(getattr(declared, "__annotations__", {}))
-
 
 def _place(name: str, kind: object) -> Place:
     """One place in a flow's agents, read off what the flow annotated it with.
@@ -1326,7 +1216,6 @@ def _place(name: str, kind: object) -> Place:
         goals_default=True if goal else goals_default,
     )
 
-
 def _where(kind: object) -> type[Remote] | Remote | Isolated | None:
     """Where a flow said the agent filling a place may work.
 
@@ -1346,7 +1235,6 @@ def _where(kind: object) -> type[Remote] | Remote | Isolated | None:
             return said
     return None
 
-
 def _goal(kind: object) -> bool:
     """Whether a flow said the agent filling a place is run under its backend's goal feature.
 
@@ -1363,7 +1251,6 @@ def _goal(kind: object) -> bool:
         return False
     return any(said is Goal for said in get_args(kind)[1:])
 
-
 def _goals_default(kind: object) -> bool:
     """The initial on/off choice a flow suggests for this agent's goals.
 
@@ -1378,7 +1265,6 @@ def _goals_default(kind: object) -> bool:
         if isinstance(said, AgentDefaults):
             return said.goals
     return True
-
 
 def _moments(kind: object) -> tuple[Moment, ...]:
     """The moments a flow asked the agent filling a place to run.
@@ -1395,7 +1281,6 @@ def _moments(kind: object) -> tuple[Moment, ...]:
     if get_origin(kind) is not Annotated:
         return ()
     return tuple(said for said in get_args(kind)[1:] if isinstance(said, Moment))
-
 
 def _is_person(kind: object) -> bool:
     """Whether a place in a flow's agents is the person at the prompt.
@@ -1415,12 +1300,10 @@ def _is_person(kind: object) -> bool:
 
     people = (Person, HumanAgent)
     if isinstance(kind, str):
-        # Read by the word it names rather than by what that word means, which is all there
-        # is to go on: the first thing inside an `Annotated[...]` is the type it is about.
+
         said = kind.removeprefix("Annotated[").split(",")[0].strip()
         return said.rpartition(".")[2] in {one.__name__ for one in people}
     return any(kind is one for one in people)
-
 
 def _about() -> dict[str, Any]:
     """What is running now, for a report of something that went wrong while it was.
@@ -1471,8 +1354,4 @@ def _about() -> dict[str, Any]:
         ],
     }
 
-
-# What a report of a failure carries about the run it happened in: asked for only if one is
-# ever made, and never otherwise. Registered once, here, because what it answers is what is
-# running at the moment of the report rather than anything one run holds.
 telemetry.about("flow", _about)

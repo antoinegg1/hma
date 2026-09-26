@@ -30,7 +30,6 @@ _META_FIELDS = (
 )
 _TURN_FIELDS = ("model", "effort", "approval_policy", "sandbox_policy")
 
-
 def collect(
     home: pathlib.Path,
     workspace: pathlib.Path | None,
@@ -106,7 +105,6 @@ def collect(
             )
         )
     return collected
-
 
 def _parse(
     path: pathlib.Path,
@@ -190,7 +188,6 @@ def _parse(
         turn.end = max(turn.end, prev)
         actions.append(turn)
     return actions, info
-
 
 def _add_event(
     actions: list[Action],

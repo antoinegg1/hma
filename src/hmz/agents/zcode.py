@@ -15,10 +15,6 @@ runtime may do, whether a high-risk tool is allowed, what to answer a question w
 of those is answered, because a request left hanging stops the turn waiting behind it.
 """
 
-# A session and the agent holding it are two halves of one object declared in one
-# file, which is what the underscore keeps out of the package rather than out of them.
-# pyright: reportPrivateUsage=false
-
 from __future__ import annotations
 
 import contextlib
@@ -44,18 +40,8 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-#: How long a server being taken down is given to go before it is left to the operating system.
 _STOP_SECONDS = 5.0
 
-#: What ZCode is run in at each rung of the ladder. `plan` refuses an edit and refuses a command
-#: it reads as high-risk, and lets it look at anything; `edit` may change the workspace and asks
-#: about none of it; `build` -- the mode its own terminal opens in -- asks before a tool with
-#: side effects and waits for the answer, which is what makes it the rung where a hook hung on
-#: `PERMISSION_REQUEST` has something to refuse; and `yolo` asks nothing at all.
-#:
-#: Its own `auto` is not the `auto` here and is nobody's rung: its permission service answers
-#: `mode.auto.unimplemented` to every tool in that mode -- `Auto mode is reserved but not
-#: implemented yet` -- so an agent run at it would be an agent allowed to do nothing.
 _PERMITTED = {
     "read-only": "plan",
     "workspace-write": "edit",
@@ -63,46 +49,21 @@ _PERMITTED = {
     "bypass": "yolo",
 }
 
-#: The modes in which what the agent asks for is granted. ZCode asks in three of the four --
-#: `edit` and `build` both stop at a high-risk tool and wait -- and a rung is what says whether
-#: the answer is yes: an agent allowed no more than its workspace is not one that gets a
-#: `rm -rf` by asking twice. `yolo` is here because it is granted rather than asked, and is
-#: never the mode a request arrives under.
 _GRANTS = ("build", "yolo")
 
-#: The two tools ZCode reaches outside the workspace with, and so the two an agent that may not
-#: search the web is denied. Denied at the session rather than in anybody's settings file: two
-#: agents of one flow may be told different things, and neither is a reason to change what the
-#: person at this machine has configured.
 _WEB = ("WebFetch", "WebSearch")
 
-#: What each kind of token is called in the counts the server states. Reasoning and the cached
-#: part of the input are counted inside these two rather than beside them -- the server's own
-#: `totalTokens` is the input and the output added up -- so a third kind here would be counting
-#: some of the same tokens twice.
 _KINDS = {"input": "inputTokens", "output": "outputTokens"}
 
-#: What the client is told the runtime may do. The one answer that is not a default is about
-#: ZCode's own file search: turning it off would take `find` and `grep` away from an agent
-#: inside its workspace, which is not what anybody means by running one unattended.
 _PREFERENCES = {"nativeSearchEnhancementsEnabled": True}
 
-#: What the server asks its client before it will open a session at all, and gives up on after
-#: fifteen seconds.
 _RUNTIME = "session/requestRuntimePreferences"
 
-#: What the server calls the client requests that are somebody's to answer rather than the
-#: runtime's own: an approval, and a question the agent stopped on.
 _APPROVAL = "interaction/requestPermission"
 _ASKS = "interaction/requestUserInput"
 
-#: What a session's own stream is delivered as. The other kind replays for a web client that
-#: may have missed some; a turn read here is read as it happens and misses nothing.
 _DELIVERY = "desktop-continuous"
 
-#: Where the words are in each tool's arguments, so that a row of a transcript says what the
-#: agent reached for rather than the first field that happens to serialise. A tool that is not
-#: here is shown under whatever string it does name itself with.
 _ABOUT = {
     "Bash": "description",
     "Edit": "file_path",
@@ -113,10 +74,7 @@ _ABOUT = {
     "Write": "file_path",
 }
 
-#: What a payload of `session.updated` has to carry to be one model's answer rather than one of
-#: the several other things that arrive under that name.
 _ANSWERED = ("stopReason", "usage")
-
 
 @dataclass
 class _Held:
@@ -139,7 +97,6 @@ class _Held:
     mode: str = ""
     told: tuple[str, str, str] | None = None
 
-
 class _AppServer:
     """A `zcode app-server` of our own, spoken to in the ZCode protocol over its stdio."""
 
@@ -156,10 +113,7 @@ class _AppServer:
             server is the agent's, so its account is the agent's too.
         """
         self._argv = argv
-        #: Whose turns run here, so that a hook has an agent to fire on and a question somebody
-        #: to be put to. Held weakly, as codex's is and for the same reason: the agent holds
-        #: the server and the finalizer that takes it down is the agent's, so a server holding
-        #: its agent back would be an agent nothing could collect.
+
         self._held: list[weakref.ref[AgentBase]] = []
         self._stopping = threading.Lock()
         self._stopped = False
@@ -167,7 +121,7 @@ class _AppServer:
             argv,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            # Its log is nobody's: what a flow watches is the agent, which comes over stdout.
+            
             stderr=subprocess.DEVNULL,
             encoding="utf-8",
             errors="replace",
@@ -175,18 +129,13 @@ class _AppServer:
             start_new_session=os.name != "nt",
         )
         self._pending = itertools.count(1)
-        self._writing = threading.Lock()  # a line is written whole or not at all
-        #: Which sessions this server is holding and what each is allowed, so that one opened
-        #: on a server since let go of is picked back up rather than talked to as though it
-        #: were still here -- and so that an approval it asks about is answered as the rung
-        #: that session runs at, rather than as the loosest one any session of the agent has.
+        self._writing = threading.Lock()  
+
         self.sessions: dict[str, str] = {}
         self._messages: queue.Queue[dict[str, Any] | None] = queue.Queue()
-        # Read from a thread of its own, so that a turn can wait on the server for a while
-        # rather than only for as long as it takes to answer.
+
         threading.Thread(target=self._pump, daemon=True).start()
-        # One stream, shared by every session of the agent: a call is a write and the reads up
-        # to its answer, and two of them interleaved would each take the other's messages.
+
         self._speaking = threading.Lock()
 
     @property
@@ -226,8 +175,7 @@ class _AppServer:
         """
         ident = next(self._pending)
         self._write({"id": ident, "method": method, "params": params})
-        # An answer is a frame with no method of its own: the server asks things of us over the
-        # same stream, numbering its own calls, and one of those is not this one.
+
         while (message := self._read()) is None or not (
             message.get("id") == ident and "method" not in message
         ):
@@ -260,8 +208,7 @@ class _AppServer:
                     },
                     "thoughtLevel": held.effort,
                     "mode": held.mode,
-                    # A title is a turn of its own on the lite model, and nothing here reads
-                    # one: a session is named by the flow that opened it.
+
                     "titleGenerationEnabled": False,
                     **({} if searches else {"toolDenylist": list(_WEB)}),
                 },
@@ -270,7 +217,7 @@ class _AppServer:
             self._called(
                 "session/subscribe", {"sessionId": session, "deliveryKind": _DELIVERY}
             )
-        # Everything a settling would say was said in the call that opened it.
+        
         held.told = (held.model, held.effort, held.mode)
         self.sessions[session] = held.mode
         return session
@@ -372,17 +319,14 @@ class _AppServer:
             )
             said = str(answered.get("response") or "")
             if not answered.get("startedTurn"):
-                # A goal recorded rather than run: `plan` is the rung where ZCode writes the
-                # objective down and waits to be let out of it, which is that rung meaning what
-                # it says rather than a goal that failed.
+
                 return said.strip()
             watched = self._watched()
             for event in self._reading(session, held):
                 if event.kind == "result":
                     return event.text or said.strip()
                 if not watched:
-                    # A goal runs for as long as it takes to be met, and nothing above this
-                    # yields while it does. So its own words are the only sign it is running.
+
                     say(event.text, sys.stderr)
             return said.strip()
 
@@ -428,8 +372,7 @@ class _AppServer:
                     yield from saying.streamed(payload)
                 case "session.updated" if all(name in payload for name in _ANSWERED):
                     marked = str(payload.get("assistantMessageId") or "")
-                    # The whole message as the server has it, which is what was streamed plus
-                    # whatever arrived in no delta at all.
+
                     for event in saying.ended(
                         marked, str(payload.get("content") or "")
                     ):
@@ -440,16 +383,12 @@ class _AppServer:
                     counted += int(spent.total)
                     costing = costing + spent
                     if held.spends is not None and spent.total:
-                        # As the turn spends it rather than once it is over: a turn is minutes
-                        # long, and a rate that only moved at the end of one would stand still
-                        # for all of them.
+
                         held.spends(spent)
                 case "turn.failed":
                     raise Failed(1, self._argv, said, json.dumps(payload))
                 case "turn.completed":
-                    # What the whole turn cost, which is what the server adds up rather than
-                    # what this saw: a request whose event arrived after the turn's own would
-                    # otherwise be a turn that cost less than it did.
+
                     whole = _spent(cast("dict[str, Any]", payload.get("usage") or {}))
                     owed = Usage(
                         {
@@ -459,9 +398,7 @@ class _AppServer:
                         }
                     )
                     if held.spends is not None and owed.total:
-                        # Settling up rather than another turn's worth of spending: what this
-                        # adds is what the turn's own total says was spent and no event of it
-                        # carried.
+
                         held.spends(owed, turn=False)
                     said = str(payload.get("response") or said)
                     total = max(counted, int(whole.total))
@@ -472,7 +409,7 @@ class _AppServer:
                         spent=whole if whole.total else costing,
                     )
                     return
-                case _:  # the rest of the stream is not this turn's to show
+                case _:  
                     pass
         raise Failed(
             self._proc.poll() or 1, self._argv, said, "app server stopped mid-turn"
@@ -491,12 +428,10 @@ class _AppServer:
                         self._proc.wait(timeout=_STOP_SECONDS)
                     except subprocess.TimeoutExpired:
                         self._proc.kill()
-                # Reaped rather than left: a flow that runs agent after agent would otherwise
-                # gather a zombie for each one it let go of.
+
                 self._proc.wait()
                 return
-            # Provider wrappers and the server share this dedicated group. Taking down the
-            # group stops a stopped flow leaving either of them behind.
+
             with contextlib.suppress(ProcessLookupError):
                 os.killpg(self._proc.pid, signal.SIGTERM)
             with contextlib.suppress(subprocess.TimeoutExpired):
@@ -514,7 +449,7 @@ class _AppServer:
         Raises:
           subprocess.CalledProcessError: If the server has stopped reading.
         """
-        assert self._proc.stdin is not None  # noqa: S101
+        assert self._proc.stdin is not None  
         try:
             with self._writing:
                 self._proc.stdin.write(json.dumps(message) + "\n")
@@ -524,28 +459,22 @@ class _AppServer:
 
     def _pump(self) -> None:
         """Reads the server's whole stream, answering what it asks of us as it arrives."""
-        assert self._proc.stdout is not None  # noqa: S101
+        assert self._proc.stdout is not None  
         for line in self._proc.stdout:
             if not line.strip():
                 continue
             try:
                 message: dict[str, Any] = json.loads(line)
             except ValueError:
-                continue  # not ours: whatever the runtime put on its own stdout
+                continue  
             if "id" in message and "method" in message:
-                # Something asked of us. A request left unanswered stalls the turn holding the
-                # stream -- and with it every session of the agent -- so every one of them is
-                # answered, on a thread of its own where the answer is somebody's rather than
-                # this client's: a hook is the flow's own code, and asking waits on a person.
+
                 if message["method"] in (_APPROVAL, _ASKS):
                     threading.Thread(
                         target=self._asked, args=(message,), daemon=True
                     ).start()
                     continue
-                # What the runtime may do is the one of these with an answer of ours. The rest
-                # are the desktop app's -- headers for a server it signed into, a browser it
-                # holds -- and nothing here has any of them; answering with nothing is a client
-                # that has none rather than a request the turn behind it waits on forever.
+
                 self._write(
                     {
                         "id": message["id"],
@@ -554,7 +483,7 @@ class _AppServer:
                 )
                 continue
             self._messages.put(message)
-        self._messages.put(None)  # it has stopped, and nothing more is coming
+        self._messages.put(None)  
 
     def _asked(self, message: dict[str, Any]) -> None:
         """Answers the one kind of request that is somebody's rather than the runtime's.
@@ -577,9 +506,7 @@ class _AppServer:
         if message["method"] == _APPROVAL:
             mode = self.sessions.get(str(told.get("sessionId") or ""), "")
             if mode not in _GRANTS:
-                # A rung below the one that means the asking is granted. Refused here rather
-                # than put to a hook: what a hook may do at that moment is say no, and no is
-                # what this rung already says.
+
                 self._write(
                     {
                         "id": message["id"],
@@ -648,7 +575,7 @@ class _AppServer:
         """
         message = self._messages.get()
         if message is None:
-            self._messages.put(None)  # so that every later read finds it stopped too
+            self._messages.put(None)  
             raise Failed(
                 self._proc.wait(), self._argv, "", "app server stopped mid-turn"
             )
@@ -671,7 +598,6 @@ class _AppServer:
             raise Failed(1, self._argv, said, json.dumps(refused))
         return message.get("result")
 
-
 def _workspace(where: str) -> dict[str, str]:
     """How the directory a session works in is named, which ZCode wants twice.
 
@@ -683,7 +609,6 @@ def _workspace(where: str) -> dict[str, str]:
       directory is what identifies one and nothing else about it is ours to name.
     """
     return {"workspacePath": where, "workspaceKey": where}
-
 
 def _provider(model: str) -> str:
     """Which of ZCode's providers serves a model, out of the pair a model here is written as.
@@ -698,7 +623,6 @@ def _provider(model: str) -> str:
     provider, _, _ = model.partition("/")
     return provider
 
-
 def _model(model: str) -> str:
     """The model itself, out of that pair.
 
@@ -710,7 +634,6 @@ def _model(model: str) -> str:
     """
     _, _, named = model.partition("/")
     return named or model
-
 
 def _settling(
     session: str, held: _Held, *, again: bool = False
@@ -740,8 +663,7 @@ def _settling(
                         "providerId": _provider(held.model),
                         "modelId": _model(held.model),
                     },
-                    # This agent's model is this agent's. Persisting it would make one flow's
-                    # choice the default of whatever the person at this machine opens next.
+
                     "persistAsWorkspaceLastUsed": False,
                 },
             )
@@ -762,7 +684,6 @@ def _settling(
     held.told = (held.model, held.effort, held.mode)
     return calls
 
-
 class _Saying:
     """What one model's answer has said so far, and what of it has been shown.
 
@@ -775,13 +696,11 @@ class _Saying:
 
     def __init__(self) -> None:
         """Initializes a reading in which nothing has been said yet."""
-        #: What has been thought and what has been said, by the message each belongs to, and
-        #: how much of the words have been shown.
+
         self._thinking: dict[str, str] = {}
         self._words: dict[str, str] = {}
         self._shown: dict[str, int] = {}
-        #: Which message is being streamed, because the event that ends one does not name it:
-        #: what has just come back is what the pieces before it were pieces of.
+
         self._latest = ""
 
     def streamed(self, payload: dict[str, Any]) -> Iterator[Event]:
@@ -817,7 +736,7 @@ class _Saying:
                     "",
                 )
                 yield Event(kind="tool", text=f"{called} {about}".strip()[:120])
-            case _:  # the pieces of a tool's arguments on the way to the call itself
+            case _:  
                 pass
 
     def ended(self, marked: str, content: str) -> Iterator[Event]:
@@ -855,7 +774,6 @@ class _Saying:
         if said := rest.strip():
             yield Event(kind="text", text=said)
 
-
 def _spent(counted: dict[str, Any]) -> Usage:
     """What one request of a turn cost, by the kind each token went on.
 
@@ -873,7 +791,6 @@ def _spent(counted: dict[str, Any]) -> Usage:
         }
     )
 
-
 @dataclass(frozen=True, kw_only=True)
 class ZcodeAgentConfig(AgentConfig):
     """What ZCode is configured with: the common model and effort, and nothing else.
@@ -881,7 +798,6 @@ class ZcodeAgentConfig(AgentConfig):
     The model is written as ZCode writes it, `provider/id`, since a model here belongs to the
     provider serving it and the app server is asked for the pair.
     """
-
 
 class ZcodeSession(SessionBase):
     """A ZCode conversation, held as a session by the app server its agent runs.
@@ -893,7 +809,7 @@ class ZcodeSession(SessionBase):
     is refused by ZCode with its own reason for it.
     """
 
-    _agent: ZcodeAgent  # every turn is run on the app server this agent holds
+    _agent: ZcodeAgent  
 
     def __init__(
         self, agent: AgentBase, cwd: str | os.PathLike[str] | None = None
@@ -905,9 +821,9 @@ class ZcodeSession(SessionBase):
           cwd: The directory this conversation works in, as for `SessionBase`.
         """
         super().__init__(agent, cwd)
-        #: What the server has been told this session runs, and what its turns cost.
+        
         self._held = _Held(spends=self._spends)
-        #: The session ZCode named, known before the turn it was opened for has landed.
+        
         self._opening: str | None = None
 
     @property
@@ -932,8 +848,8 @@ class ZcodeSession(SessionBase):
           subprocess.CalledProcessError: If the turn was refused or failed, or the server
             stopped while it was running.
         """
-        del schema  # asked for in the prompt, since ZCode has no setting for it
-        with self._lock:  # a conversation is a sequence: one turn at a time
+        del schema  
+        with self._lock:  
             server = self._agent.server
             session = self._session(server)
             said = ""
@@ -944,13 +860,12 @@ class ZcodeSession(SessionBase):
                     said, spent, costing = event.text, event.tokens, event.spent
                     continue
                 if not self._agent._watchers:
-                    # On stderr, where every other backend puts its progress: a turn nobody can
-                    # watch is a flow that reads as hung for as long as the turn takes.
+
                     say(event.text, sys.stderr)
                 yield event
             if not self._agent._watchers:
                 say(said, sys.stdout)
-            self._adopt(session)  # a turn has landed, so the session is open
+            self._adopt(session)  
             yield Event(kind="result", text=said, tokens=spent, spent=costing)
 
     def _pursue(self, objective: str) -> str:
@@ -966,7 +881,7 @@ class ZcodeSession(SessionBase):
           subprocess.CalledProcessError: If any of the calls a goal is made of is refused,
             leaving the session unopened so that the next call retries it.
         """
-        with self._lock:  # a conversation is a sequence: one turn at a time
+        with self._lock:  
             server = self._agent.server
             session = self._session(server)
             said = server.pursue(session, objective, self._held)
@@ -1001,7 +916,6 @@ class ZcodeSession(SessionBase):
         server.settle(session, self._held)
         return session
 
-
 class ZcodeAgent(AgentBase):
     """ZCode, driven over its own app server so that a turn can name what it runs on.
 
@@ -1013,7 +927,6 @@ class ZcodeAgent(AgentBase):
 
     moments: ClassVar[frozenset[Moment]] = EVERYWHERE | {Moment.PERMISSION_REQUEST}
 
-    #: ZCode keeps itself going toward an objective, which is what `pursue` reaches for.
     pursues: ClassVar[bool] = True
 
     def __init__(self, config: AgentConfig, *, name: str | None = None) -> None:
@@ -1025,8 +938,7 @@ class ZcodeAgent(AgentBase):
         """
         super().__init__(config, name=name)
         self._server: _AppServer | None = None
-        #: Which account the server up now was started as, so that an agent which has fallen
-        #: back starts another rather than going on talking to one signed in as somebody else.
+
         self._server_as = ""
         self._serving = threading.Lock()
 
@@ -1041,22 +953,18 @@ class ZcodeAgent(AgentBase):
         """
         with (
             self._serving
-        ):  # two sessions of one agent share the server rather than start two
+        ):  
             if self._server is not None and self._server_as != self.node().name:
-                # Started as an account this agent has since left. Let go of rather than taken
-                # down: a turn on another thread may still be talking to it, and it is stopped
-                # by its own finalizer when the agent is collected either way.
+
                 self._server, self._server_as = None, ""
             if self._server is None:
-                # Read before the environment is built out of it: a fallback landing between
-                # the two reads would name the account this server is *not* signed into.
+
                 account = self.node().name
                 argv = ["zcode", "app-server", "--stdio"]
                 self._server = _AppServer(self.spawned(argv), self._environ())
                 self._server_as = account
                 self._server._held.append(weakref.ref(self))
-                # Held by the finalizer alone, which is what takes the server down: when the
-                # agent is collected, and at exit for one held to the end.
+
                 weakref.finalize(self, self._server.stop)
             return self._server
 

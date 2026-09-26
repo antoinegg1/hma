@@ -15,7 +15,6 @@ import sys
 
 __all__ = ["cred"]
 
-
 def cred(argv: list[str]) -> int:
     """Runs the program named on the command line, with the paths it was given swapped.
 
@@ -63,8 +62,6 @@ def cred(argv: list[str]) -> int:
     try:
         return redirect.run(swaps, command)
     except (OSError, RuntimeError, ValueError) as why:
-        # A run that could not be supervised must not fall back to running unsupervised: the
-        # program would read the credentials of whoever is at this machine, which is a turn
-        # taken as the wrong account rather than a turn that failed.
+
         print(f"hmz cred: {why}", file=sys.stderr)
         return 1

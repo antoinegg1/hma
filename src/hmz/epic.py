@@ -84,42 +84,23 @@ __all__ = [
     "where",
 ]
 
-#: What a directory may be called after: everything else in a path is flattened, the way the
-#: agents themselves flatten a workspace into the folder they log it under.
 _PLAIN = re.compile(r"[^A-Za-z0-9]")
 
-#: What a session may be named with. Wider than the above, because this name is read as well
-#: as written -- the backend, the account and the id are meant to be legible in it -- and
-#: narrower than a path, because it is one directory name on somebody's filesystem.
 _LEGIBLE = re.compile(r"[^A-Za-z0-9._@-]+")
 
-#: The file an epic's own record is written to, inside the epic's directory.
 JOURNAL = "epic.jsonl"
 
-#: What the record of a flow another flow called is called, beside the run's own: which
-#: flow it is of, and an id of that call rather than of the flow -- a flow called twice is
-#: two records, since it is two runs of it and each opened its own sessions.
 RECORD = "epic.{flow}_{ident}.jsonl"
 
-#: Every such record of one epic, as a glob over its directory. It does not match the
-#: run's own, which is the record of the flow nothing called.
 RECORDS = "epic.*.jsonl"
 
-#: Where the links to the sessions' own logs go, a directory per session.
 SESSIONS = "sessions"
 
-#: What a resumable flow left behind, kept beside the run it left it in.
 STATE = "state.json"
 
-#: Where the traces gathered of one run go, inside that run's own directory. A trace of a run
-#: belongs with the run: the sessions it points at and the state it left are already there.
 TRACES = "traces"
 
-#: What a session opened as the account this machine is already signed into is written under.
-#: A word rather than the empty string it is configured as: this goes in a directory name and
-#: in a listing, and both of those read better saying which account than saying nothing.
 LOCAL = "local"
-
 
 def _now() -> str:
     """This moment, as every file humanize writes spells one."""
@@ -127,11 +108,9 @@ def _now() -> str:
         datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
     )
 
-
 def _stamp() -> str:
     """This moment, as a name that sorts the way the moments do: to the millisecond."""
     return datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S.%f")[:-3] + "Z"
-
 
 class Session(NamedTuple):
     """One session a run opened, as the run wrote it down.
@@ -156,7 +135,6 @@ class Session(NamedTuple):
     name: str
     at: str = ""
     flow: str = ""
-
 
 class Drove(NamedTuple):
     """One agent a run was driven by, as the run wrote it down.
@@ -189,7 +167,6 @@ class Drove(NamedTuple):
         cli = f"{self.backend}@{self.provider}" if self.provider else self.backend
         return f"{cli}/{self.model}:{self.effort}"
 
-
 class Called(NamedTuple):
     """One flow a run called, as the run that called it wrote it down.
 
@@ -207,7 +184,6 @@ class Called(NamedTuple):
     record: str
     began: str = ""
     ended: str = ""
-
 
 class Ran(NamedTuple):
     """What one epic was, read back off its own record.
@@ -247,7 +223,6 @@ class Ran(NamedTuple):
         """What this epic is called, which is the directory it is written in."""
         return self.at.name
 
-
 def called(agent: str, backend: str, provider: str, ident: str) -> str:
     """What a run calls one session, which is a name rather than an id.
 
@@ -277,7 +252,6 @@ def called(agent: str, backend: str, provider: str, ident: str) -> str:
     )
     return f"{agent_at}-{cli}@{account}-{said}"
 
-
 def _record(flow: str, ident: str) -> str:
     """What the record of one called flow is called, inside the epic that called it.
 
@@ -290,7 +264,6 @@ def _record(flow: str, ident: str) -> str:
       The filename, beside the run's own record.
     """
     return RECORD.format(flow=_LEGIBLE.sub("-", flow).strip("-") or "flow", ident=ident)
-
 
 def _provider(agent: AgentBase) -> str:
     """Which account an agent's turns are running as, as a name to write down.
@@ -311,7 +284,6 @@ def _provider(agent: AgentBase) -> str:
     except ValueError:
         return agent.config.provider
     return at.name if at is not None else ""
-
 
 def _logs(backend: str, ident: str) -> list[Path]:
     """Every file one session was logged to by the backend that ran it.
@@ -335,9 +307,8 @@ def _logs(backend: str, ident: str) -> list[Path]:
         try:
             found += sorted(where.glob(pattern.format(ident=ident)))
         except (OSError, ValueError):
-            continue  # a home that cannot be read is a session with no links, not a failure
+            continue  
     return [one for one in found if one.is_file()]
-
 
 def _link(at: Path, backend: str, ident: str) -> list[str]:
     """Points a directory of the epic's own at the logs one session is being written to.
@@ -364,9 +335,7 @@ def _link(at: Path, backend: str, ident: str) -> list[str]:
     made: list[str] = []
     try:
         at.mkdir(parents=True, exist_ok=True)
-        # The links this made last time go first: a session gains files as it runs -- a
-        # sub-agent's transcript, a second day's log -- and a name that was unambiguous when
-        # there was one file is a name two files want once there are two.
+
         for old in at.iterdir():
             if old.is_symlink():
                 old.unlink()
@@ -378,11 +347,9 @@ def _link(at: Path, backend: str, ident: str) -> list[str]:
             (at / name).symlink_to(one)
             made.append(name)
     except OSError:
-        # A filesystem that will not make one -- Windows without the privilege, a mount that
-        # has gone -- is a run without links rather than a run that stops.
+
         return made
     return made
-
 
 class State(dict[str, Any]):
     """What a resumable flow left behind, and what it is writing now.
@@ -467,7 +434,6 @@ class State(dict[str, Any]):
             except (OSError, TypeError, ValueError):
                 return
 
-
 def _kept(epic: Path) -> dict[str, Any]:
     """What every flow of one epic left behind, by the name each was run as.
 
@@ -490,7 +456,6 @@ def _kept(epic: Path) -> dict[str, Any]:
         if isinstance(one, dict)
     }
 
-
 def state(epic: Path, flow: str = "") -> dict[str, Any]:
     """What a resumable flow left behind in one epic.
 
@@ -507,7 +472,6 @@ def state(epic: Path, flow: str = "") -> dict[str, Any]:
         return held.get(flow, {})
     ran = read(epic)
     return held.get(ran.flow, {}) if ran is not None else {}
-
 
 def resumed(flow: str, workspace: Path | str | None = None) -> Path | None:
     """The epic one flow's next run picks up from, which is the last run of it here.
@@ -530,7 +494,6 @@ def resumed(flow: str, workspace: Path | str | None = None) -> Path | None:
             return epic
     return None
 
-
 def _drove(agents: Sequence[AgentBase]) -> list[dict[str, Any]]:
     """What each agent of a run is, for the line a record opens with.
 
@@ -550,20 +513,15 @@ def _drove(agents: Sequence[AgentBase]) -> list[dict[str, Any]]:
             "effort": agent.config.effort,
             "service_tier": agent.config.service_tier,
             "permission": agent.config.permission,
-            # What it was configured with rather than what a turn of it ends up running as:
-            # the account a turn fell back onto is written down against the session that ran
-            # there, which is where it happened.
+
             "provider": agent.config.provider,
             "goals": agent.config.goals,
             "web_search": agent.config.web_search,
-            # Asked as the run is written down rather than read back off a name: what the
-            # person's backend is called is the agents' own business, and what a run picked
-            # up again needs is which of its agents nobody chose.
+
             "person": isinstance(agent, HumanAgent),
         }
         for agent in agents
     ]
-
 
 class Epic:
     """One run of one flow: the directory it is written to, and what has happened to it."""
@@ -599,19 +557,14 @@ class Epic:
             home()
             / "epics"
             / _PLAIN.sub("-", str((workspace or Path.cwd()).resolve()))
-            # The moment names it and six hex say which, since two flows may be started in
-            # one millisecond and neither is the other's run. To the millisecond rather than
-            # to the second because these are read back in the order they sort in: which run
-            # a flow is picked up from is the last of them, and two started inside one second
-            # would otherwise be ordered by the hex, which is to say at random.
+
             / f"{_stamp()}-{uuid.uuid4().hex[:6]}",
             JOURNAL,
             (workspace or Path.cwd()).resolve(),
             flow,
             agents,
         )
-        #: The programs this run starts, sampled while it runs, or None for a run nobody
-        #: asked to profile -- which is every run until somebody says otherwise.
+
         self._profiler = self._profiling() if profile else None
         self.write(
             "began",
@@ -648,13 +601,11 @@ class Epic:
         self._journal = journal
         self._writing = (
             threading.Lock()
-        )  # sessions open on whichever thread a turn runs on
+        )  
         self._agents = list(agents)
-        #: Every session this run has opened, by the name it was written down under, so that
-        #: the links can be made again as the backends go on writing to them.
+
         self._sessions: dict[str, tuple[str, str]] = {}
-        #: What each resumable flow of this run is holding, so that a value written inside
-        #: one -- which no mapping can see -- is still saved when the run ends.
+
         self._state: list[State] = []
         self._flow = flow
         self._where = workspace
@@ -693,7 +644,7 @@ class Epic:
             from .tracing.profile import PROFILE, Profiler
         except (
             ImportError
-        ):  # pragma: no cover -- an install missing what it was built with
+        ):  
             return None
         one = Profiler(self._at / PROFILE)
         try:
@@ -747,21 +698,14 @@ class Epic:
         """
         from .agents import Stopped
 
-        # The sampler first, so that what it saw is written down before anything reads it,
-        # and so that a run which is over stops costing anything.
         if self._profiler is not None:
             self._profiler.stop()
-        # The links again, now that the run is over: a backend writes a session's log while
-        # the session runs and finishes writing it after the last turn, and a sub-agent's
-        # transcript appears whenever that sub-agent was started.
+
         self.links()
-        # And what each flow of this run is holding, which is where a value written inside
-        # something the state holds -- a list appended to -- is finally written down.
+
         for one in list(self._state):
             one.save()
-        # An agent that was told to stop is a run that was stopped, whatever the turn under
-        # way made of it: the process goes out from under that turn, and from inside one that
-        # reads as a turn that could not finish.
+
         stopped = kind is not None and (
             issubclass(kind, Stopped) or any(agent.stopped for agent in self._agents)
         )
@@ -795,8 +739,7 @@ class Epic:
         Returns:
           The record, to be written to while the call runs and ended when it returns.
         """
-        # Named for the flow and for this call of it: a flow called twice in one run is two
-        # runs of it, each with its own sessions, and one file for both would say neither.
+
         record = _record(flow, uuid.uuid4().hex[:6])
         self.write("called", flow=flow, task=task, epic=record)
         return Sub(self, record, flow, agents, task, resumable=resumable)
@@ -823,7 +766,7 @@ class Epic:
             provider=provider or LOCAL,
             session=session,
             name=name,
-            # Where to look for it inside this epic, which is a link and not the log itself.
+            
             where=f"{SESSIONS}/{name}",
         )
         self.links(name)
@@ -856,7 +799,6 @@ class Epic:
             self._at.mkdir(parents=True, exist_ok=True)
             with (self._at / self._journal).open("a", encoding="utf-8") as stream:
                 stream.write(json.dumps({"event": event, "at": _now(), **said}) + "\n")
-
 
 class Sub(Epic):
     """One flow another flow called, written down in a record of its own.
@@ -900,8 +842,7 @@ class Sub(Epic):
             task=task,
             workspace=str(under.workspace),
             resumable=resumable,
-            # Which record called this one, so that a flow that called a flow that called a
-            # flow reads back as what it was rather than as three things one run did.
+
             under=under.record,
             agents=_drove(agents),
         )
@@ -914,7 +855,6 @@ class Sub(Epic):
         """
         self._close(kind)
         self._under.write("returned", flow=self._flow, epic=self._journal)
-
 
 def under(workspace: Path | str | None = None) -> Path:
     """Where the runs of one workspace are kept.
@@ -929,7 +869,6 @@ def under(workspace: Path | str | None = None) -> Path:
     return (
         home() / "epics" / _PLAIN.sub("-", str(Path(workspace or Path.cwd()).resolve()))
     )
-
 
 def epics(workspace: Path | str | None = None) -> list[Path]:
     """The epics run in one workspace, oldest first.
@@ -946,7 +885,6 @@ def epics(workspace: Path | str | None = None) -> list[Path]:
         )
     except OSError:
         return []
-
 
 def _events(epic: Path) -> list[dict[str, Any]]:
     """Every line one epic holds, in the order they were written.
@@ -973,7 +911,6 @@ def _events(epic: Path) -> list[dict[str, Any]]:
             held.append(cast("dict[str, Any]", said))
     return held
 
-
 def records(epic: Path) -> list[Path]:
     """Every record one epic holds: the run's own, and one per flow the run called.
 
@@ -987,12 +924,10 @@ def records(epic: Path) -> list[Path]:
     """
     at = epic / JOURNAL
     held = [at] if at.is_file() else []
-    # A directory that went while it was being read is the records that were read, the way
-    # a record that cannot be read at all is an epic with nothing in it.
+
     with contextlib.suppress(OSError):
         held += sorted(one for one in epic.glob(RECORDS) if one.is_file())
     return held
-
 
 def opened(epic: Path) -> dict[str, list[str]]:
     """What each agent of one epic opened, as the ids the backends gave those sessions.
@@ -1012,7 +947,6 @@ def opened(epic: Path) -> dict[str, list[str]]:
     for one in sessions(epic):
         held.setdefault(one.agent, []).append(one.ident)
     return held
-
 
 def sessions(epic: Path) -> list[Session]:
     """Every session one epic opened, oldest first.
@@ -1054,9 +988,7 @@ def sessions(epic: Path) -> list[Session]:
                     backend=backend,
                     provider=provider,
                     ident=ident,
-                    # Worked out where an older epic did not write one down: a name is what
-                    # this session is called, and an epic written before it had one still
-                    # has sessions.
+
                     name=str(
                         said.get("name") or called(agent, backend, provider, ident)
                     ),
@@ -1064,10 +996,8 @@ def sessions(epic: Path) -> list[Session]:
                     flow=flow,
                 )
             )
-    # By when each was opened rather than by which record it is in: the records are one run,
-    # and a run happened in one order.
-    return sorted(held, key=lambda one: one.at)
 
+    return sorted(held, key=lambda one: one.at)
 
 def read(epic: Path) -> Ran | None:
     """What one epic was, read back off its own record.
@@ -1115,7 +1045,6 @@ def read(epic: Path) -> Ran | None:
         resumable=bool(began.get("resumable")),
     )
 
-
 def _calls(events: Sequence[dict[str, Any]]) -> list[Called]:
     """Every flow one record says it called, in the order it called them.
 
@@ -1137,8 +1066,7 @@ def _calls(events: Sequence[dict[str, Any]]) -> list[Called]:
     for said in events:
         record, flow = str(said.get("epic") or ""), str(said.get("flow") or "")
         if said.get("event") == "called":
-            # Kept by the record and not by the flow: one flow called twice is two calls,
-            # and each wrote to a file of its own.
+
             where[record] = len(held)
             held.append(
                 Called(
@@ -1165,7 +1093,6 @@ def _calls(events: Sequence[dict[str, Any]]) -> list[Called]:
                 held[at] = held[at]._replace(ended=str(said.get("at") or ""))
     return held
 
-
 def where(epic: Path, session: Session) -> Path:
     """Where one session's links are, inside the epic that opened it.
 
@@ -1177,7 +1104,6 @@ def where(epic: Path, session: Session) -> Path:
       The directory, which is there once that session has been logged to anything.
     """
     return epic / SESSIONS / session.name
-
 
 def linked(epic: Path) -> dict[str, list[str]]:
     """What each session of one epic is linked to, as the paths the links point at.

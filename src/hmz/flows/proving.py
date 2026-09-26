@@ -61,7 +61,6 @@ __all__ = [
     "proved",
 ]
 
-
 class Scenario(NamedTuple):
     """One way the world answers a flow, held constant for the length of a proof.
 
@@ -84,20 +83,11 @@ class Scenario(NamedTuple):
     turns: int = 200
     seconds: float = 60.0
 
-
-#: The reviewer that never says the work is done. A flow with a bound of its own -- a
-#: budget, a cap on the rounds -- still ends here, and one that waits forever on a verdict
-#: is caught by the turn cap: the executable proof that a run of it can end.
 NEVER_DONE = Scenario("never-done", verdict=False, answer="did some of it")
 
-#: The shortest road through: every verdict is yes, so what is proved is that the flow can
-#: end the way it means to.
 ALWAYS_DONE = Scenario("always-done", verdict=True, answer="did it")
 
-#: Every turn answers with nothing, which is what a failed turn answers: a flow that reads
-#: a field off an answer nobody guarded falls over here rather than hours into a run.
 SILENT = Scenario("silent", verdict=None, answer="")
-
 
 class Outcome(NamedTuple):
     """How one scenario ended.
@@ -115,7 +105,6 @@ class Outcome(NamedTuple):
     turns: int
     said: str
 
-
 class Proof(NamedTuple):
     """What driving one flow against the scenarios showed.
 
@@ -129,14 +118,9 @@ class Proof(NamedTuple):
     findings: tuple[Finding, ...]
     outcomes: tuple[Outcome, ...]
 
-
-#: How long the load-only proof is given, there being no scenario to say.
 _PATIENCE = 60.0
 
-#: What the stubbed flow is driven with. Constant, so a proof is a proof of the flow: what
-#: the task says cannot matter to agents that answer the same thing whatever they are told.
 _TASK = "the task this proof drives the flow on"
-
 
 def proved(
     flow: str | os.PathLike[str],
@@ -163,8 +147,6 @@ def proved(
     """
     from . import find, inside
 
-    # Resolved here, where names still mean what the caller meant: the child runs in a
-    # scratch directory of its own, against which a relative path names nothing.
     at = find(str(flow))
     wanted = name or inside(str(flow))
     where = Path(at)
@@ -212,7 +194,6 @@ def proved(
             )
     return Proof(tuple(findings), tuple(outcomes))
 
-
 def _asked(
     flow: str,
     name: str,
@@ -240,8 +221,7 @@ def _asked(
         }
     )
     patience = scenario.seconds if scenario is not None else _PATIENCE
-    # A scratch directory to work in, taken away with the process: what a flow writes while
-    # it is being proved is part of the proof, not part of anybody's repository.
+
     with tempfile.TemporaryDirectory(prefix="hmz-proving-") as scratch:
         try:
             done = subprocess.run(
@@ -260,8 +240,7 @@ def _asked(
                 said=f"still running after {patience:g}s -- nothing inside the flow "
                 "ended it, so the clock did",
             )
-    # The last line that is the child's: a flow prints whatever it prints, so the answer is
-    # found from the end rather than trusted to be alone.
+
     for line in reversed(done.stdout.splitlines()):
         try:
             held = json.loads(line)
@@ -277,13 +256,6 @@ def _asked(
         said=f"the flow's process ended without answering -- {tail or 'and said nothing'}",
     )
 
-
-# ---------------------------------------------------------------------------------------
-# The child: loads the flow, builds the stubs, and drives it. Run as `-m hmz.flows.proving`
-# with the flow and the scenario as its two arguments, and answers with one JSON line.
-# ---------------------------------------------------------------------------------------
-
-
 def _rested(seconds: float) -> None:
     """A sleep that has already happened, which is what the stubs' world does with rests.
 
@@ -291,7 +263,6 @@ def _rested(seconds: float) -> None:
       seconds: How long the flow meant to wait, which the proof does not.
     """
     del seconds
-
 
 async def _rested_for(seconds: float, result: Any = None) -> Any:
     """The same for a flow that rests the async way, which `asyncio.sleep` is.
@@ -306,14 +277,12 @@ async def _rested_for(seconds: float, result: Any = None) -> Any:
     del seconds
     return result
 
-
 class _Enough(BaseException):
     """The turn cap, raised past everything a flow catches: a proof is over when it is.
 
     A `BaseException`, so that a flow's own `except Exception` -- which is a fine thing for
     a loop to write around a turn -- does not swallow the one thing that ends its proof.
     """
-
 
 class _Steps:
     """The turns taken so far, shared by every stub of one proof."""
@@ -327,7 +296,6 @@ class _Steps:
         self.taken += 1
         if self.taken > self.cap:
             raise _Enough
-
 
 def _driven(flow: str, spec: dict[str, Any]) -> dict[str, Any]:
     """Loads one flow and, given a scenario, drives it with stubs to whatever end.
@@ -346,13 +314,8 @@ def _driven(flow: str, spec: dict[str, Any]) -> dict[str, Any]:
 
     from .driving import NotAFlow, declares, set_up
 
-    # A proof's world sleeps for free. The rest a loop takes between rounds is part of its
-    # manners and no part of its shape, and it is the shape on trial: a loop that rests
-    # five seconds a round is not five hundred seconds more legal than one that does not.
-    # Patched before the flow is even loaded, so a `from time import sleep` reads this one.
     time.sleep = _rested
-    # And the other spelling of it: an async flow rests with `asyncio.sleep`, and one left
-    # sleeping would be reported as a flow that cannot end when it was only resting.
+
     asyncio.sleep = _rested_for
 
     named = f"{flow}:{spec['name']}" if spec["name"] else flow
@@ -361,7 +324,7 @@ def _driven(flow: str, spec: dict[str, Any]) -> dict[str, Any]:
         run, places, make, setting, mark = declares(named)
     except NotAFlow as refused:
         return {"refused": str(refused)}
-    except BaseException as raised:  # noqa: BLE001 -- reported, in a process built for it
+    except BaseException as raised:  
         return {"refused": f"the flow's own file raised as it was read -- {raised}"}
     answered: dict[str, Any] = {"findings": _styled(setting)}
     given = None
@@ -389,7 +352,7 @@ def _driven(flow: str, spec: dict[str, Any]) -> dict[str, Any]:
             f"still going after {scenario.turns} turns -- nothing inside the flow "
             "ended it, and a loop is legal when something inside it can end it"
         )
-    except BaseException:  # noqa: BLE001 -- the flow's own crash is the outcome
+    except BaseException:  
         import traceback
 
         tail = traceback.format_exc().strip().splitlines()
@@ -397,11 +360,9 @@ def _driven(flow: str, spec: dict[str, Any]) -> dict[str, Any]:
     answered.update(finished=finished, turns=turns, said=said)
     return answered
 
-
 async def _awaited(out: Any) -> None:
     """One awaitable flow, awaited: what `asyncio.run` takes is a coroutine."""
     await out
-
 
 def _styled(setting: type[BaseModel] | None) -> list[dict[str, str]]:
     """The config findings only the live model can show, said as the static reading says.
@@ -442,7 +403,6 @@ def _styled(setting: type[BaseModel] | None) -> list[dict[str, str]]:
                 }
             )
     return found
-
 
 def _crewed(
     places: Sequence[Place], scenario: Scenario, steps: _Steps
@@ -519,10 +479,7 @@ def _crewed(
         def stream(
             self, prompt: str, *, schema: type[BaseModel] | None = None
         ) -> Iterator[Event]:
-            # Overridden whole, as the real person's session is: their turn is not one
-            # being watched, and not one bracketed by an agent's moments. It still counts
-            # against the cap -- a flow that loops on asking forever is a flow that does
-            # not stop, whoever it is asking.
+
             del prompt
             steps.step()
             yield Event(kind="result", text=_said(schema, scenario))
@@ -539,7 +496,6 @@ def _crewed(
         else StubAgent(AgentConfig(model="stub", effort=""), name=place.name or None)
         for place in places
     ]
-
 
 def _said(schema: type[BaseModel] | None, scenario: Scenario) -> str:
     """What one stub turn answers with, as the text the base classes read back.
@@ -564,7 +520,6 @@ def _said(schema: type[BaseModel] | None, scenario: Scenario) -> str:
     except ValidationError:
         return ""
 
-
 def _made(schema: type[BaseModel], scenario: Scenario) -> dict[str, Any]:
     """A shaped answer fabricated field by field, deterministically.
 
@@ -585,7 +540,6 @@ def _made(schema: type[BaseModel], scenario: Scenario) -> dict[str, Any]:
         for name, field in schema.model_fields.items()
     }
 
-
 def _unioned(kind: Any) -> tuple[Any, ...]:
     """One annotation and, for a union, what it is a union of.
 
@@ -598,7 +552,6 @@ def _unioned(kind: Any) -> tuple[Any, ...]:
     if get_origin(kind) in (types.UnionType, typing.Union):
         return (kind, *get_args(kind))
     return (kind,)
-
 
 def _filled(kind: Any, field: Any, scenario: Scenario) -> Any:
     """One field's value, off its annotation.
@@ -616,7 +569,7 @@ def _filled(kind: Any, field: Any, scenario: Scenario) -> Any:
     from pydantic import BaseModel
 
     if get_origin(kind) is Annotated:
-        # The constraints ride along in the field itself; what is answered is the type.
+        
         return _filled(get_args(kind)[0], field, scenario)
     for said in _unioned(kind):
         if said is bool:
@@ -631,8 +584,7 @@ def _filled(kind: Any, field: Any, scenario: Scenario) -> Any:
         if said in (int, float):
             return 0
         if get_origin(said) in (list, tuple, set, frozenset):
-            # As many as the field says it takes at the least, each made the same way:
-            # a shape that requires three lanes is answered with three, not refused.
+
             fewest = 0
             for bound in getattr(field, "metadata", None) or ():
                 fewest = max(fewest, getattr(bound, "min_length", 0) or 0)
@@ -644,14 +596,12 @@ def _filled(kind: Any, field: Any, scenario: Scenario) -> Any:
             return _made(said, scenario)
     return None
 
-
 def _main(argv: list[str]) -> None:
     """The child's whole life: one flow, one spec, one JSON line back."""
     flow, spec = argv
     said = json.dumps({"proving": _driven(flow, json.loads(spec))})
     sys.stdout.write(said + "\n")
     sys.stdout.flush()
-
 
 if __name__ == "__main__":
     _main(sys.argv[1:])
