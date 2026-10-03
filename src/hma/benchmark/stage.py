@@ -1,4 +1,5 @@
 """Stage generic evaluator code with a user-supplied task configuration."""
+
 from __future__ import annotations
 
 import argparse
@@ -7,9 +8,18 @@ import shutil
 from pathlib import Path
 
 FIELDS = {
-    "schema_version", "experiment_id", "suite", "slug", "higher_is_better",
-    "feedback_mode", "submission_limit", "max_artifact_bytes",
-    "score_timeout_seconds", "upstream_path", "dataset_path", "control_path",
+    "schema_version",
+    "experiment_id",
+    "suite",
+    "slug",
+    "higher_is_better",
+    "feedback_mode",
+    "submission_limit",
+    "max_artifact_bytes",
+    "score_timeout_seconds",
+    "upstream_path",
+    "dataset_path",
+    "control_path",
 }
 
 
@@ -40,7 +50,9 @@ def stage(config: Path, home: Path | None = None) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--home", type=Path, help="Override evaluator_seed_home from the launch configuration")
+    parser.add_argument(
+        "--home", type=Path, help="Override evaluator_seed_home from the launch configuration"
+    )
     args = parser.parse_args()
     stage(args.config, args.home)
     print("Evaluator code staged; data and grader files remain externally supplied.")

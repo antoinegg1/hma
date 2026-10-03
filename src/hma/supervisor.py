@@ -1,4 +1,4 @@
-'HMA controller for capped alternation with a shared workspace and final Review.'
+"HMA controller for capped alternation with a shared workspace and final Review."
 
 from __future__ import annotations
 
@@ -13,12 +13,14 @@ import shutil
 import tarfile
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-import docker
 import requests
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+import docker
+
+from .actor_entry import EXIT_SUBMISSION_CAP
 from .handoff import atomic_json, copy_verified
 
 PACKAGE = Path(__file__).resolve().parent
@@ -29,31 +31,49 @@ TEARDOWN_MARGIN_SECONDS = 30.0
 
 MIN_FINALIZE_SECONDS = 60.0
 
+
+def closure_reason(state: dict[str, Any], exhausted: bool) -> str | None:
+    """Natural completion wins ties; watchdog quota exits have a distinct code."""
+    if not state.get("Running"):
+        code = state.get("ExitCode")
+        if code == 0:
+            return "natural_exit"
+        if code == EXIT_SUBMISSION_CAP and exhausted:
+            return "submission_cap"
+        return "actor_error"
+    return "submission_cap" if exhausted else None
+
+
 class ActorFailure(RuntimeError):
-    'An actor turn exited non-zero: the cell is discarded, deliberately.'
+    "An actor turn exited non-zero: the cell is discarded, deliberately."
+
 
 class Mount(BaseModel):
-    'A trusted, pre-staged read-only task/control mount.'
+    "A trusted, pre-staged read-only task/control mount."
 
     model_config = ConfigDict(extra="forbid")
     source: Path
     target: str
+
 
 class SeedFile(BaseModel):
-    'Explicit authentication/configuration file, not a previous actor HOME.'
+    "Explicit authentication/configuration file, not a previous actor HOME."
 
     model_config = ConfigDict(extra="forbid")
     source: Path
     target: str
+
 
 class Actor(BaseModel):
     model_config = ConfigDict(extra="forbid")
     spec: str
+    provider: str | None = None
     environment_names: list[str] = Field(default_factory=list)
     seed_files: list[SeedFile] = Field(default_factory=list)
 
+
 class Config(BaseModel):
-    'Host-only launch contract. No pool enrollment or remote-node selection.'
+    "Host-only launch contract. No pool enrollment or remote-node selection."
 
     model_config = ConfigDict(extra="forbid")
     root: Path
@@ -68,11 +88,14 @@ class Config(BaseModel):
     kimi_proxy_module: Path | None = None
     evaluator_cpus: float = 2
     evaluator_memory: str = "4096m"
-    actors: tuple[Actor, Actor]
+    workflow: Literal["hma", "nta", "goal"] = "hma"
+    actors: tuple[Actor, ...]
+    actor_command: list[str] | None = None
+    workspace_seed: Path | None = None
     agent_data: list[Mount]
     evaluator_data: list[Mount]
     active_time_limit_seconds: int = Field(default=21600, gt=0, strict=True)
-    max_valid_submissions_per_session: int = Field(default=5, ge=1, strict=True)
+    max_valid_submissions_per_session: int | None = Field(default=5, ge=1, strict=True)
     cpus: float = Field(default=26, gt=0)
     memory: str = "200000m"
     shm_size: str = "65536m"
@@ -82,20 +105,16 @@ class Config(BaseModel):
 
     review_turn_seconds: int = Field(default=600, gt=0, strict=True)
 
-    review_reserve_seconds: int = Field(default=900, gt=0, strict=True)
+    review_reserve_seconds: int = Field(default=900, ge=0, strict=True)
     poll_seconds: float = Field(default=0.25, gt=0, le=5)
     stop_seconds: int = Field(default=5, ge=0, le=30)
 
     @model_validator(mode="after")
     def validate_paths(self) -> Config:
-        'Refuse broad paths, unsafe mount targets, and historical HOME copying.'
+        "Refuse broad paths, unsafe mount targets, and historical HOME copying."
         if self.uid <= 0:
             raise ValueError("actor/evaluator UID must be non-root")
-        if (
-            not self.root.is_absolute()
-            or len(self.root.parts) < 5
-            or self.root.is_symlink()
-        ):
+        if not self.root.is_absolute() or len(self.root.parts) < 5 or self.root.is_symlink():
             raise ValueError("root must be a new, explicit campaign directory")
         if not self.task_file.is_file() or not self.evaluator_seed_home.is_dir():
             raise ValueError("prepared task and evaluator seed are required")
@@ -114,17 +133,13 @@ class Config(BaseModel):
                         "data mounts must be unique, explicit, read-only .flowbench-data paths"
                     )
                 targets.add(str(target))
-        if not any(
-            m.target == "/home/user/.flowbench-data/input" for m in self.agent_data
-        ):
+        if not any(m.target == "/home/user/.flowbench-data/input" for m in self.agent_data):
             raise ValueError("agent_data must include the public input directory")
         if any(
             not Path(m.target).is_relative_to("/home/user/.flowbench-data/input")
             for m in self.agent_data
         ):
-            raise ValueError(
-                "actors may mount public input only, never evaluator/control data"
-            )
+            raise ValueError("actors may mount public input only, never evaluator/control data")
         native = Path(self.native_evaluator_relative)
         if native.is_absolute() or ".." in native.parts:
             raise ValueError("native evaluator path must be relative")
@@ -145,9 +160,7 @@ class Config(BaseModel):
                     or seed.source.is_symlink()
                     or not seed.source.is_file()
                 ):
-                    raise ValueError(
-                        "only explicit regular provider auth/config seeds are allowed"
-                    )
+                    raise ValueError("only explicit regular provider auth/config seeds are allowed")
             if len({s.target for s in actor.seed_files}) != len(actor.seed_files):
                 raise ValueError("duplicate provider seed")
             for name in actor.environment_names:
@@ -165,7 +178,15 @@ class Config(BaseModel):
 
     @model_validator(mode="after")
     def validate_review_budget(self) -> Config:
-        'The reserve must actually fit everything it is reserved for.'
+        "The reserve must actually fit everything it is reserved for."
+        if len(self.actors) != (1 if self.workflow == "goal" else 2):
+            raise ValueError("goal needs one actor; alternation needs two")
+        if self.workflow != "hma":
+            if self.max_valid_submissions_per_session is not None or self.review_reserve_seconds:
+                raise ValueError("goal/NTA require null cap and zero review reserve")
+            return self
+        if self.max_valid_submissions_per_session is None:
+            raise ValueError("HMA requires a positive cap")
         owed = (
             self.review_turn_seconds
             + self.stop_seconds
@@ -181,8 +202,9 @@ class Config(BaseModel):
             raise ValueError("review reserve leaves no exploration time")
         return self
 
+
 def prompt_for(task: str, seconds: int) -> str:
-    'Adapt the budget only. The prompt is otherwise the plain HMA one.'
+    "Adapt the budget only. The prompt is otherwise the plain HMA one."
     duration = f"{seconds // 3600}-hour" if seconds % 3600 == 0 else f"{seconds}-second"
     task = re.sub(r"\b\d+(?:\.\d+)?-hour\b", duration, task)
     task = task.replace(
@@ -196,8 +218,9 @@ def prompt_for(task: str, seconds: int) -> str:
         task += "\n\n## Test-time information policy\n\n" + policy
     return task
 
+
 def review_prompt_for(task: str, seconds: int) -> str:
-    'The closing review turn: one ballot, no new work.'
+    "The closing review turn: one ballot, no new work."
     if "no submission quota" in task.lower():
         raise ValueError("review prompt built from the unrendered task statement")
     if not isinstance(seconds, int) or isinstance(seconds, bool) or seconds < 1:
@@ -243,6 +266,7 @@ further reading as optional.
 """
     )
 
+
 class Supervisor:
     "Own only containers labelled with this new experiment's random identifier."
 
@@ -270,7 +294,7 @@ class Supervisor:
         timeout: float = 5,
         retries: int = 0,
     ) -> dict[str, Any]:
-        'One control call, with a budget the CALLER sizes.'
+        "One control call, with a budget the CALLER sizes."
         attempt = 0
         while True:
             try:
@@ -283,7 +307,6 @@ class Supervisor:
                 response.raise_for_status()
                 return response.json()
             except requests.RequestException as error:
-
                 if attempt >= retries or getattr(error, "response", None) is not None:
                     raise
                 attempt += 1
@@ -292,21 +315,18 @@ class Supervisor:
     def close_exploration_turn(
         self, turn_id: str, opened: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        'Close a submitting turn, and degrade without inventing anything.'
+        "Close a submitting turn, and degrade without inventing anything."
         config = self.config
         budget = min(
             180.0,
             max(
                 30.0,
-                self.deadline
-                - config.review_turn_seconds
-                - config.stop_seconds
-                - time.time(),
+                self.deadline - config.review_turn_seconds - config.stop_seconds - time.time(),
             ),
         )
         try:
             return self.control("close", {"id": turn_id}, timeout=budget)
-        except Exception as error:  
+        except Exception as error:
             failure = type(error).__name__
 
             try:
@@ -317,25 +337,20 @@ class Supervisor:
             return {
                 "id": turn_id,
                 "closed": True,
-
                 "close_failed": failure,
                 "accepted": max(0, len(records) - baseline),
-                "last_submission_id": (
-                    records[-1]["submission_id"] if records else None
-                ),
+                "last_submission_id": (records[-1]["submission_id"] if records else None),
             }
 
     def stop(self, container: Any) -> None:
-        'Kill the entire container cgroup, never a fuzzy host process pattern.'
+        "Kill the entire container cgroup, never a fuzzy host process pattern."
         container.reload()
         if container.labels.get(LABEL) != self.owner:
             raise RuntimeError("refusing to stop an unowned container")
         if container.attrs["State"].get("Running"):
             container.stop(timeout=self.config.stop_seconds)
         container.reload()
-        if container.attrs["State"].get("Running") or container.attrs["State"].get(
-            "Restarting"
-        ):
+        if container.attrs["State"].get("Running") or container.attrs["State"].get("Restarting"):
             raise RuntimeError("container survived stop; refusing handoff")
         if container.attrs["State"].get("Pid", 0) != 0:
             raise RuntimeError("container PID still present; refusing handoff")
@@ -347,15 +362,12 @@ class Supervisor:
         *,
         private: set[str] | None = None,
     ) -> None:
-        'Copy immutable protocol files into a stopped container, with no host mounts.'
+        "Copy immutable protocol files into a stopped container, with no host mounts."
         archive = io.BytesIO()
         directories: set[str] = set()
         with tarfile.open(fileobj=archive, mode="w") as bundle:
             for path, payload in files.items():
-                if (
-                    not path.startswith(("opt/hma/", "run/hma/"))
-                    or ".." in Path(path).parts
-                ):
+                if not path.startswith(("opt/hma/", "run/hma/")) or ".." in Path(path).parts:
                     raise ValueError("Unsafe protocol injection path")
                 for parent in reversed(Path(path).parents):
                     name = str(parent)
@@ -377,42 +389,29 @@ class Supervisor:
             raise RuntimeError("Protocol file injection failed")
 
     def latest_candidate(self) -> Path | None:
-        ledger = (
-            self.config.root / "evaluator/workspace/.flowbench/mle-submissions.jsonl"
-        )
+        ledger = self.config.root / "evaluator/workspace/.flowbench/mle-submissions.jsonl"
         if not ledger.exists():
             return None
-        valid = [
-            json.loads(line) for line in ledger.read_text().splitlines() if line.strip()
-        ]
+        valid = [json.loads(line) for line in ledger.read_text().splitlines() if line.strip()]
         if not valid:
             return None
         record = valid[-1]
         path = ledger.parent / "mle-candidates" / f"{record['artifact_sha256']}.csv"
         with path.open("rb") as artifact:
-            if (
-                hashlib.file_digest(artifact, "sha256").hexdigest()
-                != record["artifact_sha256"]
-            ):
+            if hashlib.file_digest(artifact, "sha256").hexdigest() != record["artifact_sha256"]:
                 raise RuntimeError("latest accepted artifact hash mismatch")
         return path
 
     def ledger_records(self) -> list[dict[str, Any]]:
-        'Every accepted submission, in order. Identity and time only are used.'
-        ledger = (
-            self.config.root / "evaluator/workspace/.flowbench/mle-submissions.jsonl"
-        )
+        "Every accepted submission, in order. Identity and time only are used."
+        ledger = self.config.root / "evaluator/workspace/.flowbench/mle-submissions.jsonl"
         if not ledger.exists():
             return []
-        return [
-            json.loads(line)
-            for line in ledger.read_text().splitlines()
-            if line.strip()
-        ]
+        return [json.loads(line) for line in ledger.read_text().splitlines() if line.strip()]
 
     @staticmethod
     def exploration_failure(error: Exception) -> str:
-        'Name what ended exploration when a control call raised.'
+        "Name what ended exploration when a control call raised."
         response = getattr(error, "response", None)
         if response is not None and getattr(response, "status_code", None) == 409:
             if "expired deadline" in str(getattr(response, "text", "")):
@@ -420,10 +419,8 @@ class Supervisor:
         return "control_failed"
 
     @staticmethod
-    def attribution(
-        turns: list[dict[str, Any]], records: list[dict[str, Any]]
-    ) -> dict[str, int]:
-        'Map every accepted submission id to the actor slot that produced it.'
+    def attribution(turns: list[dict[str, Any]], records: list[dict[str, Any]]) -> dict[str, int]:
+        "Map every accepted submission id to the actor slot that produced it."
         authors: dict[str, int] = {}
         index = 0
         for turn in turns:
@@ -434,7 +431,6 @@ class Supervisor:
                 return {}
             accepted = int(turn["accepted"] or 0)
             if accepted <= 0:
-
                 continue
             taken = 0
             while index < len(records) and taken < accepted:
@@ -452,11 +448,11 @@ class Supervisor:
         records: list[dict[str, Any]],
         submission_id: str,
     ) -> int | None:
-        'Which actor slot produced a given accepted submission, or None if unknown.'
+        "Which actor slot produced a given accepted submission, or None if unknown."
         return Supervisor.attribution(turns, records).get(str(submission_id))
 
     def review_phase(self, task_text: str, turns: list[dict[str, Any]]) -> dict[str, Any]:
-        'One ballot, cast by the model that did NOT write the standing submission.'
+        "One ballot, cast by the model that did NOT write the standing submission."
         config = self.config
         records = self.ledger_records()
         if len(records) < 2:
@@ -484,9 +480,7 @@ class Supervisor:
                         "sequence": r["sequence"],
                         "accepted_at_utc": r["accepted_at_utc"],
                         "author": (
-                            "you"
-                            if authors.get(str(r["submission_id"])) == reviewer
-                            else "peer"
+                            "you" if authors.get(str(r["submission_id"])) == reviewer else "peer"
                         ),
                         "standing": r["submission_id"] == standing["submission_id"],
                     }
@@ -505,10 +499,8 @@ class Supervisor:
 
         if turns and turns[-1].get("close_failed") and turns[-1].get("id"):
             try:
-                self.control(
-                    "close", {"id": str(turns[-1]["id"])}, timeout=30.0
-                )
-            except Exception:  
+                self.control("close", {"id": str(turns[-1]["id"])}, timeout=30.0)
+            except Exception:
                 pass
 
         turn_id = f"{self.owner}:review"
@@ -524,9 +516,9 @@ class Supervisor:
         atomic_json(
             route,
             {
-                "host": evaluator.attrs["NetworkSettings"]["Networks"][
-                    self.network.name
-                ]["IPAddress"],
+                "host": evaluator.attrs["NetworkSettings"]["Networks"][self.network.name][
+                    "IPAddress"
+                ],
                 "port": 80,
                 "token": opened["token"],
                 "deadline_epoch": self.review_deadline,
@@ -534,7 +526,9 @@ class Supervisor:
         )
         route.chmod(0o444)
         container = self.actor(
-            reviewer, home, route,
+            reviewer,
+            home,
+            route,
             review_prompt_for(task_text, self.config.review_turn_seconds),
             container_name=f"hma-{self.owner}-review",
         )
@@ -570,6 +564,8 @@ class Supervisor:
             "nominate": None,
             "exit_code": exit_code,
             "lived_seconds": lived_seconds,
+            "started_epoch": turn_started,
+            "ended_epoch": time.time(),
             "timed_out": timed_out,
             "session_files": sessions,
         }
@@ -583,7 +579,7 @@ class Supervisor:
                     max(5.0, self.review_deadline - MIN_FINALIZE_SECONDS - time.time()),
                 ),
             )
-        except Exception as error:  
+        except Exception as error:
             outcome["close_failed"] = type(error).__name__
 
         nominated = self.read_nomination(review, records)
@@ -595,51 +591,48 @@ class Supervisor:
         if nominated == standing["submission_id"]:
             outcome["reason"] = "review_noop"
         elif not sessions:
-
             outcome["reason"] = "review_session_died"
         elif timed_out:
-
             outcome["reason"] = "review_silent"
         elif exit_code not in (0, None) or lived_seconds < min(60.0, wall_seconds):
-
             outcome["reason"] = "review_session_died"
         else:
-
             outcome["reason"] = "review_silent"
         return outcome
 
     @staticmethod
     def session_evidence(home: Path) -> int:
-        'Count provider session transcripts under one turn HOME, BOTH backends.'
+        "Count provider session transcripts under one turn HOME, BOTH backends."
         total = 0
-        for relative in (".claude/projects", ".codex/sessions"):
+        for relative in (
+            ".claude/projects",
+            ".codex/sessions",
+            ".kimi",
+            ".kimi-code",
+            ".dsh",
+            ".humanize/dsh",
+        ):
             root = home / relative
             if not root.is_dir() or root.is_symlink():
                 continue
-            total += sum(
-                1 for p in root.rglob("*.jsonl") if p.is_file() and not p.is_symlink()
-            )
+            total += sum(1 for p in root.rglob("*.jsonl") if p.is_file() and not p.is_symlink())
         return total
 
-    def finalize_nomination(
-        self, outcome: dict[str, Any], nominated: str
-    ) -> dict[str, Any]:
-        'Bind the nomination, then label the result from the LEDGER, not from hope.'
+    def finalize_nomination(self, outcome: dict[str, Any], nominated: str) -> dict[str, Any]:
+        "Bind the nomination, then label the result from the LEDGER, not from hope."
         try:
             outcome["finalized"] = self.control(
                 "finalize",
                 {"submission_id": nominated},
-
                 timeout=max(MIN_FINALIZE_SECONDS, self.deadline - time.time()),
             )
             outcome["reason"] = "review_finalized"
             return outcome
-        except Exception as error:  
+        except Exception as error:
             outcome["finalize_error"] = type(error).__name__
             response = getattr(error, "response", None)
             refused = response is not None
             if refused:
-
                 outcome["finalize_refused"] = str(getattr(response, "text", ""))[:400]
         try:
             records = self.ledger_records()
@@ -670,16 +663,14 @@ class Supervisor:
                 {"nominated_from": nominated, "reconciled_from_ledger": True},
             )
         elif tail is not None and tail == str(outcome["standing_submission_id"]):
-            outcome["reason"] = (
-                "review_finalize_refused" if refused else "review_finalize_failed"
-            )
+            outcome["reason"] = "review_finalize_refused" if refused else "review_finalize_failed"
         else:
             outcome["reason"] = "review_finalize_unconfirmed"
         return outcome
 
     @staticmethod
     def read_nomination(review: Path, records: list[dict[str, Any]]) -> str | None:
-        'Parse the single ballot, or return None. Never raises.'
+        "Parse the single ballot, or return None. Never raises."
         path = review / "nomination.json"
         try:
             if path.is_symlink() or not path.is_file() or path.stat().st_size > 8192:
@@ -757,10 +748,7 @@ class Supervisor:
             mem_limit=config.evaluator_memory,
         )
         self.resources.append(container)
-        files = {
-            f"opt/hma/{NAME}/{p.name}": p.read_bytes()
-            for p in self.runtime.glob("*.py")
-        }
+        files = {f"opt/hma/{NAME}/{p.name}": p.read_bytes() for p in self.runtime.glob("*.py")}
         files["run/hma/admin-key"] = self.key.encode()
         self.inject(container, files, private={"run/hma/admin-key"})
         container.start()
@@ -768,9 +756,7 @@ class Supervisor:
         port = container.attrs["NetworkSettings"]["Ports"]["80/tcp"][0]["HostPort"]
         self.url = f"http://127.0.0.1:{port}"
         if config.controller_container:
-            address = container.attrs["NetworkSettings"]["Networks"][self.network.name][
-                "IPAddress"
-            ]
+            address = container.attrs["NetworkSettings"]["Networks"][self.network.name]["IPAddress"]
             self.url = f"http://{address}:80"
         for _ in range(60):
             try:
@@ -794,7 +780,7 @@ class Supervisor:
         container_name: str | None = None,
     ) -> Any:
         config = self.config
-        actor = config.actors[index % 2]
+        actor = config.actors[index % len(config.actors)]
         for seed in actor.seed_files:
             copy_verified(seed.source, home / seed.target)
             (home / seed.target).chmod(0o600)
@@ -816,26 +802,24 @@ class Supervisor:
                 for name in directories + files:
                     os.lchown(Path(root) / name, config.uid, config.gid)
         environment = {name: os.environ[name] for name in actor.environment_names}
-        environment.update(HOME="/home/user", HUMANIZE_HOME="/home/user/.humanize")
+        environment.update(
+            HOME="/home/user",
+            HUMANIZE_HOME="/home/user/.humanize",
+            HMA_WORKFLOW=config.workflow,
+            HUMANIZE_SENTRY="off",
+            HMA_PROVIDER=actor.provider or "",
+        )
         volumes = {
             str(home): {"bind": "/home/user", "mode": "rw"},
-            
             str(workspace): {"bind": "/home/user/workspace", "mode": "rw"},
         }
         volumes.update(
-            {
-                str(m.source.resolve()): {"bind": m.target, "mode": "ro"}
-                for m in config.agent_data
-            }
+            {str(m.source.resolve()): {"bind": m.target, "mode": "ro"} for m in config.agent_data}
         )
         devices = (
             []
             if config.gpu is None
-            else [
-                docker.types.DeviceRequest(
-                    device_ids=[config.gpu], capabilities=[["gpu"]]
-                )
-            ]
+            else [docker.types.DeviceRequest(device_ids=[config.gpu], capabilities=[["gpu"]])]
         )
         container = self.client.containers.create(
             config.agent_image,
@@ -844,16 +828,20 @@ class Supervisor:
                 "python3",
                 "/opt/hma/actor_entry.py",
                 "--",
-                "hmz",
-                "exec",
-                "-f",
-                "/opt/hma/actor_turn",
-                "-a",
-                actor.spec,
-                "--",
-                prompt,
+                *(
+                    config.actor_command
+                    or [
+                        "hmz",
+                        "exec",
+                        "-f",
+                        "/opt/hma/actor_turn",
+                        "-a",
+                        actor.spec,
+                        "--",
+                        prompt,
+                    ]
+                ),
             ],
-
             name=container_name or f"hma-{self.owner}-turn-{index:05d}",
             labels={
                 LABEL: self.owner,
@@ -876,29 +864,23 @@ class Supervisor:
         )
         self.resources.append(container)
         files = {
-            "opt/hma/actor_turn/__init__.py": (
-                self.runtime / "actor_turn.py"
-            ).read_bytes(),
-            "opt/hma/actor_entry.py": (
-                self.runtime / "actor_entry.py"
-            ).read_bytes(),
-            "opt/hma/submit_client.py": (
-                self.runtime / "submit_client.py"
-            ).read_bytes(),
+            "opt/hma/actor_turn/__init__.py": (self.runtime / "actor_turn.py").read_bytes(),
+            "opt/hma/actor_entry.py": (self.runtime / "actor_entry.py").read_bytes(),
+            "opt/hma/submit_client.py": (self.runtime / "submit_client.py").read_bytes(),
             "run/hma/route.json": route.read_bytes(),
         }
         if config.kimi_proxy_module and "cli=kimi" in actor.spec:
-            files["opt/hma/provider_proxy.py"] = (
-                self.runtime / "provider_proxy.py"
-            ).read_bytes()
+            files["opt/hma/provider_proxy.py"] = (self.runtime / "provider_proxy.py").read_bytes()
         self.inject(container, files)
         return container
 
     def run(self) -> dict[str, Any]:
-        'New experiment only; restart of an ambiguous controller fails closed.'
+        "New experiment only; restart of an ambiguous controller fails closed."
         config = self.config
         config.root.mkdir(parents=True, exist_ok=False)
         config.root.chmod(0o700)
+        if config.workspace_seed is not None:
+            shutil.copytree(config.workspace_seed, self.shared_workspace)
         shutil.copytree(
             PACKAGE, self.runtime, ignore=shutil.ignore_patterns("__pycache__", "*.pyc")
         )
@@ -906,9 +888,7 @@ class Supervisor:
             copy_verified(config.kimi_proxy_module, self.runtime / "provider_proxy.py")
         atomic_json(config.root / "contract.json", config.model_dump(mode="json"))
         outcome: dict[str, Any] = {"status": "failed", "turns": []}
-        atomic_json(
-            config.root / "state.json", {"status": "starting", "owner": self.owner}
-        )
+        atomic_json(config.root / "state.json", {"status": "starting", "owner": self.owner})
         try:
             self.network = self.client.networks.create(
                 f"hma-{self.owner}", labels={LABEL: self.owner}
@@ -941,7 +921,6 @@ class Supervisor:
                 while time.time() < self.explore_deadline:
                     home = config.root / "turns" / f"{index:05d}" / "agent"
 
-                    workspace = self.shared_workspace
                     (home / "workspace").mkdir(parents=True, exist_ok=True)
                     turn_id = f"{self.owner}:{index}"
                     opened = self.control(
@@ -956,9 +935,9 @@ class Supervisor:
                     inflight_turn, inflight_opened = turn_id, opened
                     route = home.parent / "route.json"
                     evaluator.reload()
-                    address = evaluator.attrs["NetworkSettings"]["Networks"][
-                        self.network.name
-                    ]["IPAddress"]
+                    address = evaluator.attrs["NetworkSettings"]["Networks"][self.network.name][
+                        "IPAddress"
+                    ]
                     atomic_json(
                         route,
                         {
@@ -981,20 +960,16 @@ class Supervisor:
                         },
                     )
                     inflight_container = container
+                    turn_started = time.time()
                     container.start()
                     reason = "deadline"
                     while time.time() < self.explore_deadline:
                         status = self.control("status", {}, retries=2)
-                        if status["exhausted"]:
-                            reason = "submission_cap"
-                            break
                         container.reload()
-                        if not container.attrs["State"].get("Running"):
-                            reason = (
-                                "natural_exit"
-                                if container.attrs["State"].get("ExitCode") == 0
-                                else "actor_error"
-                            )
+                        if observed := closure_reason(
+                            container.attrs["State"], status["exhausted"]
+                        ):
+                            reason = observed
                             break
                         time.sleep(config.poll_seconds)
                     self.stop(container)
@@ -1004,7 +979,14 @@ class Supervisor:
                     status = self.close_exploration_turn(turn_id, opened)
                     inflight_turn, inflight_opened = None, None
                     outcome["turns"].append(
-                        {"turn": index, "actor": index % 2, "reason": reason, **status}
+                        {
+                            "turn": index,
+                            "actor": index % len(config.actors),
+                            "reason": reason,
+                            "started_epoch": turn_started,
+                            "ended_epoch": time.time(),
+                            **status,
+                        }
                     )
                     atomic_json(config.root / "turn-history.json", outcome["turns"])
                     if reason == "actor_error":
@@ -1013,42 +995,46 @@ class Supervisor:
                         )
 
                     index += 1
+                    if config.workflow == "goal":
+                        break
             except ActorFailure:
                 raise
-            except Exception as error:  
+            except Exception as error:
                 exploration_reason = self.exploration_failure(error)
                 outcome["exploration_error"] = type(error).__name__
                 if inflight_container is not None:
                     try:
                         self.stop(inflight_container)
-                    except Exception:  
+                    except Exception:
                         pass
                 if inflight_turn is not None:
-
                     outcome["turns"].append(
                         {
                             "turn": index,
-                            "actor": index % 2,
+                            "actor": index % len(config.actors),
+                            "started_epoch": turn_started
+                            if inflight_container is not None
+                            else time.time(),
+                            "ended_epoch": time.time(),
                             "reason": exploration_reason,
-                            **self.close_exploration_turn(
-                                inflight_turn, inflight_opened
-                            ),
+                            **self.close_exploration_turn(inflight_turn, inflight_opened),
                         }
                     )
                     atomic_json(config.root / "turn-history.json", outcome["turns"])
             exploration_elapsed = time.time() - started
             if exploration_reason is None:
                 exploration_reason = (
-                    str(outcome["turns"][-1].get("reason"))
-                    if outcome["turns"]
-                    else "no_turns"
+                    str(outcome["turns"][-1].get("reason")) if outcome["turns"] else "no_turns"
                 )
 
             self.review_deadline = self.deadline
             try:
-
-                review = self.review_phase(prompt, outcome["turns"])
-            except Exception as error:  
+                review = (
+                    self.review_phase(prompt, outcome["turns"])
+                    if config.workflow == "hma"
+                    else {"reason": "review_disabled"}
+                )
+            except Exception as error:
                 review = {
                     "reason": "review_error",
                     "error": type(error).__name__,
@@ -1057,10 +1043,11 @@ class Supervisor:
             outcome["review"] = review
             atomic_json(config.root / "review.json", review)
             outcome.update(
-                status="complete",
-                reason="global_deadline",
+                status="failed" if "exploration_error" in outcome else "complete",
+                reason="exploration_error"
+                if "exploration_error" in outcome
+                else exploration_reason,
                 deadline_epoch=self.deadline,
-
                 exploration_elapsed_seconds=round(exploration_elapsed, 3),
                 exploration_reason=exploration_reason,
             )
@@ -1093,6 +1080,7 @@ class Supervisor:
                 },
             )
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
@@ -1106,6 +1094,7 @@ def main() -> None:
     print(json.dumps(outcome, indent=2))
     if outcome["status"] != "complete":
         raise SystemExit(1)
+
 
 if __name__ == "__main__":
     main()

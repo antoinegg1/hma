@@ -1,0 +1,384 @@
+{
+  "schema_version": 1,
+  "models": {
+    "opus": {
+      "cli": "claude",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    "gpt": {
+      "cli": "codex",
+      "model": "gpt-5.6-sol",
+      "provider": "openai"
+    },
+    "glm": {
+      "cli": "claude",
+      "model": "glm-5.3",
+      "provider": "glm"
+    },
+    "ds4": {
+      "cli": "dsh",
+      "model": "deepseek-v4-flash",
+      "provider": "deepseek"
+    },
+    "ds41": {
+      "cli": "dsh",
+      "model": "deepseek-v4.1-flash",
+      "provider": "deepseek"
+    },
+    "kimi": {
+      "cli": "kimi",
+      "model": "kimi-k3",
+      "provider": "kimi"
+    }
+  },
+  "experiments": [
+    {
+      "id": "goal-opus",
+      "workflow": "goal",
+      "actors": [
+        "opus"
+      ],
+      "repeats": 3,
+      "cap": null,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 0
+    },
+    {
+      "id": "goal-gpt",
+      "workflow": "goal",
+      "actors": [
+        "gpt"
+      ],
+      "repeats": 3,
+      "cap": null,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 0
+    },
+    {
+      "id": "goal-glm",
+      "workflow": "goal",
+      "actors": [
+        "glm"
+      ],
+      "repeats": 3,
+      "cap": null,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 0
+    },
+    {
+      "id": "goal-ds4",
+      "workflow": "goal",
+      "actors": [
+        "ds4"
+      ],
+      "repeats": 3,
+      "cap": null,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 0
+    },
+    {
+      "id": "goal-ds41",
+      "workflow": "goal",
+      "actors": [
+        "ds41"
+      ],
+      "repeats": 3,
+      "cap": null,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 0
+    },
+    {
+      "id": "goal-kimi",
+      "workflow": "goal",
+      "actors": [
+        "kimi"
+      ],
+      "repeats": 3,
+      "cap": null,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 0
+    },
+    {
+      "id": "hma-opus-gpt",
+      "workflow": "hma",
+      "actors": [
+        "opus",
+        "gpt"
+      ],
+      "repeats": 3,
+      "cap": 5,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 900
+    },
+    {
+      "id": "hma-gpt-opus",
+      "workflow": "hma",
+      "actors": [
+        "gpt",
+        "opus"
+      ],
+      "repeats": 3,
+      "cap": 5,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 900
+    },
+    {
+      "id": "hma-gpt-ds41",
+      "workflow": "hma",
+      "actors": [
+        "gpt",
+        "ds41"
+      ],
+      "repeats": 3,
+      "cap": 5,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 900
+    },
+    {
+      "id": "hma-gpt-kimi",
+      "workflow": "hma",
+      "actors": [
+        "gpt",
+        "kimi"
+      ],
+      "repeats": 3,
+      "cap": 5,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 900
+    },
+    {
+      "id": "hma-gpt-glm",
+      "workflow": "hma",
+      "actors": [
+        "gpt",
+        "glm"
+      ],
+      "repeats": 3,
+      "cap": 5,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 900
+    },
+    {
+      "id": "hma-ds41-kimi",
+      "workflow": "hma",
+      "actors": [
+        "ds41",
+        "kimi"
+      ],
+      "repeats": 3,
+      "cap": 5,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 900
+    },
+    {
+      "id": "nta-gpt-kimi",
+      "workflow": "nta",
+      "actors": [
+        "gpt",
+        "kimi"
+      ],
+      "repeats": 1,
+      "cap": null,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 0
+    },
+    {
+      "id": "nta-kimi-gpt",
+      "workflow": "nta",
+      "actors": [
+        "kimi",
+        "gpt"
+      ],
+      "repeats": 1,
+      "cap": null,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 0
+    },
+    {
+      "id": "nta-glm-ds4",
+      "workflow": "nta",
+      "actors": [
+        "glm",
+        "ds4"
+      ],
+      "repeats": 1,
+      "cap": null,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 0
+    },
+    {
+      "id": "nta-ds41-glm",
+      "workflow": "nta",
+      "actors": [
+        "ds41",
+        "glm"
+      ],
+      "repeats": 1,
+      "cap": null,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 0
+    },
+    {
+      "id": "nta-opus-gpt",
+      "workflow": "nta",
+      "actors": [
+        "opus",
+        "gpt"
+      ],
+      "repeats": 1,
+      "cap": null,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 0
+    },
+    {
+      "id": "cap-1",
+      "workflow": "hma",
+      "actors": [
+        "gpt",
+        "kimi"
+      ],
+      "repeats": 1,
+      "cap": 1,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 900
+    },
+    {
+      "id": "cap-3",
+      "workflow": "hma",
+      "actors": [
+        "gpt",
+        "kimi"
+      ],
+      "repeats": 1,
+      "cap": 3,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 900
+    },
+    {
+      "id": "order-kimi-gpt",
+      "workflow": "hma",
+      "actors": [
+        "kimi",
+        "gpt"
+      ],
+      "repeats": 1,
+      "cap": 5,
+      "tasks": "all",
+      "seconds": 21600,
+      "review_reserve": 900
+    },
+    {
+      "id": "case-glm-kimi",
+      "workflow": "hma",
+      "actors": [
+        "glm",
+        "kimi"
+      ],
+      "repeats": 1,
+      "cap": 5,
+      "tasks": [
+        "mbm_27"
+      ],
+      "seconds": 21600,
+      "review_reserve": 900
+    },
+    {
+      "id": "ml_master_v2-ds4",
+      "workflow": "harness",
+      "actors": [
+        "ds4"
+      ],
+      "repeats": 1,
+      "cap": null,
+      "tasks": "harness16",
+      "seconds": 88200,
+      "review_reserve": 0,
+      "harness": "ml_master_v2"
+    },
+    {
+      "id": "ml_master_v2-ds41",
+      "workflow": "harness",
+      "actors": [
+        "ds41"
+      ],
+      "repeats": 1,
+      "cap": null,
+      "tasks": "harness16",
+      "seconds": 88200,
+      "review_reserve": 0,
+      "harness": "ml_master_v2"
+    },
+    {
+      "id": "mlevolve_no_prior-ds4",
+      "workflow": "harness",
+      "actors": [
+        "ds4"
+      ],
+      "repeats": 1,
+      "cap": null,
+      "tasks": "harness16",
+      "seconds": 44280,
+      "review_reserve": 0,
+      "harness": "mlevolve_no_prior"
+    },
+    {
+      "id": "mlevolve_no_prior-ds41",
+      "workflow": "harness",
+      "actors": [
+        "ds41"
+      ],
+      "repeats": 1,
+      "cap": null,
+      "tasks": "harness16",
+      "seconds": 44280,
+      "review_reserve": 0,
+      "harness": "mlevolve_no_prior"
+    },
+    {
+      "id": "scienceflow-ds4",
+      "workflow": "harness",
+      "actors": [
+        "ds4"
+      ],
+      "repeats": 1,
+      "cap": null,
+      "tasks": "harness16",
+      "seconds": 88200,
+      "review_reserve": 0,
+      "harness": "scienceflow"
+    },
+    {
+      "id": "scienceflow-ds41",
+      "workflow": "harness",
+      "actors": [
+        "ds41"
+      ],
+      "repeats": 1,
+      "cap": null,
+      "tasks": "harness16",
+      "seconds": 88200,
+      "review_reserve": 0,
+      "harness": "scienceflow"
+    }
+  ]
+}

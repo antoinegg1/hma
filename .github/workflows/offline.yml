@@ -1,0 +1,23 @@
+name: Offline reproduction checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-repro.lock
+      - run: python -m pip install --no-deps -e .
+      - run: python -m pytest -q
+      - run: hma-repro doctor --config configs/local.example.json --offline
+      - run: hma-repro plan --suite paper
+      - run: python -m pip install build ruff
+      - run: ruff check src/hma tests
+      - run: ruff format --check src/hma tests
+      - run: python -m build --wheel

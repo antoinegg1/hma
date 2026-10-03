@@ -1,0 +1,87 @@
+{
+  "name": "MLE-bench 16-task set",
+  "mlebench_commit": "507f92e1138bb6e40dac5c6ee7a6758e6424bf97",
+  "total_dataset_gb": 264.3,
+  "tasks": [
+    {
+      "task": "mbh_01",
+      "slug": "3d-object-detection-for-autonomous-vehicles",
+      "dataset_gb": 58.515
+    },
+    {
+      "task": "mbl_02",
+      "slug": "aptos2019-blindness-detection",
+      "dataset_gb": 8.012
+    },
+    {
+      "task": "mbl_08",
+      "slug": "jigsaw-toxic-comment-classification-challenge",
+      "dataset_gb": 0.13
+    },
+    {
+      "task": "mbl_09",
+      "slug": "leaf-classification",
+      "dataset_gb": 0.027
+    },
+    {
+      "task": "mbm_03",
+      "slug": "billion-word-imputation",
+      "dataset_gb": 1.725
+    },
+    {
+      "task": "mbm_05",
+      "slug": "cdiscount-image-classification-challenge",
+      "dataset_gb": 58.206
+    },
+    {
+      "task": "mbm_06",
+      "slug": "chaii-hindi-and-tamil-question-answering",
+      "dataset_gb": 0.029
+    },
+    {
+      "task": "mbm_09",
+      "slug": "freesound-audio-tagging-2019",
+      "dataset_gb": 24.358
+    },
+    {
+      "task": "mbm_18",
+      "slug": "imet-2020-fgvc7",
+      "dataset_gb": 23.438
+    },
+    {
+      "task": "mbm_20",
+      "slug": "iwildcam-2020-fgvc7",
+      "dataset_gb": 85.876
+    },
+    {
+      "task": "mbm_22",
+      "slug": "kuzushiji-recognition",
+      "dataset_gb": 2.828
+    },
+    {
+      "task": "mbm_23",
+      "slug": "learning-agency-lab-automated-essay-scoring-2",
+      "dataset_gb": 0.037
+    },
+    {
+      "task": "mbm_24",
+      "slug": "lmsys-chatbot-arena",
+      "dataset_gb": 0.189
+    },
+    {
+      "task": "mbm_27",
+      "slug": "petfinder-pawpularity-score",
+      "dataset_gb": 0.96
+    },
+    {
+      "task": "mbm_34",
+      "slug": "tweet-sentiment-extraction",
+      "dataset_gb": 0.004
+    },
+    {
+      "task": "mbm_35",
+      "slug": "us-patent-phrase-to-phrase-matching",
+      "dataset_gb": 0.002
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-'Trusted subprocess that calls the graders pinned in an upstream checkout.'
+"Trusted subprocess that calls the graders pinned in an upstream checkout."
 
 from __future__ import annotations
 
@@ -14,15 +14,15 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+
 def _load_config(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise TypeError("score config must be an object")
     return payload
 
-def _board_report(
-    score: float, path: Path, *, higher_is_better: bool
-) -> dict[str, Any]:
+
+def _board_report(score: float, path: Path, *, higher_is_better: bool) -> dict[str, Any]:
     with path.open(newline="", encoding="utf-8-sig") as file:
         rows = list(csv.DictReader(file))
     if not rows or "score" not in rows[0]:
@@ -59,11 +59,7 @@ def _board_report(
     gold_threshold, silver_threshold, bronze_threshold = (
         scores[index - 1] for index in medal_positions
     )
-    beats = (
-        (lambda value: score >= value)
-        if higher_is_better
-        else (lambda value: score <= value)
-    )
+    beats = (lambda value: score >= value) if higher_is_better else (lambda value: score <= value)
     gold = beats(gold_threshold)
     silver = not gold and beats(silver_threshold)
     bronze = not gold and not silver and beats(bronze_threshold)
@@ -83,16 +79,16 @@ def _board_report(
         "above_median": beats(median_threshold) and score != median_threshold,
     }
 
+
 def _configure_mlebench_pandas(pd: Any) -> None:
-    'Restores the frame behaviour used by the pinned MLE-bench environment.'
+    "Restores the frame behaviour used by the pinned MLE-bench environment."
     try:
         pd.set_option("future.infer_string", False)
     except (AttributeError, KeyError):
-        
         pass
     if not hasattr(pd.DataFrame, "applymap"):
-
         pd.DataFrame.applymap = pd.DataFrame.map
+
 
 def _mlebench_score(config: dict[str, Any], submission_path: Path) -> dict[str, Any]:
     import pandas as pd
@@ -104,19 +100,16 @@ def _mlebench_score(config: dict[str, Any], submission_path: Path) -> dict[str, 
     slug = str(config["slug"])
     sys.path.insert(0, str(upstream))
     py7zr = types.ModuleType("py7zr")
-    py7zr.SevenZipFile = object  
+    py7zr.SevenZipFile = object
     sys.modules.setdefault("py7zr", py7zr)
     competition_dir = upstream / "mlebench" / "competitions" / slug
-    task_config = yaml.safe_load(
-        (competition_dir / "config.yaml").read_text(encoding="utf-8")
-    )
+    task_config = yaml.safe_load((competition_dir / "config.yaml").read_text(encoding="utf-8"))
     module_name, function_name = task_config["grader"]["grade_fn"].split(":", 1)
     grade = getattr(importlib.import_module(module_name), function_name)
     answer_parts = Path(task_config["dataset"]["answers"]).parts[1:]
     submission = pd.read_csv(submission_path)
     answers_path = dataset.joinpath(*answer_parts)
     if answers_path.suffix == ".jsonl":
-
         from mlebench.utils import read_jsonl
 
         answers: Any = read_jsonl(str(answers_path))
@@ -132,9 +125,8 @@ def _mlebench_score(config: dict[str, Any], submission_path: Path) -> dict[str, 
     )
     return {"valid": True, "raw_score": score, "leaderboard": report}
 
-def _dojo_position(
-    score: float, dataset: Path, *, higher_is_better: bool
-) -> dict[str, Any]:
+
+def _dojo_position(score: float, dataset: Path, *, higher_is_better: bool) -> dict[str, Any]:
     reports: dict[str, Any] = {}
     position_scores: list[float] = []
     for name in ("private", "public"):
@@ -162,6 +154,7 @@ def _dojo_position(
     reports["avg_score"] = sum(position_scores) / len(position_scores)
     return reports
 
+
 def _mledojo_score(config: dict[str, Any], submission_path: Path) -> dict[str, Any]:
     import pandas as pd
 
@@ -188,16 +181,17 @@ def _mledojo_score(config: dict[str, Any], submission_path: Path) -> dict[str, A
     )
     return {"valid": True, "raw_score": score, "position": report}
 
+
 def _basic_csv_check(path: Path) -> None:
     with path.open(newline="", encoding="utf-8-sig") as file:
         header = next(csv.reader(file))
     if header and not header[0].strip():
-
         header = header[1:]
     if not header or any(not value.strip() for value in header):
         raise ValueError("CSV header is empty")
     if len(header) != len(set(header)):
         raise ValueError("CSV header contains duplicate columns")
+
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Score one protected MLE submission")
@@ -214,7 +208,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         score = result["raw_score"]
         if isinstance(score, bool) or not math.isfinite(float(score)):
             raise ValueError("grader returned a non-finite score")
-    except Exception as error:  
+    except Exception as error:
         result = {
             "valid": False,
             "error": str(error)[:2_000],
@@ -222,6 +216,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         }
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0 if result["valid"] else 2
+
 
 if __name__ == "__main__":
     sys.exit(main())

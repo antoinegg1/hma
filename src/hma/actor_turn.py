@@ -1,13 +1,15 @@
-'Exactly one fresh NoGoals session; the external supervisor owns alternation.'
+"Exactly one fresh session; native goals are enabled only in the goal baseline."
 
+import os
 from typing import Annotated, Any
 
 from hmz.flows import Agent, AgentDefaults, flow
 
-NoGoals = Annotated[Agent, AgentDefaults(goals=False)]
+TaskAgent = Annotated[Agent, AgentDefaults(goals=os.environ.get("HMA_WORKFLOW") == "goal")]
+
 
 def close_session(session: Any) -> None:
-    'Unwind the provider; the supervisor additionally stops the whole container.'
+    "Unwind the provider; the supervisor additionally stops the whole container."
     try:
         session.close()
     finally:
@@ -21,11 +23,15 @@ def close_session(session: Any) -> None:
                 server.stop()
                 owner._server = None
 
+
 @flow
-def run(agents: tuple[NoGoals], task: str) -> None:
-    'Natural return is enough: never continue just to reach the submission cap.'
+def run(agents: tuple[TaskAgent], task: str) -> None:
+    "Natural return is enough: never continue just to reach the submission cap."
     session = agents[0].new()
     try:
-        session(task, suppress=True)
+        if os.environ.get("HMA_WORKFLOW") == "goal":
+            session.pursue(task, suppress=False)
+        else:
+            session(task, suppress=False)
     finally:
         close_session(session)

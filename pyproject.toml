@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0 AND MIT"
 license-files = ["LICENSE"]
-dependencies = ["docker>=7.1,<8", "pydantic>=2.13,<3", "requests>=2.32,<3"]
+dependencies = ["docker>=7.1,<8", "pydantic>=2.13,<3", "requests>=2.32,<3", "pyyaml>=6", "python-dotenv>=1.2", "matplotlib>=3.9", "uv==0.12.9"]
 
 [project.optional-dependencies]
 runtime = ["dateparser>=1.4.2", "deepseek-harness-sdk>=0.1.1rc1,<0.2", "psutil>=7.2.2", "pyfiglet>=1", "python-dotenv>=1.2.3", "pyyaml>=6.0.3", "rich>=15", "sentry-sdk>=2.68.1", "textual>=8.2.8"]
@@ -18,6 +18,7 @@ test = ["pytest>=8,<10"]
 evaluation = ["pandas>=2.2", "pyyaml>=6"]
 
 [project.scripts]
+hma-repro = "hma.repro.cli:main"
 hma-run = "hma.supervisor:main"
 hmz = "hmz.__main__:main"
 hma-stage-evaluator = "hma.benchmark.stage:main"
@@ -27,3 +28,13 @@ packages = ["src/hma", "src/hmz"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"baselines/harness16" = "hma/repro/assets/harness16"
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["src/hmz", "baselines", ".venv"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

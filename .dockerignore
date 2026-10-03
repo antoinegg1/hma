@@ -1,5 +1,11 @@
 .git
 .venv
 __pycache__
-*.pyc
 .pytest_cache
+.ruff_cache
+.cache
+.env
+configs/local.json
+runs
+data
+outputs

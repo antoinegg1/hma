@@ -11,8 +11,9 @@ import time
 from pathlib import Path
 from typing import Any
 
+
 def atomic_json(path: Path, value: Any) -> None:
-    'Persist protected controller metadata with an atomic, durable rename.'
+    "Persist protected controller metadata with an atomic, durable rename."
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, name = tempfile.mkstemp(prefix=".pending-", dir=path.parent)
     with os.fdopen(fd, "w") as stream:
@@ -27,10 +28,9 @@ def atomic_json(path: Path, value: Any) -> None:
     finally:
         os.close(directory)
 
-def copy_verified(
-    source: Path, target: Path, *, deadline: float | None = None
-) -> dict[str, Any]:
-    'Copy regular non-symlink files, break hard links, verify the destination.'
+
+def copy_verified(source: Path, target: Path, *, deadline: float | None = None) -> dict[str, Any]:
+    "Copy regular non-symlink files, break hard links, verify the destination."
     descriptor = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     with os.fdopen(descriptor, "rb") as incoming:
         metadata = os.fstat(incoming.fileno())

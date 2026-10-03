@@ -1,0 +1,31 @@
+{
+  "source_repository": "https://github.com/agentkaggle/KaggleBench",
+  "source_commit": "46ebbed386c6ca4c8d580b4554ce17f8da81c918",
+  "imports": [
+    {
+      "source": "src/flowbench/mle_native/catalog.py",
+      "target": "src/hma/benchmark/catalog.py",
+      "sha256_original": "4170225312fd8700db4bcaeb50d30fe0e6c4657b0c5e007afeb0403cd32815d7"
+    },
+    {
+      "source": "src/flowbench/mle_native/integrity.py",
+      "target": "src/hma/benchmark/integrity.py",
+      "sha256_original": "ea0d102d7808d59199e094a4fa46aabcbdd9e57bf65bc78e16a0aba5cce1cb77"
+    },
+    {
+      "source": "src/flowbench/mle_native/prepare_worker.py",
+      "target": "src/hma/benchmark/prepare_worker.py",
+      "sha256_original": "743db3ec3675d346a76e09d7219f6e78e17d15de17c2999e4adb87439dfc7fe1"
+    },
+    {
+      "source": "src/flowbench/mle_native/prepare_data.py",
+      "target": "src/hma/benchmark/prepare_data.py",
+      "sha256_original": "1acd6758d9566aa581f6cc715833de140e67dee24ad19a7cada4f7dfc58316b7"
+    },
+    {
+      "source": "experiments/harness-repro-16task-20260918/adapter/fixed",
+      "target": "baselines/harness16",
+      "note": "Adapter bytes retained; private base_image removed from lock metadata."
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-'Run one completion-bounded Humanize Goal through Kimi Code on a provider gateway.'
+"Run one completion-bounded Humanize Goal through Kimi Code on a provider gateway."
 
 from __future__ import annotations
 
@@ -36,14 +36,17 @@ _HOP_BY_HOP = frozenset(
     }
 )
 
+
 def _utc_now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
 
 def _nonempty_environment(name: str) -> str:
     value = os.environ.get(name, "").strip()
     if not value:
         raise ValueError(f"{name} must be nonempty")
     return value
+
 
 class _Proxy(ThreadingHTTPServer):
     daemon_threads = True
@@ -58,6 +61,7 @@ class _Proxy(ThreadingHTTPServer):
     def counted(self) -> None:
         with self._lock:
             self.requests += 1
+
 
 class _ProxyHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.0"
@@ -75,9 +79,7 @@ class _ProxyHandler(BaseHTTPRequestHandler):
 
     def _forward(self, body: bytes | None) -> None:
         headers = {
-            name: value
-            for name, value in self.headers.items()
-            if name.lower() not in _HOP_BY_HOP
+            name: value for name, value in self.headers.items() if name.lower() not in _HOP_BY_HOP
         }
         headers["Authorization"] = f"Bearer {self.server.api_key}"
         request = urllib.request.Request(
@@ -111,11 +113,13 @@ class _ProxyHandler(BaseHTTPRequestHandler):
                 self.wfile.write(chunk)
                 self.wfile.flush()
 
+
 def _submission_present(path: Path) -> bool:
     try:
         return path.is_file() and not path.is_symlink() and path.stat().st_size > 0
     except OSError:
         return False
+
 
 def main() -> int:
     from hmz.agents.kimi import KimiCodeCLIAgent, KimiCodeCLIAgentConfig
@@ -138,16 +142,12 @@ def main() -> int:
     def observe(_agent: object, _session: object, event: object) -> None:
         kind = str(getattr(event, "kind", ""))
         text = str(getattr(event, "text", ""))
-        destination = (
-            sys.stderr if kind in {"reasoning", "tool", "failed"} else sys.stdout
-        )
+        destination = sys.stderr if kind in {"reasoning", "tool", "failed"} else sys.stdout
         print(text, file=destination, flush=True)
 
     try:
         os.environ["KIMI_MODEL_API_KEY"] = _PLACEHOLDER_KEY
-        os.environ["KIMI_MODEL_BASE_URL"] = (
-            f"http://127.0.0.1:{proxy.server_address[1]}"
-        )
+        os.environ["KIMI_MODEL_BASE_URL"] = f"http://127.0.0.1:{proxy.server_address[1]}"
         agent = KimiCodeCLIAgent(
             KimiCodeCLIAgentConfig(
                 model=os.environ["MODEL"],
@@ -198,6 +198,7 @@ def main() -> int:
             json.dumps(receipt, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "data_root": "data",
+  "agent_image": "hma-agent:local",
+  "evaluator_image": "hma-evaluator:local",
+  "gpus": [
+    "0"
+  ],
+  "cpus": 26,
+  "memory": "200000m",
+  "shm_size": "65536m",
+  "providers": {
+    "openai": {
+      "api_key": "",
+      "base_url": ""
+    },
+    "anthropic": {
+      "api_key": "",
+      "base_url": ""
+    },
+    "glm": {
+      "api_key": "",
+      "base_url": ""
+    },
+    "deepseek": {
+      "api_key": "",
+      "base_url": ""
+    },
+    "kimi": {
+      "api_key": "",
+      "base_url": ""
+    }
+  },
+  "harness_images": {
+    "ml_master_v2": "hma-ml_master_v2:local",
+    "mlevolve_no_prior": "hma-mlevolve_no_prior:local",
+    "scienceflow": "hma-scienceflow:local"
+  },
+  "evaluator_cpus": 2,
+  "evaluator_memory": "16384m"
+}

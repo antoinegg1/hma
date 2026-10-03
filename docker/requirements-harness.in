@@ -1,0 +1,22 @@
+# Runtime imports used by the frozen MLEvolve no-prior and ML-Master adapters.
+# The training stack is inherited from requirements-ml.lock.
+backoff==2.2.1
+black==24.3.0
+coolname==2.2.0
+dataclasses-json==0.6.7
+faiss-cpu==1.11.0
+funcy==2.0
+genson==1.3.0
+humanize==4.12.3
+omegaconf==2.3.0
+rank-bm25==0.2.2
+shutup==0.2.0
+mcp==1.26.0
+anthropic==0.49.0
+google-genai==1.51.0
+oss2==2.19.1
+fastapi==0.118.3
+slowapi==0.1.9
+aiohttp>=3.11.13
+beautifulsoup4==4.13.3
+PyMuPDF==1.25.5

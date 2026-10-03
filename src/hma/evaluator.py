@@ -1,4 +1,4 @@
-'Opt-in guarded native evaluator; never modifies the original evaluator file.'
+"Opt-in guarded native evaluator; never modifies the original evaluator file."
 
 from __future__ import annotations
 
@@ -19,25 +19,17 @@ from typing import Any
 
 from .handoff import atomic_json
 
-def guarded_types(
-    base: ModuleType, control_file: Path, admin_key: str
-) -> tuple[type, type]:
-    'Wrap native scoring/ledger semantics with durable per-session admission.'
+
+def guarded_types(base: ModuleType, control_file: Path, admin_key: str) -> tuple[type, type]:
+    "Wrap native scoring/ledger semantics with durable per-session admission."
     request_context = threading.local()
 
     class State(base.State):
         def __init__(self, config: dict[str, Any]) -> None:
             super().__init__(config)
-            if (
-                config["feedback_mode"] != "blind"
-                or config["submission_limit"] is not None
-            ):
-                raise ValueError(
-                    "hma requires blind evaluation and no cell-wide quota"
-                )
-            self.turns = (
-                json.loads(control_file.read_text()) if control_file.exists() else []
-            )
+            if config["feedback_mode"] != "blind" or config["submission_limit"] is not None:
+                raise ValueError("hma requires blind evaluation and no cell-wide quota")
+            self.turns = json.loads(control_file.read_text()) if control_file.exists() else []
             if not isinstance(self.turns, list):
                 raise TypeError("invalid protected turn journal")
             identities: set[str] = set()
@@ -60,16 +52,18 @@ def guarded_types(
                     not isinstance(turn.get("token"), str)
                     or len(turn["token"]) < 32
                     or type(turn.get("closed")) is not bool
-                    or type(turn.get("limit")) is not int
-                    or turn["limit"] < 0
+                    or (
+                        turn.get("limit") is not None
+                        and (type(turn["limit"]) is not int or turn["limit"] < 0)
+                    )
                 ):
                     raise ValueError("invalid protected turn admission")
-                if not isinstance(
-                    turn.get("deadline_epoch"), (int, float)
-                ) or not math.isfinite(turn["deadline_epoch"]):
+                if not isinstance(turn.get("deadline_epoch"), (int, float)) or not math.isfinite(
+                    turn["deadline_epoch"]
+                ):
                     raise ValueError("invalid protected deadline")
 
-                if turn["limit"] > 0:
+                if turn["limit"] != 0:
                     if deadline is not None and deadline != turn["deadline_epoch"]:
                         raise ValueError("protected deadline changed")
                     deadline = turn["deadline_epoch"]
@@ -82,7 +76,10 @@ def guarded_types(
                 if (
                     type(previous_end) is not int
                     or not turn["baseline"] <= previous_end <= len(self.records)
-                    or previous_end - turn["baseline"] > turn["limit"]
+                    or (
+                        turn["limit"] is not None
+                        and previous_end - turn["baseline"] > turn["limit"]
+                    )
                 ):
                     raise ValueError("invalid protected turn count")
 
@@ -94,26 +91,15 @@ def guarded_types(
         def authorize(self) -> dict[str, Any]:
             turn = self.current()
             token = getattr(request_context, "token", "")
-            if (
-                not token
-                or not hmac.compare_digest(token, turn["token"])
-                or turn["closed"]
-            ):
+            if not token or not hmac.compare_digest(token, turn["token"]) or turn["closed"]:
                 raise ValueError("inactive turn")
             if time.time() >= turn["deadline_epoch"]:
                 raise ValueError("global deadline")
             return turn
 
-        def open_turn(
-            self, turn_id: str, limit: int, deadline: float
-        ) -> dict[str, Any]:
+        def open_turn(self, turn_id: str, limit: int | None, deadline: float) -> dict[str, Any]:
             with self.lock:
-                if (
-                    not turn_id
-                    or isinstance(limit, bool)
-                    or not isinstance(limit, int)
-                    or limit < 0
-                ):
+                if not turn_id or (limit is not None and (type(limit) is not int or limit < 0)):
                     raise ValueError("invalid turn contract")
 
                 if limit == 0 and not self.turns:
@@ -132,11 +118,9 @@ def guarded_types(
                 if self.turns and not self.current()["closed"]:
                     raise ValueError("previous turn has not closed")
                 if self.turns:
-                    budget = min(
-                        t["deadline_epoch"] for t in self.turns if t["limit"] > 0
-                    )
+                    budget = min(t["deadline_epoch"] for t in self.turns if t["limit"] != 0)
 
-                    if limit > 0 and deadline != budget:
+                    if limit != 0 and deadline != budget:
                         raise ValueError("global deadline cannot be reset")
                     if limit == 0 and deadline < budget:
                         raise ValueError("selection deadline precedes the budget")
@@ -171,18 +155,20 @@ def guarded_types(
                 "accepted": count,
                 "limit": turn["limit"],
                 "closed": turn["closed"],
-
-                "exhausted": turn["limit"] > 0 and count >= turn["limit"],
+                "exhausted": turn["limit"] is not None
+                and turn["limit"] > 0
+                and count >= turn["limit"],
                 "selection": turn["limit"] == 0,
-                "last_submission_id": self.records[-1]["submission_id"]
-                if self.records
-                else None,
+                "last_submission_id": self.records[-1]["submission_id"] if self.records else None,
             }
 
         def submit(self, artifact: Path, artifact_hash: str) -> dict[str, Any]:
             with self.lock:
                 turn = self.authorize()
-                if len(self.records) - turn["baseline"] >= turn["limit"]:
+                if (
+                    turn["limit"] is not None
+                    and len(self.records) - turn["baseline"] >= turn["limit"]
+                ):
                     raise OverflowError("submission not accepted")
                 return super().submit(artifact, artifact_hash)
 
@@ -198,7 +184,7 @@ def guarded_types(
             return super()._record(result, artifact_hash)
 
         def finalize(self, submission_id: str) -> dict[str, Any]:
-            'Re-state an already-accepted candidate as the last ledger record.'
+            "Re-state an already-accepted candidate as the last ledger record."
             with self.lock:
                 if not self.turns or not self.current()["closed"]:
                     raise ValueError("finalize requires the last turn to be closed")
@@ -248,9 +234,7 @@ def guarded_types(
     class Handler(base.Handler):
         def do_POST(self) -> None:
             if self.path.startswith("/turn/"):
-                if not hmac.compare_digest(
-                    self.headers.get("X-Control-Key", ""), admin_key
-                ):
+                if not hmac.compare_digest(self.headers.get("X-Control-Key", ""), admin_key):
                     self._send(HTTPStatus.FORBIDDEN, {"error": "control_forbidden"})
                     return
                 try:
@@ -297,11 +281,7 @@ def guarded_types(
                     current = base._STATE.turn_status()
                     self._send(
                         HTTPStatus.OK,
-                        {
-
-                            key: current[key]
-                            for key in ("accepted", "closed", "exhausted")
-                        },
+                        {key: current[key] for key in ("accepted", "closed", "exhausted")},
                     )
                     return
                 super().do_GET()
@@ -312,6 +292,7 @@ def guarded_types(
 
     State.request_context = request_context
     return State, Handler
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -331,6 +312,7 @@ def main() -> None:
     state_type, handler = guarded_types(base, args.control, key)
     base._STATE = state_type(base._CONFIG)
     ThreadingHTTPServer(("0.0.0.0", args.port), handler).serve_forever()
+
 
 if __name__ == "__main__":
     main()

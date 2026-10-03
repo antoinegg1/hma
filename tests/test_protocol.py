@@ -1,4 +1,5 @@
 """Offline checks with temporary synthetic inputs; no experimental data."""
+
 from __future__ import annotations
 
 import json
@@ -7,7 +8,6 @@ import threading
 import time
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
-from unittest.mock import Mock
 
 import pytest
 
@@ -34,12 +34,16 @@ def config(tmp_path):
         actors=({"spec": "actor-a"}, {"spec": "actor-b"}),
         agent_data=({"source": public, "target": "/home/user/.flowbench-data/input"},),
         evaluator_data=(),
-        uid=1000, gid=1000, gpu=None,
+        uid=1000,
+        gid=1000,
+        gpu=None,
     )
 
 
 def test_prompt_keeps_cap_undisclosed_and_review_wall_explicit():
-    task = "Use a 6-hour budget. There is no medal-based stopping condition and no submission quota."
+    task = (
+        "Use a 6-hour budget. There is no medal-based stopping condition and no submission quota."
+    )
     rendered = prompt_for(task, 21600)
     assert "no submission quota" not in rendered.lower()
     assert "cap" not in rendered.lower()
@@ -61,7 +65,9 @@ def test_reserve_must_fit_review_and_teardown(config):
 
 def test_private_mount_refused_for_actor(config, tmp_path):
     fields = config.model_dump()
-    fields["agent_data"].append({"source": tmp_path, "target": "/home/user/.flowbench-data/private"})
+    fields["agent_data"].append(
+        {"source": tmp_path, "target": "/home/user/.flowbench-data/private"}
+    )
     with pytest.raises(ValueError, match="public input only"):
         Config.model_validate(fields)
 
@@ -134,9 +140,11 @@ def test_review_author_uses_actual_turn_counts():
 
 def test_fresh_homes_share_exactly_one_workspace(config, monkeypatch, tmp_path):
     made = []
+
     def create(*args, **kwargs):
         made.append(kwargs)
         return SimpleNamespace()
+
     client = SimpleNamespace(containers=SimpleNamespace(create=create))
     supervisor = Supervisor(config, client)
     supervisor.network = SimpleNamespace(name="test-network")
@@ -152,8 +160,10 @@ def test_fresh_homes_share_exactly_one_workspace(config, monkeypatch, tmp_path):
         home = config.root / "turns" / str(index) / "agent"
         home.mkdir(parents=True)
         supervisor.actor(index, home, route, "synthetic prompt")
+
     def mounted(call, target):
         return next(source for source, value in call["volumes"].items() if value["bind"] == target)
+
     assert mounted(made[0], "/home/user") != mounted(made[1], "/home/user")
     assert mounted(made[0], "/home/user/workspace") == mounted(made[1], "/home/user/workspace")
     assert "actor-a" in made[0]["command"] and "actor-b" in made[1]["command"]
@@ -173,7 +183,9 @@ def test_actual_run_loop_handles_cap_natural_return_and_review(config, monkeypat
     )
 
     class OfflineSupervisor(Supervisor):
-        def evaluator(self): return evaluator
+        def evaluator(self):
+            return evaluator
+
         def control(self, endpoint, payload, **kwargs):
             if endpoint == "open":
                 active.index += 1
@@ -182,15 +194,27 @@ def test_actual_run_loop_handles_cap_natural_return_and_review(config, monkeypat
             if endpoint == "status":
                 return {"exhausted": active.index == 0}
             raise AssertionError(endpoint)
+
         def actor(self, index, home, route, prompt, **kwargs):
             return SimpleNamespace(
-                id=str(index), start=lambda: None, reload=lambda: None,
-                attrs={"State": {"Running": False, "ExitCode": 0}}, logs=lambda: b"",
+                id=str(index),
+                start=lambda: None,
+                reload=lambda: None,
+                attrs={"State": {"Running": False, "ExitCode": 75 if index == 0 else 0}},
+                logs=lambda: b"",
             )
-        def stop(self, container): pass
+
+        def stop(self, container):
+            pass
+
         def close_exploration_turn(self, turn_id, opened):
-            if active.index == 1: clock.now = self.explore_deadline
-            return {"accepted": 5 if active.index == 0 else 1, "last_submission_id": str(active.index)}
+            if active.index == 1:
+                clock.now = self.explore_deadline
+            return {
+                "accepted": 5 if active.index == 0 else 1,
+                "last_submission_id": str(active.index),
+            }
+
         def review_phase(self, prompt, turns):
             assert clock.now == self.explore_deadline
             assert self.review_deadline == self.deadline
@@ -223,7 +247,11 @@ def test_staging_has_no_embedded_data_and_refuses_overwrite(tmp_path):
     config_file = tmp_path / "launch.json"
     config_file.write_text(json.dumps(launch))
     target = stage(config_file)
-    assert sorted(p.name for p in target.iterdir()) == ["mle-config.json", "mle-evaluator-server.py", "mle-score-worker.py"]
+    assert sorted(p.name for p in target.iterdir()) == [
+        "mle-config.json",
+        "mle-evaluator-server.py",
+        "mle-score-worker.py",
+    ]
     payload = json.loads((target / "mle-config.json").read_text())
     assert payload["feedback_mode"] == "blind"
     parsed = Config.model_validate_json(config_file.read_text())
@@ -235,6 +263,7 @@ def test_staging_has_no_embedded_data_and_refuses_overwrite(tmp_path):
 
 def test_telemetry_cannot_be_enabled(monkeypatch):
     from hmz import telemetry
+
     monkeypatch.setenv("HUMANIZE_SENTRY", "on")
     assert telemetry.enabled() is False
     assert telemetry.DSN == ""

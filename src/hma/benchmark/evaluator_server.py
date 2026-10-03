@@ -1,4 +1,4 @@
-'Restart-safe local evaluator for MLE-bench and MLE-Dojo profiles.'
+"Restart-safe local evaluator for MLE-bench and MLE-Dojo profiles."
 
 from __future__ import annotations
 
@@ -27,8 +27,10 @@ _MAX_JSON_BYTES = 4 * 1024 * 1024
 _CHUNK_BYTES = 1024 * 1024
 _CHAIN_GENESIS = "0" * 64
 
+
 def _utc_now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
 
 def _record_hash(record: dict[str, Any]) -> str:
     unsigned = {key: value for key, value in record.items() if key != "record_hash"}
@@ -36,6 +38,7 @@ def _record_hash(record: dict[str, Any]) -> str:
         unsigned, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     ).encode()
     return hashlib.sha256(payload).hexdigest()
+
 
 def _load_config() -> dict[str, Any]:
     config = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
@@ -69,8 +72,9 @@ def _load_config() -> dict[str, Any]:
         raise ValueError("MLE evaluator submission limit is invalid")
     return config
 
+
 class State:
-    'Owns the immutable submission ledger and serialized grader calls.'
+    "Owns the immutable submission ledger and serialized grader calls."
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -90,15 +94,9 @@ class State:
         for line_number, line in enumerate(lines, start=1):
             record = json.loads(line)
             result = record.get("result") if isinstance(record, dict) else None
-            submission_id = (
-                record.get("submission_id") if isinstance(record, dict) else None
-            )
-            artifact_hash = (
-                record.get("artifact_sha256") if isinstance(record, dict) else None
-            )
-            accepted_at = (
-                record.get("accepted_at_utc") if isinstance(record, dict) else None
-            )
+            submission_id = record.get("submission_id") if isinstance(record, dict) else None
+            artifact_hash = record.get("artifact_sha256") if isinstance(record, dict) else None
+            accepted_at = record.get("accepted_at_utc") if isinstance(record, dict) else None
             try:
                 raw_score = result["raw_score"]
                 score = float(raw_score)
@@ -188,9 +186,7 @@ class State:
             submission_limit = self.config["submission_limit"]
             if submission_limit is not None and len(self.records) >= submission_limit:
                 raise OverflowError("submission limit exhausted")
-            if any(
-                record["artifact_sha256"] == artifact_hash for record in self.records
-            ):
+            if any(record["artifact_sha256"] == artifact_hash for record in self.records):
                 raise FileExistsError("identical artifact already submitted")
             result = self._score(artifact)
             if not result["valid"]:
@@ -260,9 +256,7 @@ class State:
             "artifact_sha256": record["artifact_sha256"],
             "status": "accepted",
             "remaining_submissions": (
-                None
-                if submission_limit is None
-                else submission_limit - len(self.records)
+                None if submission_limit is None else submission_limit - len(self.records)
             ),
         }
         if self.config["feedback_mode"] == "interactive":
@@ -280,11 +274,13 @@ class State:
         with self.lock:
             return [self.public_record(record) for record in self.records]
 
+
 _CONFIG = _load_config()
 _STATE = State(_CONFIG)
 
+
 class Handler(BaseHTTPRequestHandler):
-    'Serves the minimal evaluator API on the private cell network.'
+    "Serves the minimal evaluator API on the private cell network."
 
     timeout = 60
 
@@ -311,9 +307,7 @@ class Handler(BaseHTTPRequestHandler):
             length = -1
         maximum = int(_CONFIG["max_artifact_bytes"])
         if length <= 0 or length > maximum:
-            self._send(
-                HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "invalid_body_size"}
-            )
+            self._send(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "invalid_body_size"})
             return None
         return length
 
@@ -395,9 +389,11 @@ class Handler(BaseHTTPRequestHandler):
             artifact.unlink(missing_ok=True)
         self._send(status, response)
 
+
 def serve() -> None:
-    'Runs the evaluator until its cell is stopped.'
+    "Runs the evaluator until its cell is stopped."
     ThreadingHTTPServer(("0.0.0.0", 80), Handler).serve_forever()
+
 
 if __name__ == "__main__":
     serve()

@@ -1,0 +1,5 @@
+[
+  {"baseline":"ScienceFlow","kind":"published_configuration_only","model":"DeepSeek-V4-Flash-Preview","hours":24,"resources":"16–32 logical CPU cores, 256 GB RAM, at most 2 GPUs","configuration":"Recoverable workspaces; ESTRA re-anchoring; resource-aware execution","source":"HMA paper Table 5; Zhao et al. (2026)","scores_included":false},
+  {"baseline":"MLEvolve","kind":"published_configuration_only","model":"Gemini-3.1-Pro-preview","hours":12,"resources":"21 vCPUs, 234 GB RAM, 1 NVIDIA H200","configuration":"Temperature 1.0; 500 expansion steps; 3 parallel branches and 3 initial drafts","source":"HMA paper Table 5; Du et al. (2026)","scores_included":false},
+  {"baseline":"ML-Master 2.0","kind":"published_configuration_only","model":"DeepSeek-V3.2; thinking for context promotion","hours":24,"resources":"24 CPU cores and 2 RTX 4090 per agent; 1008 GB RAM and 1 TB SSD shared across 4 tasks","configuration":"Hierarchical cognitive caching; prior wisdom from 407 competitions excluding MLE-bench","source":"HMA paper Table 5; Zhu et al. (2026)","scores_included":false}
+]
