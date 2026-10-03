@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import shutil
+import subprocess
 from pathlib import Path
 
 from hma.benchmark.integrity import atomic_json
@@ -116,6 +117,14 @@ def doctor(local, offline: bool) -> dict:
         result["docker_daemon"] = True
     except Exception:
         result["docker_daemon"] = False
+    from hma.repro.hardware import inspect_hardware
+
+    try:
+        result["hardware"] = inspect_hardware(local)
+        result["gpu_model_matches"] = True
+    except (ValueError, OSError, subprocess.SubprocessError) as error:
+        result["gpu_model_matches"] = False
+        result["hardware_error"] = str(error)
     result["providers"] = {}
     for name in local.providers:
         try:
@@ -124,7 +133,8 @@ def doctor(local, offline: bool) -> dict:
         except ValueError:
             result["providers"][name] = "missing"
     result["ready"] = all(
-        result[k] for k in ("docker_cli", "docker_daemon", "nvidia_smi", "uv", "nonroot")
+        result[k]
+        for k in ("docker_cli", "docker_daemon", "nvidia_smi", "gpu_model_matches", "uv", "nonroot")
     ) and all(v != "missing" for v in result["providers"].values())
     return result
 

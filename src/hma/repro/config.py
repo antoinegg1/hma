@@ -31,8 +31,9 @@ class Local(Strict):
     agent_image: str = "hma-agent:local"
     evaluator_image: str = "hma-evaluator:local"
     gpus: list[str] = Field(default_factory=lambda: ["0"])
-    cpus: float = Field(default=26, gt=0)
-    memory: str = "200000m"
+    expected_gpu_model: str | None = Field(default="NVIDIA A10", min_length=1)
+    cpus: float = Field(default=30, gt=0)
+    memory: str = "220g"
     shm_size: str = "65536m"
     evaluator_cpus: float = Field(default=2, gt=0)
     evaluator_memory: str = "16384m"

@@ -14,6 +14,7 @@ import docker
 from hma.benchmark.integrity import atomic_json, sha256_file
 from hma.benchmark.stage import stage
 from hma.repro.config import ASSETS, TASKS, Experiment, Local, Suite, fingerprint
+from hma.repro.hardware import inspect_hardware
 from hma.repro.providers import credentials, names
 from hma.supervisor import Config, Supervisor
 
@@ -236,6 +237,7 @@ def _run_locked(plan: dict, local: Local, root: Path, resume: bool) -> list[dict
     secret_env = credentials(local, provider_ids)
     if os.getuid() == 0:
         raise ValueError("run as a non-root Docker user")
+    hardware = inspect_hardware(local)
     client = docker.from_env()
     client.ping()
     images = {local.evaluator_image}
@@ -255,7 +257,13 @@ def _run_locked(plan: dict, local: Local, root: Path, resume: bool) -> list[dict
         for task in sorted({c["task"] for c in plan["cells"]})
     }
     identity = fingerprint(
-        {"settings": settings, "images": image_ids, "code": code, "data": manifests}
+        {
+            "settings": settings,
+            "images": image_ids,
+            "code": code,
+            "data": manifests,
+            "hardware": hardware,
+        }
     )
     if (root / "plan.json").exists():
         previous = json.loads((root / "plan.json").read_text())
@@ -272,6 +280,7 @@ def _run_locked(plan: dict, local: Local, root: Path, resume: bool) -> list[dict
             {
                 "identity": identity,
                 "settings": settings,
+                "hardware": hardware,
                 "images": image_ids,
                 "code": code,
                 "data": manifests,

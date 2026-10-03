@@ -56,8 +56,8 @@
   "max_valid_submissions_per_session": 5,
   "review_reserve_seconds": 900,
   "review_turn_seconds": 600,
-  "cpus": 26,
-  "memory": "200000m",
+  "cpus": 30,
+  "memory": "220g",
   "shm_size": "65536m",
   "gpu": "0",
   "evaluator": {

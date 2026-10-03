@@ -28,6 +28,15 @@ The user's task scope is fresh reruns; historical archives are unnecessary.
 
 ## Protocol invariants
 
+- Appendix C.1 specifies one NVIDIA A10, 30 vCPUs, and 220 GiB RAM per task,
+  shared by the alternating agents. Use the same configured limits for native
+  and external 16-task runs. Table 5's H200/other hardware describes cited
+  baselines' original papers, not this execution environment. Keep
+  `expected_gpu_model="NVIDIA A10"` for the paper setting; an explicit different
+  model or null is a hardware variant. Use `hma-repro` for hardware preflight;
+  low-level `hma-run` has no such check. The 64 GiB shared-memory limit and
+  separate 2-CPU/16-GiB evaluator are implementation choices absent from the
+  manuscript. Provision their overhead separately.
 - The immutable matrix is `src/hma/repro/assets/experiments.json`. No fallback
   models or undocumented changes to caps, timing, prompts, order or repeat count.
 - Goal: exactly one fresh native session with native goal pursuit enabled; no
@@ -35,8 +44,12 @@ The user's task scope is fresh reruns; historical archives are unnecessary.
   one shared workspace; accepted submission cap 5 (1/3 only in named ablations).
   NTA: alternate only on natural completion, explicit null cap, no final review.
 - Native runs have a 21,600-second total window. HMA reserves 900 seconds, with a
-  600-second review call and time for shutdown/finalization. Never reset time on
-  handoff or silently extend a deadline. Harness research and total windows are
+  600-second review call and time for shutdown/finalization. The 900-second
+  reserve is specified by the paper; the 600-second call limit is an implementation
+  choice. NTA uses one repeat in this fresh-run matrix. The historical cap-1/3 and
+  reverse-order archives had 21,700-second terminal windows; fresh runs enforce
+  the nominal 21,600-second budget. Never reset time on handoff or silently extend
+  a deadline. Harness research and total windows are
   separate fields; smoke shortening cannot modify the default scientific plan.
 - The admission gate counts accepted submissions only; invalid submissions do
   not exhaust a cap. Null means unlimited. Zero is the internal review-only gate,
@@ -56,7 +69,9 @@ The user's task scope is fresh reruns; historical archives are unnecessary.
   score selection. MLEvolve memory/mechanism checks remain enabled; the memory
   encoder is a pinned generic pretrained model, not competition prior knowledge.
 - Resume schedules only never-started cells under exactly the same plan, code,
-  image IDs, resources and data manifests. No automatic retries, score-based
+  image IDs, resources, recorded hardware and data manifests. GPU UUID/name,
+  memory/driver and host CPU model/count/RAM are recorded; CPU model and driver
+  version need not match the historical host. No automatic retries, score-based
   exclusions, deletion of failed cells, or combining independently sampled runs.
 - Table metrics use fixed planned denominators, per-repeat rates then mean/SE.
   One repeat has undefined SE. Final disqualifications require evidence, reason,

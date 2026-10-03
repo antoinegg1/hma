@@ -413,6 +413,8 @@ def test_campaign_resume_never_retries_and_rejects_changed_environment(tmp_path,
 
     monkeypatch.setattr(campaign.os, "getuid", lambda: 1000)
     monkeypatch.setattr(campaign, "credentials", lambda *a: {})
+    hardware = {"gpus": [{"uuid": "GPU-fixture", "name": "NVIDIA A10"}]}
+    monkeypatch.setattr(campaign, "inspect_hardware", lambda *a: hardware)
     monkeypatch.setattr(prepare, "_verify_frozen_task", lambda *a: None)
     image = SimpleNamespace(id="sha256:original")
     client = SimpleNamespace(ping=lambda: True, images=SimpleNamespace(get=lambda name: image))
@@ -431,8 +433,13 @@ def test_campaign_resume_never_retries_and_rejects_changed_environment(tmp_path,
     monkeypatch.setattr(campaign, "stage_cell", failed_stage)
     root = tmp_path / "campaign"
     assert campaign.run_plan(selected, local, root)[0]["status"] == "failed"
+    assert json.loads((root / "environment.json").read_text())["hardware"] == hardware
     assert campaign.run_plan(selected, local, root, resume=True)[0]["status"] == "failed"
     assert len(calls) == 1
+    hardware["gpus"][0]["uuid"] = "GPU-changed"
+    with pytest.raises(ValueError, match="environment changed"):
+        campaign.run_plan(selected, local, root, resume=True)
+    hardware["gpus"][0]["uuid"] = "GPU-fixture"
     image.id = "sha256:changed"
     with pytest.raises(ValueError, match="environment changed"):
         campaign.run_plan(selected, local, root, resume=True)

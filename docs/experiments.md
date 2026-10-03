@@ -4,8 +4,19 @@ All commands below use `hma-repro`. The source of truth is
 [`experiments.json`](../src/hma/repro/assets/experiments.json). Defaults are a
 **new-run protocol**, not a replay of heterogeneous historical cohorts. Six HMA
 pairs use the manuscript's stated three-repeat protocol. NTA/ablations use one
-repeat. Every native task has 21,600 seconds; HMA exploration ends at 20,700,
-then reserves 900 seconds for final review (600-second model call).
+repeat; one repeat for each NTA configuration is an explicit fresh-run choice.
+Every native task has 21,600 seconds; HMA exploration ends at 20,700, then reserves
+900 seconds for final review. The paper specifies that reserve; this implementation
+limits the model call to 600 seconds and leaves time for shutdown/finalization.
+Appendices F.1/F.2 report 21,700-second terminal windows in the historical reverse
+order and cap-1/3 archives. Fresh runs enforce the nominal 21,600-second budget.
+
+Native and external 16-task runs share the Appendix C.1 resource defaults:
+one NVIDIA A10, 30 vCPUs, and 220 GiB RAM per task. Table 5 lists other papers'
+original baseline hardware; those entries do not configure our reruns. The
+64 GiB shared-memory and separate 2-CPU/16-GiB evaluator limits are implementation
+settings not specified in the manuscript. Actual hardware is recorded and frozen
+for resume; report runs with a changed GPU expectation as hardware variants.
 
 | Selection | Configurations | Tasks × repeats | New task-runs |
 | --- | --- | --- | ---: |
@@ -36,7 +47,9 @@ the same task description/public data and blind submission service.
 ML-Master and ScienceFlow receive 86,400 research seconds; MLEvolve receives
 43,200. ML-Master/MLEvolve have up to 900 postprocessing seconds, ScienceFlow
 zero. Total windows are 88,200 / 44,280 / 88,200 seconds respectively, including
-startup, finalization and slack. The accepted candidate is selected by the frozen
+startup, finalization and slack. Table 1 supplies the 24/12/24-hour research
+budgets; postprocessing and total windows are adapter implementation settings.
+The accepted candidate is selected by the frozen
 upstream export rule (`unique` or `last_final`); if missing, use the most recently
 modified eligible `runs/**/submission.csv` before the deadline. The fallback is
 score-independent and tries exactly one candidate. No accepted candidate is a

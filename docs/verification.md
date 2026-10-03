@@ -15,6 +15,11 @@ manuscript's unspecified corrected-key numbers.
   and response deduplication for four native log formats. A complete synthetic
   new-run fixture also verifies normalization, score regression retention and
   actual PDF/SVG case/trajectory rendering.
+- Hardware defaults were checked against manuscript Section 4.1 and Appendix
+  C.1: one NVIDIA A10, 30 vCPUs and 220 GiB. Offline fixtures reject H200/A10G,
+  missing devices and duplicate physical GPU selections; retain actual hardware
+  for explicit variants; and reject resume after the recorded hardware changes.
+  Driver/query failures stop preflight with a readable error.
 - Full matrix resolves to 27 configurations and 3,397 task-runs; all 75 task IDs
   resolve with 22 lite / 38 medium / 15 high tasks. Provider templates are blank.
 - All four public upstream Git revisions were successfully fetched. The upstream
@@ -25,7 +30,7 @@ manuscript's unspecified corrected-key numbers.
 - Dependency resolution checks cover the host/native and common ML/harness locks.
   This is not evidence that every large training package imports on a GPU host.
 
-Recorded on 2026-10-03: **50 offline tests passed**, Ruff lint and formatting
+Recorded on 2026-10-03: **61 offline tests passed**, Ruff lint and formatting
 passed, and `hma-1.0.0-py3-none-any.whl` built successfully. A separate clean
 Python 3.12 environment installed the locked dependencies and wheel, passed
 `uv pip check`, and ran the same test suite. The combined host/ML/harness locks
@@ -35,8 +40,10 @@ assets and no datasets, runs, credentials or local configuration.
 
 ## Not run here
 
-The implementation machine has no Docker CLI/daemon. No real model credentials
-were configured for this work. Consequently none of the following is marked as
+The implementation machine has no Docker CLI/daemon, and its `nvidia-smi` query
+fails because it cannot communicate with the NVIDIA driver. Live `doctor`
+correctly reports not ready. No real model credentials were configured for this
+work. Consequently none of the following is marked as
 passed: image builds, NVIDIA container execution, Kaggle task preparation, actual
 private grading, native provider authentication, external harness inference, or
 full-paper experiments. The fresh-clone Docker/data/API path still needs the

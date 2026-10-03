@@ -21,13 +21,18 @@ Docker host and must be able to reach container IPs; rootless Docker, Docker
 Desktop, remote daemons, and containerized controllers are not supported by the
 campaign CLI. The host must have `python3.12-venv` or equivalent available.
 
-The paper resource configuration is **one H200, 26 CPU cores, 200 GB RAM per
-concurrent task**. Set `gpus` to one device ID per worker; CPU/memory limits apply
-to each worker. ScienceFlow's own pinned environment uses CUDA 12.8 PyTorch, so
-the host NVIDIA driver must support CUDA 12.8. Smaller hardware is useful for
-smoke tests but changes the experimental setting. Budget multiple TB of disk for
-all data, build layers, workspaces, and accepted candidates; disk use is
-workload-dependent. Use an adequately sized local data/run volume.
+The paper's execution environment is **one NVIDIA A10, 30 vCPUs, and 220 GiB
+RAM**, shared by the alternating agents within a task (Section 4.1 and Appendix
+C.1). The default configuration uses these limits for native and external
+16-task runs. Set `gpus` to one device ID per worker; limits apply to each worker.
+The H200 in Table 5 belongs to MLEvolve's original published configuration, not
+the paper's HMA environment. See [environment provenance](docs/provenance.md)
+for the reported CPU, GPU memory, driver, and implementation-specific settings.
+
+ScienceFlow's pinned environment uses CUDA 12.8 PyTorch, so the host driver must
+support CUDA 12.8. Different hardware changes the experimental setting. Budget
+multiple TB of disk for data, build layers, workspaces, and accepted candidates;
+disk use is workload-dependent. Use an adequately sized local data/run volume.
 
 You need Kaggle access and acceptance of each selected competition's rules, plus
 API access to the exact model IDs in
@@ -59,11 +64,18 @@ runtime. No model is contacted by `plan`, `doctor`, or offline tests.
 
 ## 3. Local configuration and credentials
 
-Edit `configs/local.json` to set `data_root`, image tags, GPU IDs, CPU count,
-memory, and shared-memory limits. Each concurrent task additionally runs a private
-CPU evaluator (defaults: 2 CPUs, 16 GB RAM); size the host for this overhead and
-adjust `evaluator_cpus` / `evaluator_memory` for unusually large grading tasks. Relative paths are resolved from your current
-working directory. Run the documented commands from the checkout root.
+Edit `configs/local.json` to set `data_root`, image tags, and GPU IDs. The agent
+defaults are 30 vCPUs and `220g` (220 GiB). `expected_gpu_model` defaults to
+`"NVIDIA A10"`; `doctor` and campaign execution check every selected GPU's exact
+model name. For a hardware variant or smoke on another GPU, explicitly change
+this field to that model or `null` to disable the model check, and label the run
+as a hardware variant.
+
+The 64 GiB shared-memory limit and separate private evaluator defaults of 2 CPUs
+and 16 GiB are implementation choices, not values specified in the paper. Size
+the host for evaluator and controller overhead beyond the agent limits; adjust
+`evaluator_cpus` / `evaluator_memory` if needed. Relative paths resolve from your
+current working directory. Run the commands from the checkout root.
 
 **Every `api_key` and `base_url` in the committed template is intentionally
 empty.** Fill these in your ignored `configs/local.json`, or set the corresponding
@@ -124,10 +136,13 @@ hma-repro data verify --task leaf-classification
 hma-repro doctor
 ```
 
-`doctor` checks local prerequisites and whether provider settings are present;
-it does not test API connectivity. `run` additionally checks the selected images
-and all selected data manifests. Data preparation pins MLE-bench, downloads the
-Kaggle archive, invokes its preparer, checks upstream MD5s, and freezes SHA-256
+`doctor` checks prerequisites, selected GPU models, and whether provider settings
+are present; it does not test API connectivity. `run` additionally checks selected
+images and data manifests. Each campaign records GPU UUIDs, names, memory and
+drivers, plus host CPU model/count and RAM in `environment.json`; CPU model and
+driver version are recorded rather than required to match the historical host.
+Data preparation pins MLE-bench, downloads the Kaggle archive, invokes its
+preparer, checks upstream MD5s, and freezes SHA-256
 inventories for public/private/control trees. Some tasks use separate Python 3.11
 preparation environments managed by the pinned `uv` executable.
 
@@ -216,9 +231,9 @@ hma-repro report --run-root runs/paper --output outputs/rerun
 ```
 
 Resume requires the exact original selection and unchanged code, image IDs,
-resource settings, and data manifests. It schedules **only never-started cells**;
-complete, failed, or interrupted attempts are preserved. There is no silent
-retry, additional budget, or best-of-attempts selection. To investigate a failure,
+resource settings, recorded hardware, and data manifests. It schedules **only
+never-started cells**; complete, failed, or interrupted attempts are preserved.
+There is no silent retry, additional budget, or best-of-attempts selection. To investigate a failure,
 run the selected cell in a new root and retain the original status. Reports do
 not automatically merge independent campaigns. For a complete single report,
 use one frozen paper campaign, pausing and resuming the same selection.
@@ -263,5 +278,6 @@ historical exclusion lists into new experiments.
 
 The low-level `hma-run` and `hma-stage-evaluator` commands and
 `configs/hma-opus-gpt.json` remain available for manually staged experiments.
-Prefer `hma-repro` for the complete matrix. The root AGENTS.md is for repository
+Prefer `hma-repro` for the complete matrix and hardware preflight; low-level
+`hma-run` does not perform that hardware check. The root AGENTS.md is for repository
 maintenance and is not staged into benchmark workspaces.

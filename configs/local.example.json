@@ -6,8 +6,8 @@
   "gpus": [
     "0"
   ],
-  "cpus": 26,
-  "memory": "200000m",
+  "cpus": 30,
+  "memory": "220g",
   "shm_size": "65536m",
   "providers": {
     "openai": {
@@ -37,5 +37,6 @@
     "scienceflow": "hma-scienceflow:local"
   },
   "evaluator_cpus": 2,
-  "evaluator_memory": "16384m"
+  "evaluator_memory": "16384m",
+  "expected_gpu_model": "NVIDIA A10"
 }

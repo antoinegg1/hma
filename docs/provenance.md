@@ -41,6 +41,31 @@ imported folder; confirm the authors' redistribution terms when publishing it.
 The existing repository [LICENSE](../LICENSE) is preserved rather than assigning
 new third-party ownership or licensing terms.
 
+## Hardware and protocol provenance
+
+Section 4.1 and Appendix C.1 specify one NVIDIA A10 per task, with 30 vCPUs
+backed by an Intel Xeon Platinum 8358 at 2.60 GHz and 220 GiB RAM. The reported
+GPU memory is 23028 MiB; NVIDIA driver 570.148.08 reports CUDA 12.8 support.
+The two alternating agents share these resources. The fresh-run defaults are
+therefore one A10, 30 vCPUs and `220g` of agent memory for both native and external
+16-task workflows. Appendix D.2 supplies no separate hardware profile for the
+external 16-task comparison. Table 5 describes cited papers' original environments,
+including MLEvolve's H200, rather than a hardware override for this campaign.
+
+The manuscript does not specify `/dev/shm` or separate evaluator limits. This
+implementation uses 64 GiB shared memory and a 2-CPU/16-GiB private evaluator,
+whose overhead must fit outside the agent allocation. Its 600-second review call
+limit is also an implementation choice within the paper's 900-second reserve;
+the total native window remains 21,600 seconds. See the
+[experiment map](experiments.md) for fresh-run repeat and terminal-window choices.
+
+`hma-repro doctor` and campaign execution check selected GPUs against
+`expected_gpu_model` (default `NVIDIA A10`). Explicitly changing it or setting it
+to null permits a documented hardware variant. Campaign `environment.json`
+records GPU UUID/name/memory/driver and host CPU model/count/RAM; these records
+are part of resume identity. CPU model and driver version are not required to
+equal the historical values. Low-level `hma-run` omits this hardware preflight.
+
 ## Dependency policy
 
 - Host/native controller: Python 3.12, `requirements-repro.lock` (runtime, tests,
@@ -61,8 +86,9 @@ new third-party ownership or licensing terms.
   exact location required by its mechanism audit. Competition-specific DINOv3
   cold-start assets are unnecessary in the no-prior arm.
 - These portable environments differ from the authors' old private images.
-  Docker image IDs, source fingerprints, data-manifest hashes and local resource
-  settings are frozen per campaign. Mutable public OS image tags/apt repositories
+  Docker image IDs, source fingerprints, data-manifest hashes, local resource
+  settings and recorded hardware are frozen per campaign. Mutable public OS
+  image tags/apt repositories
   mean builds on different dates can produce different image IDs. Preserve/export
   the built images when transferring an identical environment between machines.
 

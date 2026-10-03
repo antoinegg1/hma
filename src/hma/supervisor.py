@@ -96,8 +96,8 @@ class Config(BaseModel):
     evaluator_data: list[Mount]
     active_time_limit_seconds: int = Field(default=21600, gt=0, strict=True)
     max_valid_submissions_per_session: int | None = Field(default=5, ge=1, strict=True)
-    cpus: float = Field(default=26, gt=0)
-    memory: str = "200000m"
+    cpus: float = Field(default=30, gt=0)
+    memory: str = "220g"
     shm_size: str = "65536m"
     gpu: str | None = "0"
     uid: int = Field(default_factory=os.getuid, gt=0)
