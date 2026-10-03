@@ -1,56 +1,157 @@
 # Instructions for maintaining and running this repository
 
-Read README.md, docs/swarm.md, docs/experiments.md, and docs/verification.md before
-changing the reproduction protocol. The complete single-host runbook is
-docs/local-run.md. This file applies to the source repository. It is **not an
-experiment prompt** and must not be staged into an evaluated agent's workspace.
-The user's task scope is fresh reruns; historical archives are unnecessary.
+This is the single entry point for an agent operating this repository. Before
+running or changing experiments, read the [README](README.md),
+[experiment map](docs/experiments.md), and [validation record](docs/verification.md).
+Follow the linked local/Swarm runbooks at each stage below; they contain the full
+commands. This file applies to the source repository. It is **not an experiment
+prompt** and must not be staged into an evaluated agent's workspace. The scope is
+fresh reruns; historical archives are unnecessary.
+
+## Required inputs and execution scope
+
+Use the user's existing instructions and configuration. Continue work already
+authorized; do not ask again merely because a run consumes API credits. A request
+limited to repository edits is not a request to publish images, deploy jobs, or
+run paid experiments. Follow the execution scope already authorized in the
+conversation. If a required input is missing, identify it and continue independent
+preparation; never invent values.
+
+| Input | Required for execution |
+| --- | --- |
+| Scope and paths | Full `paper` suite or an explicitly selected subset; fresh run/output roots. Smoke results never replace formal runs. |
+| Machines | A10 execution hosts with working NVIDIA Docker; 30 vCPU/220 GiB for each actor, plus evaluator/controller overhead (recommend 32 vCPU/256 GiB hosts). |
+| Model access | Keys and base URLs for the selected providers; full paper requires `openai`, `anthropic`, `glm`, `deepseek`, `kimi`. Exact models and API formats are in the README and [credential guide](docs/local-run.md#3-local-configuration-and-credentials). |
+| Data access | Kaggle credentials and accepted competition rules; shared `/srv/hma/data` for Swarm. |
+| Cluster access | Manager/node access, shared `/srv/hma` with cross-node locking, common non-root UID/GID and Docker socket GID. |
+| Image registry | A repository/tag to publish all five images and credentials allowing every node to pull them. |
+
+Edit the supplied `configs/local.json` directly; no template copy is needed.
+Keep committed API keys/base URLs blank. Environment overrides take precedence;
+`.env` is not loaded automatically. For Swarm, set `data_root` to `/srv/hma/data`
+before preparing data. Replace `ORG`, `DOCKER_GID`, `NODE_ID`, and other documented
+placeholders with the actual environment values.
 
 ## Execution runbook
 
-1. Work from the checkout root in Python 3.12. Install `requirements-repro.lock`,
-   then `pip install --no-deps -e .`. Edit the supplied `configs/local.json`
-   directly. Keep its committed API keys/base URLs blank; use the documented
-   provider environment variables or uncommitted local values for execution.
-2. Run `pytest -q`, `python -m hma.repro.cli doctor --offline`, and `python -m hma.repro.cli plan --suite paper`.
-   The default plan has 27 configurations, 3,397 cells, 75 tasks (22/38/15), and
-   21,767.6 maximum GPU hours. Investigate any unexplained difference.
-3. On a suitable non-root Docker/NVIDIA host, follow docs/local-run.md sections 3–6: supply
-   provider/Kaggle settings, build images, prepare/verify leaf-classification,
-   and run a real native smoke. Then check the other backends, HMA/NTA, and each
-   external harness in separate smoke roots. Do not claim an actual submission
-   passed unless an accepted candidate and finite grader result exist.
-4. For the recommended full campaign, follow docs/swarm.md: 75 labeled, Ready,
-   Active A10 nodes; one task per node; shared `/srv/hma` with cross-node `flock`;
-   consistent non-root UID/GID and Docker socket GID. Build once, publish through
-   `python -m hma.repro.swarm images`, and use its ignored `configs/swarm.local.json` with all
-   five digest-pinned image references. Prepare/verify all data on shared storage.
-5. Freeze assignments with `python -m hma.repro.swarm plan`, pre-pull its `images.txt` on every
-   node, then use `python -m hma.repro.swarm deploy`. The agent image is also the controller.
-   Configured credentials travel in a Docker secret, never service environment
-   variables or public manifests. Do not run another campaign on these GPUs.
-   The worker uses the local Docker socket to create actor/evaluator containers;
-   a default NVIDIA runtime or Swarm GPU reservation is unnecessary.
-   Deployment is detached: a returned service ID does not mean experiments finished.
-   Real smoke/full runs consume paid inference; preparation alone does not imply
-   the user requested those runs. Follow the authorization in the conversation.
-6. Inspect service status and preserve failures. `deploy --resume` requires a new
-   `--name`, optionally `--node-id` for one original node, and runs only
-   never-started cells. Never force service restarts or silently retry attempts.
-   SIGTERM supports cleanup; SIGKILL leftovers block resume until the original
-   owner's containers are explicitly cleaned up. Preserve its logs and errors.
-   Collect with `python -m hma.repro.swarm collect` into a separate report root only after every
-   planned cell has a complete/failed terminal result. Collection's shared locks
-   conflict with worker exclusive locks and support NFS. For diagnosis,
-   `collect --allow-partial` also admits pending/interrupted/cleanup_failed cells,
-   but every shard must be initialized with matching plan/environment/assignment
-   and no active worker lock. Pair it with `report --allow-partial`.
-   Regrade original shards individually if needed. Keep source shards
-   in place: the aggregate links to them. Successful collection may include failed
-   runs, which strict reporting still rejects as incomplete. Single-host campaigns
-   use `python -m hma.repro.cli run` as documented in docs/local-run.md.
-   Use `--allow-partial` for diagnosis only. A partial/smoke report must never be
-   described as full-paper results. `coverage.json` is the machine-readable record.
+1. **Install and check offline.** Work from the checkout root using the Python
+   3.12 environment from [installation](README.md#installation). Install
+   `requirements-repro.lock`, then `pip install --no-deps -e .`. Run:
+
+   ```bash
+   python -m pytest -q
+   python -m hma.repro.cli doctor --config configs/local.json --offline
+   python -m hma.repro.cli plan --suite paper --output outputs/paper-plan.json
+   ```
+
+   Expect 27 configurations, 3,397 cells, 75 tasks (22/38/15), and 21,767.6 maximum
+   GPU hours. A cell is one configuration/task/repeat, with its own workspace.
+   Investigate any unexplained difference. Offline checks do not call models.
+
+2. **Build and prepare one task.** On a non-root Docker/NVIDIA execution host,
+   follow [builds](docs/local-run.md#4-build-environments) and
+   [data preparation](docs/local-run.md#5-prepare-and-verify-data): build all five
+   images, prepare and verify `leaf-classification`, then run live `doctor`.
+   A non-GPU manager cannot pass the host GPU check; do this on an A10 host with
+   the same checkout/configuration. `doctor` checks configuration and hardware,
+   but does not test API authentication or connectivity.
+
+3. **Validate real execution.** Run the [smoke commands](docs/local-run.md#6-run-small-end-to-end-checks)
+   for all six native models, HMA, NTA, and all three external harnesses in
+   separate fresh roots. Check the declared model, nonempty parsed main-response
+   usage, and an accepted candidate with a finite private score. HMA/NTA must
+   actually hand off; inspect `turn-history.json` and fresh session/HOME evidence.
+   HMA needs review or a justified fallback; NTA must have no review. A short
+   smoke that produces no submission or handoff is inconclusive: increase its
+   budget in a new root. HMA smoke must exceed its 900-second review reserve.
+   Use items 1–6 of the [real-host checklist](docs/verification.md#real-host-acceptance-checklist)
+   for these local checks; complete its campaign and Swarm acceptance checks
+   during the later stages below.
+
+4. **Prepare Swarm and publish images.** Follow the [host setup](docs/swarm.md#host-and-storage-setup)
+   and [cluster creation](docs/swarm.md#create-and-label-the-swarm), initially
+   labeling only one A10 for the pilot below. Follow [images and data](docs/swarm.md#images-and-data)
+   to publish the five built images and generate `configs/swarm.local.json`.
+   Use that generated configuration for subsequent commands; its image references
+   must include digests. It captures local provider values at generation time;
+   later edits to `configs/local.json` do not update it. Do not rebuild between
+   planning and execution. Single-host execution instead follows
+   [the local campaign](docs/local-run.md#7-run-the-paper-matrix).
+
+5. **Run a one-node pilot before labeling all 75 nodes.** Follow the
+   [pilot commands](docs/swarm.md#optional-one-node-pilot) with `--expected-nodes 1`
+   and a separate `/srv/hma/runs/pilot` root. Pre-pull its `images.txt` and deploy
+   that root. This is a real six-hour goal run, not a short smoke. Validate
+   submission, grading and reporting, and exercise controlled shutdown/recovery
+   on a separate pilot campaign. Preserve interrupted attempts.
+
+6. **Run the full frozen matrix.** Once the pilot passes, label exactly 75 Ready,
+   Active A10 nodes; prepare and verify all 75 tasks. Follow
+   [plan and deploy](docs/swarm.md#plan-and-deploy) using a fresh
+   `/srv/hma/runs/paper` root. Freeze the task-to-node assignments, pre-pull the
+   manifest's `images.txt` on every execution node, then deploy. Each node runs
+   all configurations/repeats for its assigned task sequentially. The agent image
+   also runs the controller, which creates local actor/evaluator containers via
+   the Docker socket. Credentials travel in a Docker secret. Do not overlap other
+   campaigns on these GPUs. Deployment returns immediately; monitor until the
+   workers finish rather than treating a returned service ID as completion.
+
+7. **Monitor and recover without retrying evidence.** Use the service name from
+   deployment for `docker service ps --no-trunc SERVICE_NAME` and
+   `docker service logs SERVICE_NAME`. Inspect an individual shard, for example:
+
+   ```bash
+   python -m hma.repro.cli status --run-root /srv/hma/runs/paper/shards/mbl_09
+   ```
+
+   Do not pass the cluster root to `cli status`; it is not a campaign shard.
+   `deploy --resume` requires a new `--name`, optionally `--node-id` for one
+   original node, and runs only never-started cells. The old job must have stopped.
+   Never force service restarts or silently retry attempts. SIGTERM supports
+   cleanup; SIGKILL leftovers block resume until the original owner's containers
+   are explicitly cleaned up. Preserve logs and errors. Resume cannot repair a
+   failed/interrupted cell into complete coverage. Diagnose in a new root; a new
+   full cohort, if required, must remain separate and within the authorized scope.
+
+8. **Collect and report.** Follow [collection](docs/swarm.md#collect-and-analyze).
+   All workers must have stopped, all shards must be initialized, and every cell
+   must have a complete/failed terminal result. Optional regrading targets each
+   original shard before collection. Then run:
+
+   ```bash
+   python -m hma.repro.swarm collect --root /srv/hma/runs/paper --output /srv/hma/runs/paper-report
+   python -m hma.repro.cli report --run-root /srv/hma/runs/paper-report --output outputs/rerun
+   ```
+
+   Use a fresh collection output. Keep source shards at their original paths:
+   collection links to them. Collection holds shared locks that conflict with
+   active worker locks. For diagnosis, `collect --allow-partial` permits pending,
+   interrupted and cleanup-failed cells, but not uninitialized shards; pair it
+   with `report --allow-partial`. Successful collection may still contain failures.
+
+## Completion and handoff
+
+Only describe a campaign as a complete full-paper rerun when strict `report`
+succeeds without `--allow-partial` and `outputs/rerun/coverage.json` has:
+
+- `planned == 3397` and `full_paper_plan == true`;
+- `partial == false` and `issues == []`;
+- `complete == planned` for every entry in `by_experiment`.
+
+A selected/smoke plan is not full coverage, even if all its cells succeed. A valid
+run with no accepted candidate can be a counted miss; do not select replacements
+to improve the score. Check generated tables/figures against the
+[experiment map](docs/experiments.md#paper-output--computation--generated-files).
+Deliver the frozen plan, actual hardware/image/data provenance, original shard
+and aggregate paths, report directory, coverage, and remaining limitations.
+Raw native HOME/log directories may contain credentials; do not publish them
+uninspected or expose secret values in a handoff.
+
+Documentation and offline checks do not prove live execution: Docker/GPU/API and
+multi-node validation are still outstanding in the recorded environment. The
+paper's complete corrected-answer-key patch is unavailable, so this repository
+uses pinned public upstream keys. Report that data version; complete new-run
+coverage does not establish exact agreement with the paper's corrected-key scores.
 
 ## Protocol invariants
 

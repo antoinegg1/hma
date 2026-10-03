@@ -241,8 +241,10 @@ resource settings, recorded hardware, and data manifests. It schedules **only
 never-started cells**; complete, failed, or interrupted attempts are preserved.
 There is no silent retry, additional budget, or best-of-attempts selection. To investigate a failure,
 run the selected cell in a new root and retain the original status. Reports do
-not automatically merge independent campaigns. For a complete single report,
-use one frozen paper campaign, pausing and resuming the same selection.
+not automatically merge independent campaigns. Resume can finish pending cells,
+but cannot turn failed or interrupted cells into complete coverage. A complete
+report requires complete evidence from one frozen campaign; do not splice in
+replacement attempts from other roots.
 
 `grade` independently rescoring retained accepted CSVs is optional: the blind
 evaluator already stores private scores during execution. It writes an offline
