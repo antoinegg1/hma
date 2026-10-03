@@ -59,7 +59,7 @@ limit is also an implementation choice within the paper's 900-second reserve;
 the total native window remains 21,600 seconds. See the
 [experiment map](experiments.md) for fresh-run repeat and terminal-window choices.
 
-`hma-repro doctor` and campaign execution check selected GPUs against
+`python -m hma.repro.cli doctor` and campaign execution check selected GPUs against
 `expected_gpu_model` (default `NVIDIA A10`). Explicitly changing it or setting it
 to null permits a documented hardware variant. Campaign `environment.json`
 records GPU UUID/name/memory/driver and host CPU model/count/RAM; these records

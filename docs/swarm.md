@@ -68,12 +68,12 @@ per-task defaults: `gpus: ["0"]`, `expected_gpu_model: "NVIDIA A10"`,
 Build the agent, evaluator, and three harness images once:
 
 ```bash
-hma-repro build
-hma-swarm images --config configs/local.json --repository ghcr.io/ORG/hma \
+python -m hma.repro.cli build
+python -m hma.repro.swarm images --config configs/local.json --repository ghcr.io/ORG/hma \
   --tag repro-v1 --output configs/swarm.local.json
 ```
 
-Replace `ORG` and log into your registry before publishing. `hma-swarm images`
+Replace `ORG` and log into your registry before publishing. `python -m hma.repro.swarm images`
 pushes all five built images and writes their `NAME@sha256:DIGEST` references to
 `configs/swarm.local.json`. This ignored, mode-0600 file preserves the provider
 values from the input configuration. Use it for all subsequent commands.
@@ -84,8 +84,8 @@ Set `KAGGLE_API_TOKEN` or the manager user's `~/.kaggle/access_token`, accept
 competition rules, and prepare the shared dataset once:
 
 ```bash
-hma-repro data prepare --config configs/swarm.local.json --suite paper
-hma-repro data verify --config configs/swarm.local.json --suite paper
+python -m hma.repro.cli data prepare --config configs/swarm.local.json --suite paper
+python -m hma.repro.cli data verify --config configs/swarm.local.json --suite paper
 ```
 
 Provider keys and URLs stay blank in the committed example. Store local values
@@ -100,7 +100,7 @@ preparation host. See the [data and answer-key scope](local-run.md#5-prepare-and
 Run these commands on the manager, with the shared filesystem mounted:
 
 ```bash
-hma-swarm plan --config configs/swarm.local.json --root /srv/hma/runs/paper
+python -m hma.repro.swarm plan --config configs/swarm.local.json --root /srv/hma/runs/paper
 ```
 
 Planning freezes the task-to-node mapping, full scientific plan, source identity,
@@ -120,7 +120,7 @@ Back on the manager, launch with the numeric IDs configured consistently across
 the cluster:
 
 ```bash
-hma-swarm deploy --root /srv/hma/runs/paper --config configs/swarm.local.json \
+python -m hma.repro.swarm deploy --root /srv/hma/runs/paper --config configs/swarm.local.json \
   --user 1000:1000 --docker-gid DOCKER_GID
 ```
 
@@ -154,7 +154,7 @@ and partial outputs. After the original job has stopped on a node, continue only
 its never-started cells using an explicitly named new job:
 
 ```bash
-hma-swarm deploy --root /srv/hma/runs/paper --config configs/swarm.local.json \
+python -m hma.repro.swarm deploy --root /srv/hma/runs/paper --config configs/swarm.local.json \
   --user 1000:1000 --docker-gid DOCKER_GID \
   --resume --name hma-paper-resume-1 --node-id ORIGINAL_NODE_ID
 ```
@@ -176,15 +176,15 @@ Before labeling the remaining nodes, use one labeled A10 to exercise Swarm with
 a single task/repeat:
 
 ```bash
-hma-repro plan --experiment goal-gpt --task leaf-classification --repeat 0 \
+python -m hma.repro.cli plan --experiment goal-gpt --task leaf-classification --repeat 0 \
   --output outputs/swarm-pilot.json
-hma-swarm plan --config configs/swarm.local.json --root /srv/hma/runs/pilot \
+python -m hma.repro.swarm plan --config configs/swarm.local.json --root /srv/hma/runs/pilot \
   --plan-file outputs/swarm-pilot.json --expected-nodes 1
 ```
 
 Pre-pull the pilot's `images.txt` on that node and deploy using its pilot root.
 This retains the full six-hour goal budget and calls a real model. For shorter
-local checks, use `hma-repro smoke` in the [local runbook](local-run.md).
+local checks, use `python -m hma.repro.cli smoke` in the [local runbook](local-run.md).
 Create a separate full-paper root after completing the pilot and labeling all
 75 execution nodes.
 
@@ -201,24 +201,24 @@ Optional regrading runs on each original shard before collection, not on the
 aggregate root. For example, substitute a task ID from the manifest:
 
 ```bash
-hma-repro grade --run-root /srv/hma/runs/paper/shards/TASK_ID
+python -m hma.repro.cli grade --run-root /srv/hma/runs/paper/shards/TASK_ID
 ```
 
 The private evaluator already records scores, so regrading is unnecessary unless
 you want an independent check. Then collect and report:
 
 ```bash
-hma-swarm collect --root /srv/hma/runs/paper --output /srv/hma/runs/paper-report
-hma-repro report --run-root /srv/hma/runs/paper-report --output outputs/rerun
+python -m hma.repro.swarm collect --root /srv/hma/runs/paper --output /srv/hma/runs/paper-report
+python -m hma.repro.cli report --run-root /srv/hma/runs/paper-report --output outputs/rerun
 ```
 
 For diagnosis after the workers stop, partial collection also accepts pending,
 interrupted, and `cleanup_failed` cells in already initialized shards:
 
 ```bash
-hma-swarm collect --root /srv/hma/runs/paper \
+python -m hma.repro.swarm collect --root /srv/hma/runs/paper \
   --output /srv/hma/runs/paper-partial --allow-partial
-hma-repro report --run-root /srv/hma/runs/paper-partial \
+python -m hma.repro.cli report --run-root /srv/hma/runs/paper-partial \
   --output outputs/rerun-partial --allow-partial
 ```
 
@@ -233,7 +233,7 @@ output directory for each collection; existing outputs are never overwritten.
 
 Reporting generates new CSV tables and PDF/SVG/PNG figures. Successful collection
 does not imply a complete reproduction: strict reporting rejects failed runs or
-missing evidence. Use `--allow-partial` on `hma-repro report` only for diagnosis,
+missing evidence. Use `--allow-partial` on `python -m hma.repro.cli report` only for diagnosis,
 and never describe that report as full-paper results. See the
 [experiment map](experiments.md) for definitions and [verification record](verification.md)
 for completed checks and remaining real-runtime validation.

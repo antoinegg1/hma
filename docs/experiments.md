@@ -1,6 +1,6 @@
 # Experiment and analysis map
 
-All commands below use `hma-repro`. The source of truth is
+All commands below use `python -m hma.repro.cli`. The source of truth is
 [`experiments.json`](../src/hma/repro/assets/experiments.json). Defaults are a
 **new-run protocol**, not a replay of heterogeneous historical cohorts. Six HMA
 pairs use the manuscript's stated three-repeat protocol. NTA/ablations use one
@@ -70,7 +70,7 @@ cohort and silently pick the better result.
 
 ## Paper output → computation → generated files
 
-Run `hma-repro report --run-root runs/paper --output outputs/rerun` once the
+Run `python -m hma.repro.cli report --run-root runs/paper --output outputs/rerun` once the
 campaign is complete. Tables are CSV; figures are PDF/SVG/PNG. Raw normalized
 records and derived numerical tables are retained alongside the plots.
 

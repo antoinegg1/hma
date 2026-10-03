@@ -44,7 +44,7 @@ resolved without conflicts. A blank-credential launch failed before Docker or
 inference, as intended. The installed wheel contains the experiment and adapter
 assets and no datasets, runs, credentials or local configuration. Source checkout
 and installed wheel produce the same code identity, as required for manager,
-controller and hardware-helper agreement. Both CLI entry points were checked.
+controller and hardware-helper agreement. Both Python module entry points were checked; the campaign and Swarm tools do not install custom shell commands.
 
 ## Not run here
 
@@ -62,11 +62,11 @@ real-host checks below; offline fixtures are not substitutes for those checks.
 
 Follow README installation/configuration and docs/local-run.md, then, in order:
 
-1. `hma-repro build` succeeds for all five images. Check native CLI versions,
+1. `python -m hma.repro.cli build` succeeds for all five images. Check native CLI versions,
    `pip check`, and the recorded environment freeze. Confirm the ScienceFlow
    interpreter runs as the configured non-root user and its CUDA 12.8 stack can
    access the chosen GPU.
-2. `hma-repro data prepare --task leaf-classification` and `data verify` succeed;
+2. `python -m hma.repro.cli data prepare --task leaf-classification` and `data verify` succeed;
    `doctor` reports ready after all provider settings are configured.
 3. Run each documented native smoke in its own root. Each log must identify the
    declared backend/model and decode nonempty main-response usage. For grading

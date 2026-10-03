@@ -59,8 +59,8 @@ python -m pip install -r requirements-repro.lock
 python -m pip install --no-deps -e .
 cp configs/local.example.json configs/local.json
 python -m pytest -q
-hma-repro doctor --offline
-hma-repro plan --suite paper --output outputs/paper-plan.json
+python -m hma.repro.cli doctor --offline
+python -m hma.repro.cli plan --suite paper --output outputs/paper-plan.json
 ```
 
 The default plan contains **3,397 task-runs**, with a maximum of **21,767.6 GPU
@@ -106,7 +106,7 @@ treat raw run directories as private and inspect before sharing them.
 ## 4. Build environments
 
 ```bash
-hma-repro build
+python -m hma.repro.cli build
 ```
 
 This builds `agent`, `evaluator`, `ml_master_v2`, `mlevolve_no_prior`, and
@@ -115,13 +115,13 @@ before building external harness images. No private image registry is required.
 For only the native workflows:
 
 ```bash
-hma-repro build --image agent --image evaluator
+python -m hma.repro.cli build --image agent --image evaluator
 ```
 
 Then build selected external layers when needed:
 
 ```bash
-hma-repro build --image ml_master_v2 --image mlevolve_no_prior --image scienceflow
+python -m hma.repro.cli build --image ml_master_v2 --image mlevolve_no_prior --image scienceflow
 ```
 
 Images record resolved Python dependencies. ScienceFlow retains its upstream
@@ -137,9 +137,9 @@ Configure Kaggle with `KAGGLE_API_TOKEN` or a user-only
 preparation. No Kaggle credential is copied into actor containers.
 
 ```bash
-hma-repro data prepare --task leaf-classification
-hma-repro data verify --task leaf-classification
-hma-repro doctor
+python -m hma.repro.cli data prepare --task leaf-classification
+python -m hma.repro.cli data verify --task leaf-classification
+python -m hma.repro.cli doctor
 ```
 
 `doctor` checks prerequisites, selected GPU models, and whether provider settings
@@ -155,10 +155,10 @@ preparation environments managed by the pinned `uv` executable.
 Prepare the complete suite, or just the external comparison:
 
 ```bash
-hma-repro data prepare --suite paper
-hma-repro data verify --suite paper
+python -m hma.repro.cli data prepare --suite paper
+python -m hma.repro.cli data verify --suite paper
 # Alternative subset:
-hma-repro data prepare --suite harness16
+python -m hma.repro.cli data prepare --suite harness16
 ```
 
 Re-running preparation verifies already frozen tasks. A checksum mismatch is an
@@ -177,8 +177,8 @@ agreement with the paper's corrected-key numbers is not claimed.
 These commands call real models after you configure credentials:
 
 ```bash
-hma-repro smoke --experiment goal-gpt --task leaf-classification --seconds 300 --run-root runs/smoke-gpt
-hma-repro report --run-root runs/smoke-gpt --output outputs/smoke-gpt --allow-partial
+python -m hma.repro.cli smoke --experiment goal-gpt --task leaf-classification --seconds 300 --run-root runs/smoke-gpt
+python -m hma.repro.cli report --run-root runs/smoke-gpt --output outputs/smoke-gpt --allow-partial
 ```
 
 A short run may produce no submission. To exercise submission and actual grading,
@@ -190,11 +190,11 @@ Repeat with `goal-opus`, `goal-glm`, `goal-ds4`, `goal-ds41`, and `goal-kimi`
 for every native model/backend. Check alternation separately:
 
 ```bash
-hma-repro smoke --experiment hma-gpt-kimi --task leaf-classification --seconds 1800 --run-root runs/smoke-hma
-hma-repro smoke --experiment nta-gpt-kimi --task leaf-classification --seconds 600 --run-root runs/smoke-nta
-hma-repro smoke --experiment ml_master_v2-ds4 --task leaf-classification --seconds 600 --run-root runs/smoke-master
-hma-repro smoke --experiment mlevolve_no_prior-ds4 --task leaf-classification --seconds 600 --run-root runs/smoke-evolve
-hma-repro smoke --experiment scienceflow-ds4 --task leaf-classification --seconds 600 --run-root runs/smoke-science
+python -m hma.repro.cli smoke --experiment hma-gpt-kimi --task leaf-classification --seconds 1800 --run-root runs/smoke-hma
+python -m hma.repro.cli smoke --experiment nta-gpt-kimi --task leaf-classification --seconds 600 --run-root runs/smoke-nta
+python -m hma.repro.cli smoke --experiment ml_master_v2-ds4 --task leaf-classification --seconds 600 --run-root runs/smoke-master
+python -m hma.repro.cli smoke --experiment mlevolve_no_prior-ds4 --task leaf-classification --seconds 600 --run-root runs/smoke-evolve
+python -m hma.repro.cli smoke --experiment scienceflow-ds4 --task leaf-classification --seconds 600 --run-root runs/smoke-science
 ```
 
 HMA smoke must leave more than its 900-second review reserve. Harness smoke uses
@@ -204,7 +204,7 @@ not a scientific result. All smoke plans have distinct fingerprints and labels.
 ## 7. Run the paper matrix
 
 ```bash
-hma-repro run --suite paper --run-root runs/paper
+python -m hma.repro.cli run --suite paper --run-root runs/paper
 ```
 
 The scheduler assigns one task at a time per configured GPU. The full matrix
@@ -212,9 +212,9 @@ includes all experimental arms and reference runs needed by the report. Selectio
 commands are available for development or smaller campaigns:
 
 ```bash
-hma-repro plan --suite hma
-hma-repro run --suite goal --run-root runs/goal-only
-hma-repro run --experiment hma-gpt-opus --task mbh_07 --repeat 0 --run-root runs/ingv
+python -m hma.repro.cli plan --suite hma
+python -m hma.repro.cli run --suite goal --run-root runs/goal-only
+python -m hma.repro.cli run --experiment hma-gpt-opus --task mbh_07 --repeat 0 --run-root runs/ingv
 ```
 
 Selectors accept task IDs, slugs, or catalog names; `--experiment`, `--task`, and
@@ -229,11 +229,11 @@ model, prompt, cap, timing, data, or environment creates a new protocol.
 ## 8. Status, interruption, grading, and reports
 
 ```bash
-hma-repro status --run-root runs/paper
-hma-repro run --suite paper --run-root runs/paper --resume
-hma-repro export --run-root runs/paper --output outputs/events
-hma-repro grade --run-root runs/paper
-hma-repro report --run-root runs/paper --output outputs/rerun
+python -m hma.repro.cli status --run-root runs/paper
+python -m hma.repro.cli run --suite paper --run-root runs/paper --resume
+python -m hma.repro.cli export --run-root runs/paper --output outputs/events
+python -m hma.repro.cli grade --run-root runs/paper
+python -m hma.repro.cli report --run-root runs/paper --output outputs/rerun
 ```
 
 Resume requires the exact original selection and unchanged code, image IDs,
@@ -284,6 +284,6 @@ historical exclusion lists into new experiments.
 
 The low-level `hma-run` and `hma-stage-evaluator` commands and
 `configs/hma-opus-gpt.json` remain available for manually staged experiments.
-Prefer `hma-repro` for the complete matrix and hardware preflight; low-level
+Prefer `python -m hma.repro.cli` for the complete matrix and hardware preflight; low-level
 `hma-run` does not perform that hardware check. The root AGENTS.md is for repository
 maintenance and is not staged into benchmark workspaces.

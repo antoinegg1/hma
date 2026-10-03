@@ -133,7 +133,7 @@ def test_service_is_host_local_nonroot_secret_based_and_never_automatically_rest
         ("--mode", "global-job"),
         ("--network", "host"),
         ("--restart-condition", "none"),
-        ("--entrypoint", "hma-swarm"),
+        ("--entrypoint", "python3"),
         ("--group", "999"),
         ("--stop-grace-period", "120s"),
     ]:
@@ -142,6 +142,8 @@ def test_service_is_host_local_nonroot_secret_based_and_never_automatically_rest
     assert "type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock" in command
     assert "source=providers-fixture,target=hma-local.json,uid=1000,gid=1000,mode=0400" in command
     assert "--gpus" not in command
+    image_index = command.index(manifest["settings"]["agent_image"])
+    assert command[image_index + 1 : image_index + 4] == ["-m", "hma.repro.swarm", "worker"]
     assert not any("API_KEY" in arg for arg in command)
     with pytest.raises(ValueError, match="non-root"):
         swarm.service_command(manifest, "hma-fixture", "providers-fixture", "0:0", 999)

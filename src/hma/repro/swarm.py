@@ -90,7 +90,9 @@ def create_manifest(
     if len(local.gpus) != 1:
         raise ValueError("Swarm requires exactly one selected GPU per node")
     if any(not IMAGE_DIGEST.fullmatch(ref) for ref in image_refs(local)):
-        raise ValueError("pin every image to a registry @sha256 digest using hma-swarm images")
+        raise ValueError(
+            "pin every image to a registry @sha256 digest using python -m hma.repro.swarm images"
+        )
     required = {
         e.harness
         for e in Suite.model_validate(selected["suite"]).experiments
@@ -241,7 +243,7 @@ def service_command(
         "--secret",
         f"source={secret},target=hma-local.json,uid={uid},gid={gid},mode=0400",
         "--entrypoint",
-        "hma-swarm",
+        "python3",
     ]
     if node_id:
         if node_id not in {a["node_id"] for a in manifest["assignments"]}:
@@ -249,6 +251,8 @@ def service_command(
         command += ["--constraint", f"node.id=={node_id}"]
     command += [
         manifest["settings"]["agent_image"],
+        "-m",
+        "hma.repro.swarm",
         "worker",
         "--root",
         manifest["root"],

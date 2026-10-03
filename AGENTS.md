@@ -11,7 +11,7 @@ The user's task scope is fresh reruns; historical archives are unnecessary.
 1. Work from the checkout root in Python 3.12. Install `requirements-repro.lock`,
    then `pip install --no-deps -e .`. Copy the example local JSON only if the local
    file does not exist. Keep committed API keys/base URLs blank.
-2. Run `pytest -q`, `hma-repro doctor --offline`, and `hma-repro plan --suite paper`.
+2. Run `pytest -q`, `python -m hma.repro.cli doctor --offline`, and `python -m hma.repro.cli plan --suite paper`.
    The default plan has 27 configurations, 3,397 cells, 75 tasks (22/38/15), and
    21,767.6 maximum GPU hours. Investigate any unexplained difference.
 3. On a suitable non-root Docker/NVIDIA host, follow docs/local-run.md sections 3–6: supply
@@ -22,10 +22,10 @@ The user's task scope is fresh reruns; historical archives are unnecessary.
 4. For the recommended full campaign, follow docs/swarm.md: 75 labeled, Ready,
    Active A10 nodes; one task per node; shared `/srv/hma` with cross-node `flock`;
    consistent non-root UID/GID and Docker socket GID. Build once, publish through
-   `hma-swarm images`, and use its ignored `configs/swarm.local.json` with all
+   `python -m hma.repro.swarm images`, and use its ignored `configs/swarm.local.json` with all
    five digest-pinned image references. Prepare/verify all data on shared storage.
-5. Freeze assignments with `hma-swarm plan`, pre-pull its `images.txt` on every
-   node, then use `hma-swarm deploy`. The agent image is also the controller.
+5. Freeze assignments with `python -m hma.repro.swarm plan`, pre-pull its `images.txt` on every
+   node, then use `python -m hma.repro.swarm deploy`. The agent image is also the controller.
    Configured credentials travel in a Docker secret, never service environment
    variables or public manifests. Do not run another campaign on these GPUs.
    The worker uses the local Docker socket to create actor/evaluator containers;
@@ -38,7 +38,7 @@ The user's task scope is fresh reruns; historical archives are unnecessary.
    never-started cells. Never force service restarts or silently retry attempts.
    SIGTERM supports cleanup; SIGKILL leftovers block resume until the original
    owner's containers are explicitly cleaned up. Preserve its logs and errors.
-   Collect with `hma-swarm collect` into a separate report root only after every
+   Collect with `python -m hma.repro.swarm collect` into a separate report root only after every
    planned cell has a complete/failed terminal result. Collection's shared locks
    conflict with worker exclusive locks and support NFS. For diagnosis,
    `collect --allow-partial` also admits pending/interrupted/cleanup_failed cells,
@@ -47,7 +47,7 @@ The user's task scope is fresh reruns; historical archives are unnecessary.
    Regrade original shards individually if needed. Keep source shards
    in place: the aggregate links to them. Successful collection may include failed
    runs, which strict reporting still rejects as incomplete. Single-host campaigns
-   use `hma-repro run` as documented in docs/local-run.md.
+   use `python -m hma.repro.cli run` as documented in docs/local-run.md.
    Use `--allow-partial` for diagnosis only. A partial/smoke report must never be
    described as full-paper results. `coverage.json` is the machine-readable record.
 
@@ -58,7 +58,7 @@ The user's task scope is fresh reruns; historical archives are unnecessary.
   and external 16-task runs. Table 5's H200/other hardware describes cited
   baselines' original papers, not this execution environment. Keep
   `expected_gpu_model="NVIDIA A10"` for the paper setting; an explicit different
-  model or null is a hardware variant. Use `hma-repro` for hardware preflight;
+  model or null is a hardware variant. Use `python -m hma.repro.cli` for hardware preflight;
   low-level `hma-run` has no such check. The 64 GiB shared-memory limit and
   separate 2-CPU/16-GiB evaluator are implementation choices absent from the
   manuscript. Provision their overhead separately.
@@ -123,8 +123,8 @@ tests. Required offline checks after relevant code changes:
 
 ```bash
 python -m pytest -q
-hma-repro doctor --config configs/local.example.json --offline
-hma-repro plan --suite paper
+python -m hma.repro.cli doctor --config configs/local.example.json --offline
+python -m hma.repro.cli plan --suite paper
 ```
 
 For lint/build development tools, install `ruff` and `build` separately, then use:

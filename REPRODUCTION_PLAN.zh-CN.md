@@ -176,16 +176,16 @@ README按执行顺序提供：
 拟议命令接口：
 
 ```sh
-hma-repro doctor --config configs/local.yaml
-hma-repro plan --suite paper --config configs/local.yaml
-hma-repro data prepare --task leaf-classification --config configs/local.yaml
-hma-repro smoke --task leaf-classification --config configs/local.yaml
-hma-repro data prepare --suite paper --config configs/local.yaml
-hma-repro run --suite paper --config configs/local.yaml --run-root runs/paper
-hma-repro status --run-root runs/paper
-hma-repro run --suite paper --config configs/local.yaml --run-root runs/paper --resume
-hma-repro grade --run-root runs/paper
-hma-repro report --run-root runs/paper --output outputs/rerun
+python -m hma.repro.cli doctor --config configs/local.json
+python -m hma.repro.cli plan --suite paper --config configs/local.json
+python -m hma.repro.cli data prepare --task leaf-classification --config configs/local.json
+python -m hma.repro.cli smoke --task leaf-classification --config configs/local.json
+python -m hma.repro.cli data prepare --suite paper --config configs/local.json
+python -m hma.repro.cli run --suite paper --config configs/local.json --run-root runs/paper
+python -m hma.repro.cli status --run-root runs/paper
+python -m hma.repro.cli run --suite paper --config configs/local.json --run-root runs/paper --resume
+python -m hma.repro.cli grade --run-root runs/paper
+python -m hma.repro.cli report --run-root runs/paper --output outputs/rerun
 ```
 
 所有模型、任务、重复、预算和路径由配置管理。安装、镜像构建、凭据配置及按组运行的实际命令在实现后加入README。以上保留原拟议接口，实际实现使用 configs/local.json；请执行 README 中已更新的命令。
