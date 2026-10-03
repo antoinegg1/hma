@@ -282,8 +282,8 @@ historical exclusion lists into new experiments.
 | `baselines/harness16/` | Frozen external adapters and source file locks |
 | `tests/` | Offline protocol, statistics and integration fixtures |
 
-The low-level `hma-run` and `hma-stage-evaluator` commands and
-`configs/hma-opus-gpt.json` remain available for manually staged experiments.
-Prefer `python -m hma.repro.cli` for the complete matrix and hardware preflight; low-level
-`hma-run` does not perform that hardware check. The root AGENTS.md is for repository
+Use `configs/local.json` and `python -m hma.repro.cli` for experiment configuration,
+the complete matrix and hardware preflight. The low-level `hma-run` and
+`hma-stage-evaluator` commands are retained for controller development; `hma-run`
+does not perform that hardware check. The root AGENTS.md is for repository
 maintenance and is not staged into benchmark workspaces.

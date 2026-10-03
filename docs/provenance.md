@@ -77,9 +77,8 @@ local Docker helper. See [Swarm execution](swarm.md).
 ## Dependency policy
 
 - Host/native controller: Python 3.12, `requirements-repro.lock` (runtime, tests,
-  plotting and preparation tooling). Earlier `requirements-core.lock` and
-  `requirements-runtime.lock` remain source-validation references, but the new
-  README uses the complete reproduction lock.
+  plotting and preparation tooling). `requirements-runtime.lock` preserves the
+  native runtime constraints used when regenerating the reproduction and ML locks.
 - Native image: CUDA 12.6.3 runtime/Ubuntu 24.04, Node 22.23.2 (download checksum),
   Codex 0.153.0, Claude Code 2.1.259, Kimi Code 0.41.0; DeepSeek SDK/runtime
   0.1.5rc1 in the Python lock. Common ML stack is `requirements-ml.lock`.

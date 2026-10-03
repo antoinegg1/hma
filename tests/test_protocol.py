@@ -231,7 +231,7 @@ def test_actual_run_loop_handles_cap_natural_return_and_review(config, monkeypat
 
 
 def test_staging_has_no_embedded_data_and_refuses_overwrite(tmp_path):
-    template = Path(__file__).parents[1] / "configs/hma-opus-gpt.json"
+    template = Path(__file__).parent / "fixtures/legacy-launch.json"
     launch = json.loads(template.read_text())
     home = tmp_path / "evaluator"
     launch["evaluator_seed_home"] = str(home)
