@@ -1,7 +1,8 @@
 # Instructions for maintaining and running this repository
 
-Read README.md, docs/experiments.md, and docs/verification.md before changing the
-reproduction protocol. This file applies to the source repository. It is **not an
+Read README.md, docs/swarm.md, docs/experiments.md, and docs/verification.md before
+changing the reproduction protocol. The complete single-host runbook is
+docs/local-run.md. This file applies to the source repository. It is **not an
 experiment prompt** and must not be staged into an evaluated agent's workspace.
 The user's task scope is fresh reruns; historical archives are unnecessary.
 
@@ -13,16 +14,40 @@ The user's task scope is fresh reruns; historical archives are unnecessary.
 2. Run `pytest -q`, `hma-repro doctor --offline`, and `hma-repro plan --suite paper`.
    The default plan has 27 configurations, 3,397 cells, 75 tasks (22/38/15), and
    21,767.6 maximum GPU hours. Investigate any unexplained difference.
-3. On a suitable non-root Docker/NVIDIA host, follow README sections 3–6: supply
+3. On a suitable non-root Docker/NVIDIA host, follow docs/local-run.md sections 3–6: supply
    provider/Kaggle settings, build images, prepare/verify leaf-classification,
    and run a real native smoke. Then check the other backends, HMA/NTA, and each
    external harness in separate smoke roots. Do not claim an actual submission
    passed unless an accepted candidate and finite grader result exist.
-4. Prepare/verify all required tasks, freeze the `paper` plan, and use
-   `hma-repro run --suite paper --run-root runs/paper` for the full campaign.
+4. For the recommended full campaign, follow docs/swarm.md: 75 labeled, Ready,
+   Active A10 nodes; one task per node; shared `/srv/hma` with cross-node `flock`;
+   consistent non-root UID/GID and Docker socket GID. Build once, publish through
+   `hma-swarm images`, and use its ignored `configs/swarm.local.json` with all
+   five digest-pinned image references. Prepare/verify all data on shared storage.
+5. Freeze assignments with `hma-swarm plan`, pre-pull its `images.txt` on every
+   node, then use `hma-swarm deploy`. The agent image is also the controller.
+   Configured credentials travel in a Docker secret, never service environment
+   variables or public manifests. Do not run another campaign on these GPUs.
+   The worker uses the local Docker socket to create actor/evaluator containers;
+   a default NVIDIA runtime or Swarm GPU reservation is unnecessary.
+   Deployment is detached: a returned service ID does not mean experiments finished.
    Real smoke/full runs consume paid inference; preparation alone does not imply
    the user requested those runs. Follow the authorization in the conversation.
-5. Inspect `status`, preserve failures, optionally `grade`, and run `report`.
+6. Inspect service status and preserve failures. `deploy --resume` requires a new
+   `--name`, optionally `--node-id` for one original node, and runs only
+   never-started cells. Never force service restarts or silently retry attempts.
+   SIGTERM supports cleanup; SIGKILL leftovers block resume until the original
+   owner's containers are explicitly cleaned up. Preserve its logs and errors.
+   Collect with `hma-swarm collect` into a separate report root only after every
+   planned cell has a complete/failed terminal result. Collection's shared locks
+   conflict with worker exclusive locks and support NFS. For diagnosis,
+   `collect --allow-partial` also admits pending/interrupted/cleanup_failed cells,
+   but every shard must be initialized with matching plan/environment/assignment
+   and no active worker lock. Pair it with `report --allow-partial`.
+   Regrade original shards individually if needed. Keep source shards
+   in place: the aggregate links to them. Successful collection may include failed
+   runs, which strict reporting still rejects as incomplete. Single-host campaigns
+   use `hma-repro run` as documented in docs/local-run.md.
    Use `--allow-partial` for diagnosis only. A partial/smoke report must never be
    described as full-paper results. `coverage.json` is the machine-readable record.
 

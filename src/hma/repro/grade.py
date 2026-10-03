@@ -11,8 +11,10 @@ from hma.benchmark.integrity import atomic_json, sha256_file
 
 
 def grade(root: Path) -> dict:
-    client = docker.from_env()
     environment = json.loads((root / "environment.json").read_text())
+    if environment.get("kind") == "swarm-collection":
+        raise ValueError("regrade original Swarm shards individually on a prepared Docker host")
+    client = docker.from_env()
     from hma.benchmark.prepare_data import _verify_frozen_task
     from hma.repro.config import TASKS
 

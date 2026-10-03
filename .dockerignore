@@ -6,6 +6,7 @@ __pycache__
 .cache
 .env
 configs/local.json
+configs/*.local.json
 runs
 data
 outputs

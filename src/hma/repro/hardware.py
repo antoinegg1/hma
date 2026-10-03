@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import csv
+import json
 import os
 import subprocess
 from pathlib import Path
 
+import requests
+
+import docker
 from hma.repro.config import Local
 
 
@@ -76,3 +80,98 @@ def inspect_hardware(local: Local) -> dict:
         "logical_cpus": os.cpu_count(),
         "memory_bytes": memory_kib * 1024,
     }
+
+
+def inspect_docker_hardware(local: Local, client) -> dict:
+    """Inspect a Swarm node through its daemon without mounting GPUs in the controller."""
+    from hma.repro.campaign import code_identity
+
+    if os.getuid() == 0:
+        raise ValueError("run the hardware helper as a non-root Docker user")
+    settings = {
+        "providers": {},
+        "gpus": local.gpus,
+        "expected_gpu_model": local.expected_gpu_model,
+    }
+    probe = """import json, sys
+from hma.repro.config import Local
+from hma.repro.campaign import code_identity
+from hma.repro.hardware import inspect_hardware
+try:
+    hardware = inspect_hardware(Local.model_validate_json(sys.argv[1]))
+    print(json.dumps({"hardware": hardware, "code": code_identity()}), flush=True)
+except Exception as error:
+    print(json.dumps({"error": str(error)}), flush=True)
+    raise SystemExit(1)
+"""
+    container = None
+    try:
+        container = client.containers.create(
+            local.agent_image,
+            entrypoint=[],
+            command=["python3", "-c", probe, json.dumps(settings)],
+            user=f"{os.getuid()}:{os.getgid()}",
+            device_requests=[docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])],
+            environment={"NVIDIA_DRIVER_CAPABILITIES": "utility"},
+            network_disabled=True,
+            cap_drop=["ALL"],
+            security_opt=["no-new-privileges:true"],
+            read_only=True,
+            pids_limit=64,
+            labels={"io.flowbench.role": "hardware-preflight"},
+        )
+        container.start()
+        status = container.wait(timeout=30)
+        payload = json.loads(container.logs(stdout=True, stderr=False))
+        if not isinstance(status, dict):
+            raise ValueError("hardware helper returned an invalid exit status")
+        if not isinstance(payload, dict):
+            raise ValueError("hardware helper returned a non-object payload")
+        if status.get("StatusCode") != 0:
+            raise ValueError(payload.get("error") or "hardware helper exited unsuccessfully")
+        if payload.get("code") != code_identity():
+            raise ValueError("hardware helper and controller use different reproduction code")
+        hardware = payload.get("hardware")
+        required = {"gpus", "cpu_model", "logical_cpus", "memory_bytes"}
+        if not isinstance(hardware, dict) or set(hardware) != required:
+            raise ValueError("hardware helper returned an invalid inventory")
+        if (
+            not isinstance(hardware["gpus"], list)
+            or not hardware["gpus"]
+            or not isinstance(hardware["cpu_model"], (str, type(None)))
+            or type(hardware["logical_cpus"]) is not int
+            or hardware["logical_cpus"] <= 0
+            or type(hardware["memory_bytes"]) is not int
+            or hardware["memory_bytes"] <= 0
+        ):
+            raise ValueError("hardware helper returned an invalid inventory")
+        for device in hardware["gpus"]:
+            if (
+                not isinstance(device, dict)
+                or set(device) != {"index", "uuid", "name", "memory_mib", "driver"}
+                or any(
+                    not isinstance(device[key], str) or not device[key]
+                    for key in ("index", "uuid", "name", "driver")
+                )
+                or type(device["memory_mib"]) is not int
+                or device["memory_mib"] <= 0
+            ):
+                raise ValueError("hardware helper returned an invalid GPU inventory")
+        hardware["gpus"] = check_gpus(hardware["gpus"], local)
+        return hardware
+    except (
+        docker.errors.DockerException,
+        requests.RequestException,
+        ValueError,
+        TypeError,
+        KeyError,
+    ) as error:
+        raise ValueError(f"cannot inspect node hardware through Docker: {error}") from error
+    finally:
+        if container is not None:
+            try:
+                container.remove(force=True)
+            except (docker.errors.DockerException, requests.RequestException) as error:
+                raise ValueError(
+                    "hardware helper cleanup failed; inspect the local daemon"
+                ) from error

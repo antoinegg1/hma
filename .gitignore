@@ -7,6 +7,7 @@ __pycache__/
 build/
 dist/
 configs/local.json
+configs/*.local.json
 .env
 runs/
 data/

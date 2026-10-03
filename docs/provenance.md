@@ -66,6 +66,14 @@ records GPU UUID/name/memory/driver and host CPU model/count/RAM; these records
 are part of resume identity. CPU model and driver version are not required to
 equal the historical values. Low-level `hma-run` omits this hardware preflight.
 
+The optional Swarm controller runs with host networking and the node's local
+Docker socket, mounting the shared filesystem at its unchanged absolute path.
+Actor/evaluator execution still uses the original local containers and isolation.
+This is an added deployment implementation, not a claim about the paper's cluster
+or scheduler. Every image is pinned to a registry digest. Node assignments and
+source identity are frozen before deployment; GPU discovery uses a short-lived
+local Docker helper. See [Swarm execution](swarm.md).
+
 ## Dependency policy
 
 - Host/native controller: Python 3.12, `requirements-repro.lock` (runtime, tests,

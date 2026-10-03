@@ -18,6 +18,12 @@ original baseline hardware; those entries do not configure our reruns. The
 settings not specified in the manuscript. Actual hardware is recorded and frozen
 for resume; report runs with a changed GPU expectation as hardware variants.
 
+The [75-node Swarm workflow](swarm.md) partitions this same matrix by benchmark
+task. Each node executes all selected configurations/repeats for its assigned
+task sequentially. The frozen cluster identity binds every shard to one planned
+cohort; collection restores the complete plan and preserves per-node environments,
+failures and denominators. It does not merge independently sampled campaigns.
+
 | Selection | Configurations | Tasks × repeats | New task-runs |
 | --- | --- | --- | ---: |
 | `--suite goal` | Opus, GPT, GLM, DS4, DS4.1, Kimi | 6 × 75 × 3 | 1,350 |

@@ -20,6 +20,12 @@ manuscript's unspecified corrected-key numbers.
   missing devices and duplicate physical GPU selections; retain actual hardware
   for explicit variants; and reject resume after the recorded hardware changes.
   Driver/query failures stop preflight with a readable error.
+- Swarm fixtures verify the complete 75-node partition, immutable assignments,
+  digest-pinned images, credentials delivered via secret stdin, non-root host
+  networking, node locks, bounded GPU-helper cleanup, synchronous interruption,
+  and no retries of started cells. Collection checks each shard's plan, source,
+  hardware, data and image identities, and uses shared file locks compatible
+  with NFS. Explicit partial collection preserves missing/failed denominators.
 - Full matrix resolves to 27 configurations and 3,397 task-runs; all 75 task IDs
   resolve with 22 lite / 38 medium / 15 high tasks. Provider templates are blank.
 - All four public upstream Git revisions were successfully fetched. The upstream
@@ -30,13 +36,15 @@ manuscript's unspecified corrected-key numbers.
 - Dependency resolution checks cover the host/native and common ML/harness locks.
   This is not evidence that every large training package imports on a GPU host.
 
-Recorded on 2026-10-03: **61 offline tests passed**, Ruff lint and formatting
+Recorded on 2026-10-03: **124 offline tests passed**, Ruff lint and formatting
 passed, and `hma-1.0.0-py3-none-any.whl` built successfully. A separate clean
 Python 3.12 environment installed the locked dependencies and wheel, passed
 `uv pip check`, and ran the same test suite. The combined host/ML/harness locks
 resolved without conflicts. A blank-credential launch failed before Docker or
 inference, as intended. The installed wheel contains the experiment and adapter
-assets and no datasets, runs, credentials or local configuration.
+assets and no datasets, runs, credentials or local configuration. Source checkout
+and installed wheel produce the same code identity, as required for manager,
+controller and hardware-helper agreement. Both CLI entry points were checked.
 
 ## Not run here
 
@@ -45,13 +53,14 @@ fails because it cannot communicate with the NVIDIA driver. Live `doctor`
 correctly reports not ready. No real model credentials were configured for this
 work. Consequently none of the following is marked as
 passed: image builds, NVIDIA container execution, Kaggle task preparation, actual
-private grading, native provider authentication, external harness inference, or
-full-paper experiments. The fresh-clone Docker/data/API path still needs the
+private grading, native provider authentication, external harness inference,
+Swarm jobs, cross-node shared-storage behavior, or full-paper experiments.
+The fresh-clone Docker/data/API path still needs the
 real-host checks below; offline fixtures are not substitutes for those checks.
 
 ## Real-host acceptance checklist
 
-Follow README installation/configuration and then, in order:
+Follow README installation/configuration and docs/local-run.md, then, in order:
 
 1. `hma-repro build` succeeds for all five images. Check native CLI versions,
    `pip check`, and the recorded environment freeze. Confirm the ScienceFlow
@@ -59,7 +68,7 @@ Follow README installation/configuration and then, in order:
    access the chosen GPU.
 2. `hma-repro data prepare --task leaf-classification` and `data verify` succeed;
    `doctor` reports ready after all provider settings are configured.
-3. Run each README native smoke in its own root. Each log must identify the
+3. Run each documented native smoke in its own root. Each log must identify the
    declared backend/model and decode nonempty main-response usage. For grading
    acceptance, at least one finite-scored accepted candidate is required.
 4. Run HMA/NTA smokes. Inspect `turn-history.json`, native session IDs/HOMEs,
@@ -80,3 +89,9 @@ Follow README installation/configuration and then, in order:
    complete and all scientific inputs match the documented protocol. Record the
    actual GPU, driver, provider endpoints/model versions, images and data revision
    alongside any publication of new results. Do not include secret values.
+
+For Swarm, additionally complete the one-node pilot in docs/swarm.md, verify all
+75 nodes' image caches, shared paths and cross-node locks, then deploy the frozen
+full cluster. Test controlled SIGTERM cleanup and explicit same-node recovery on
+a separate pilot campaign. Confirm collection and report coverage before calling
+the cluster workflow validated. These checks have not been run on this machine.

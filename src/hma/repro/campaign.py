@@ -33,6 +33,8 @@ def code_identity() -> str:
     files = {}
     for package in ("hma", "hmz"):
         for path in (source / package).rglob("*"):
+            if path.is_relative_to(ASSETS / "harness16"):
+                continue  # These files are hashed below in both source and wheel installs.
             if path.is_file() and path.suffix in {".py", ".json"}:
                 files[str(path.relative_to(source))] = sha256_file(path)
     for path in baseline_root().rglob("*"):
@@ -220,15 +222,30 @@ def inventory(root: Path) -> list[dict]:
     return result
 
 
-def run_plan(plan: dict, local: Local, root: Path, resume: bool = False) -> list[dict]:
+def run_plan(
+    plan: dict,
+    local: Local,
+    root: Path,
+    resume: bool = False,
+    *,
+    hardware_override: dict | None = None,
+    sequential: bool = False,
+) -> list[dict]:
     root = root.expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
     with (root / ".campaign.lock").open("a+") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        return _run_locked(plan, local, root, resume)
+        return _run_locked(plan, local, root, resume, hardware_override, sequential)
 
 
-def _run_locked(plan: dict, local: Local, root: Path, resume: bool) -> list[dict]:
+def _run_locked(
+    plan: dict,
+    local: Local,
+    root: Path,
+    resume: bool,
+    hardware_override: dict | None = None,
+    sequential: bool = False,
+) -> list[dict]:
     suite = Suite.model_validate(plan["suite"])
     selected = {c["experiment"] for c in plan["cells"]}
     provider_ids = {
@@ -237,7 +254,9 @@ def _run_locked(plan: dict, local: Local, root: Path, resume: bool) -> list[dict
     secret_env = credentials(local, provider_ids)
     if os.getuid() == 0:
         raise ValueError("run as a non-root Docker user")
-    hardware = inspect_hardware(local)
+    if sequential and len(local.gpus) != 1:
+        raise ValueError("sequential workers require exactly one GPU")
+    hardware = hardware_override if hardware_override is not None else inspect_hardware(local)
     client = docker.from_env()
     client.ping()
     images = {local.evaluator_image}
@@ -314,8 +333,21 @@ def _run_locked(plan: dict, local: Local, root: Path, resume: bool) -> list[dict
             devices.put(gpu)
 
     try:
-        with ThreadPoolExecutor(max_workers=len(local.gpus)) as pool:
-            list(pool.map(execute, plan["cells"]))
+        if sequential:
+            # Swarm SIGTERM reaches this main thread so Supervisor.finally can stop siblings.
+            for cell in plan["cells"]:
+                already_started = (root / "cells" / cell["id"]).exists()
+                execute(cell)
+                result = root / "cells" / cell["id"] / "execution/result.json"
+                if (
+                    not already_started
+                    and result.exists()
+                    and json.loads(result.read_text()).get("cleanup_errors")
+                ):
+                    raise ValueError("container cleanup failed; inspect the node before resuming")
+        else:
+            with ThreadPoolExecutor(max_workers=len(local.gpus)) as pool:
+                list(pool.map(execute, plan["cells"]))
     finally:
         for name, value in old_env.items():
             if value is None:
