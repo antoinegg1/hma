@@ -51,7 +51,7 @@ def test_plan_subset_does_not_change_other_experiments():
 
 
 def test_blank_credentials_work_for_planning_but_not_execution(monkeypatch):
-    local = load_local(Path(__file__).parents[1] / "configs/local.example.json")
+    local = load_local(Path(__file__).parents[1] / "configs/local.json")
     assert all(not p.api_key and not p.base_url for p in local.providers.values())
     monkeypatch.delenv("HMA_OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("HMA_OPENAI_BASE_URL", raising=False)
@@ -311,7 +311,7 @@ def test_stage_roles_and_harness_contract_are_secret_free(tmp_path, monkeypatch)
     import hma.repro.campaign as campaign
 
     monkeypatch.setattr(campaign.os, "getuid", lambda: 1000)
-    local = load_local(Path("configs/local.example.json"))
+    local = load_local(Path("configs/local.json"))
     local.data_root = tmp_path / "data"
     suite = load_suite()
     for group in ["goal-gpt", "nta-gpt-kimi", "hma-gpt-kimi", "mlevolve_no_prior-ds4"]:
@@ -419,7 +419,7 @@ def test_campaign_resume_never_retries_and_rejects_changed_environment(tmp_path,
     image = SimpleNamespace(id="sha256:original")
     client = SimpleNamespace(ping=lambda: True, images=SimpleNamespace(get=lambda name: image))
     monkeypatch.setattr(campaign.docker, "from_env", lambda: client)
-    local = load_local(Path("configs/local.example.json"))
+    local = load_local(Path("configs/local.json"))
     local.data_root = tmp_path / "data"
     selected = plan(load_suite(), ["goal-gpt"], ["mbl_09"], [0])
     task = selected["cells"][0]["task"]

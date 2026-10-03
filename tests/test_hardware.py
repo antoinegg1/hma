@@ -19,7 +19,7 @@ INVENTORY = (
 
 def test_paper_resource_defaults_and_templates_use_gib():
     # Manuscript Appendix C.1: one A10, 30 vCPUs, 220 GiB shared by alternating actors.
-    local = load_local(Path("configs/local.example.json"))
+    local = load_local(Path("configs/local.json"))
     default = Local(providers={})
     legacy = SimpleNamespace(**json.loads(Path("configs/hma-opus-gpt.json").read_text()))
     for settings in [local, default, legacy]:

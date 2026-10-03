@@ -16,7 +16,7 @@ from hma.repro.config import load_local, load_suite, plan
 
 
 def pinned_local(tmp_path):
-    local = load_local(Path("configs/local.example.json"))
+    local = load_local(Path("configs/local.json"))
     local.data_root = tmp_path / "shared/data"
     local.agent_image = "registry.test/hma/agent@sha256:" + "a" * 64
     local.evaluator_image = "registry.test/hma/evaluator@sha256:" + "b" * 64

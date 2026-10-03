@@ -79,15 +79,9 @@ to prepare the machines, Docker environments, and experiment data.
 
 ### API configuration
 
-Create your own configuration file by copying the provided template:
-
-```bash
-cp configs/local.example.json configs/local.json
-```
-
-This copies `local.example.json` to `local.json`; edit the new `local.json` file
-with your data directory and provider credentials. It is excluded from Git.
-All API keys and base URLs in the template are intentionally blank.
+Edit the included [`configs/local.json`](configs/local.json) directly with your
+data directory and provider credentials. API keys and base URLs are left blank
+in the repository.
 
 | Setting | What to enter |
 | --- | --- |

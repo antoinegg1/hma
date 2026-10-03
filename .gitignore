@@ -6,7 +6,6 @@ __pycache__/
 *.egg-info/
 build/
 dist/
-configs/local.json
 configs/*.local.json
 .env
 runs/

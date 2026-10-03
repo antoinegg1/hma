@@ -57,7 +57,6 @@ python3.12 -m venv .venv
 . .venv/bin/activate
 python -m pip install -r requirements-repro.lock
 python -m pip install --no-deps -e .
-cp configs/local.example.json configs/local.json
 python -m pytest -q
 python -m hma.repro.cli doctor --offline
 python -m hma.repro.cli plan --suite paper --output outputs/paper-plan.json
@@ -70,7 +69,8 @@ runtime. No model is contacted by `plan`, `doctor`, or offline tests.
 
 ## 3. Local configuration and credentials
 
-Edit `configs/local.json` to set `data_root`, image tags, and GPU IDs. The agent
+Edit the supplied `configs/local.json` directly to set `data_root`, image tags,
+and GPU IDs. The agent
 defaults are 30 vCPUs and `220g` (220 GiB). `expected_gpu_model` defaults to
 `"NVIDIA A10"`; `doctor` and campaign execution check every selected GPU's exact
 model name. For a hardware variant or smoke on another GPU, explicitly change
@@ -83,9 +83,9 @@ the host for evaluator and controller overhead beyond the agent limits; adjust
 `evaluator_cpus` / `evaluator_memory` if needed. Relative paths resolve from your
 current working directory. Run the commands from the checkout root.
 
-**Every `api_key` and `base_url` in the committed template is intentionally
-empty.** Fill these in your ignored `configs/local.json`, or set the corresponding
-environment variables. Environment variables take precedence:
+**Every committed `api_key` and `base_url` in `configs/local.json` must remain
+empty.** Fill these locally without committing the values, or use the existing
+environment variables below. Environment variables take precedence:
 
 | Provider | Key variable | Base URL variable | API |
 | --- | --- | --- | --- |

@@ -59,7 +59,7 @@ Table 2 从其他论文引用的三行结果只保留出处，并标明 publishe
 - `src/hma/benchmark/prepare.py`：下载、数据准备、checksum、公共/私有分区、prompt生成。
 - `src/hma/benchmark/preflight.py`：数据、评分器、镜像、权限、GPU及provider检查。
 - `docker/`：从可获得且固定版本的基础镜像构建agent/evaluator，包含完整依赖。
-- `configs/local.example.yaml`：集中配置数据根目录、输出目录、凭据环境变量名、设备和并发。
+- `configs/local.json`：直接编辑仓库提供的配置，集中配置数据根目录、设备和并发；提交版本中的 API key/base URL 保持空白，运行时可使用既有环境变量或不提交的本地值。
 - `pyproject.toml`、依赖锁和CLI入口：统一安装与运行。
 
 MLE-bench本地catalog锁定commit为 `507f92e1138bb6e40dac5c6ee7a6758e6424bf97`，在此基础上显式记录必要的数据修正。现有部分agent镜像默认Python 3.11，HMA要求>=3.12，必须明确controller、hmz和训练环境使用的解释器。

@@ -27,7 +27,7 @@ manuscript's unspecified corrected-key numbers.
   hardware, data and image identities, and uses shared file locks compatible
   with NFS. Explicit partial collection preserves missing/failed denominators.
 - Full matrix resolves to 27 configurations and 3,397 task-runs; all 75 task IDs
-  resolve with 22 lite / 38 medium / 15 high tasks. Provider templates are blank.
+  resolve with 22 lite / 38 medium / 15 high tasks. Committed provider settings are blank.
 - All four public upstream Git revisions were successfully fetched. The upstream
   allowlists and fixed adapter hashes for all three external harnesses matched.
 - All three frozen adapters also passed configuration-only execution against

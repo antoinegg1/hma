@@ -60,8 +60,8 @@ requires exactly 75 eligible nodes by default (`--expected-nodes 75`).
 ## Images and data
 
 Install the locked requirements on the manager as shown in the [README](../README.md).
-Copy `configs/local.example.json` to the ignored `configs/local.json`, set
-`data_root` to `/srv/hma/data`, and configure all required providers. Keep the
+Edit the supplied `configs/local.json` directly: set `data_root` to
+`/srv/hma/data` and configure all required providers. Keep the
 per-task defaults: `gpus: ["0"]`, `expected_gpu_model: "NVIDIA A10"`,
 `cpus: 30`, `memory: "220g"`.
 
@@ -88,8 +88,10 @@ python -m hma.repro.cli data prepare --config configs/swarm.local.json --suite p
 python -m hma.repro.cli data verify --config configs/swarm.local.json --suite paper
 ```
 
-Provider keys and URLs stay blank in the committed example. Store local values
-in the ignored local configs with mode 0600. Deployment packages the configuration as
+Provider keys and URLs must stay blank in the committed `configs/local.json`.
+Use uncommitted local values or the existing [provider environment variables](local-run.md#3-local-configuration-and-credentials).
+The generated `configs/swarm.local.json` remains ignored and mode 0600.
+Deployment packages the configuration as
 a Docker secret rather than putting credentials in service environment variables.
 The public plan excludes credentials. Keep raw run directories private: native
 tools can persist credential-bearing state. Kaggle credentials remain on the

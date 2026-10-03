@@ -9,8 +9,9 @@ The user's task scope is fresh reruns; historical archives are unnecessary.
 ## Execution runbook
 
 1. Work from the checkout root in Python 3.12. Install `requirements-repro.lock`,
-   then `pip install --no-deps -e .`. Copy the example local JSON only if the local
-   file does not exist. Keep committed API keys/base URLs blank.
+   then `pip install --no-deps -e .`. Edit the supplied `configs/local.json`
+   directly. Keep its committed API keys/base URLs blank; use the documented
+   provider environment variables or uncommitted local values for execution.
 2. Run `pytest -q`, `python -m hma.repro.cli doctor --offline`, and `python -m hma.repro.cli plan --suite paper`.
    The default plan has 27 configurations, 3,397 cells, 75 tasks (22/38/15), and
    21,767.6 maximum GPU hours. Investigate any unexplained difference.
@@ -123,7 +124,7 @@ tests. Required offline checks after relevant code changes:
 
 ```bash
 python -m pytest -q
-python -m hma.repro.cli doctor --config configs/local.example.json --offline
+python -m hma.repro.cli doctor --config configs/local.json --offline
 python -m hma.repro.cli plan --suite paper
 ```
 
