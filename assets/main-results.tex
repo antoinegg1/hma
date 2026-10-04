@@ -1,0 +1,38 @@
+\documentclass[landscape]{article}
+\usepackage[paperwidth=16.2in,paperheight=4.1in,margin=0.2in]{geometry}
+\usepackage[table]{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\definecolor{hma}{HTML}{2F7F68}
+\definecolor{soft}{HTML}{EEF6F2}
+\begin{document}
+\begin{minipage}{15.6in}
+\centering
+{\Large\bfseries Main results on 75 MLE-bench tasks}\par\vspace{10pt}
+{\large Matched-budget comparison; all entries are percentages}\par\vspace{14pt}
+\renewcommand{\arraystretch}{1.45}
+\setlength{\tabcolsep}{13pt}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{5.55in}rrrrr@{}}
+\toprule
+\textbf{Workflow} & \textbf{Time (h)} & \textbf{Any medal} & \textbf{Gold} & \textbf{Med+} & \textbf{Mean percentile} \\
+\midrule
+Claude Opus 5 (native /goal) & 6 & 72.4 & 50.7 & 85.3 & 84.8 \\
+GPT-5.6-sol (native /goal) & 6 & 68.0 & 47.6 & 81.3 & 81.3 \\
+ScienceFlow & 24 & 70.2 & -- & -- & -- \\
+MLEvolve & 12 & 65.3 & 34.7 & 76.0 & -- \\
+\addlinespace[3pt]
+\rowcolor{soft}
+\textbf{HMA: Opus 5 $\leftrightarrow$ GPT-5.6-sol} & \textbf{6} & \textbf{78.2} & \textbf{53.8} & \textbf{90.7} & \textbf{89.0} \\
+HMA: GPT-5.6-sol $\leftrightarrow$ Opus 5 & 6 & 73.3 & 50.7 & 85.3 & 85.4 \\
+HMA: GPT-5.6-sol $\leftrightarrow$ DeepSeek V4.1 Flash & 6 & 72.0 & 50.7 & 85.3 & 84.4 \\
+HMA: GPT-5.6-sol $\leftrightarrow$ Kimi K3 & 6 & 70.7 & 50.7 & 85.3 & 83.9 \\
+\bottomrule
+\end{tabular}
+\par\vspace{12pt}
+\raggedright\small
+\textbf{Any medal} is the medal rate over all 75 tasks. \textbf{Med+} is the fraction above the human leaderboard median. HMA starts with the first listed model and uses the same six-hour budget as the native baselines.
+\end{minipage}
+\end{document}

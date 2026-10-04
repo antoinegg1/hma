@@ -55,24 +55,15 @@ handoff, and the final reviewer selects one already accepted candidate.
 
 ### Main results
 
-The table keeps the headline comparisons from the paper. All values are
-percentages; the full set of model-pair ablations is reported in the paper.
+The key comparisons from the paper are rendered directly from LaTeX for consistent
+ typography and spacing. All entries are percentages; the full set of model-pair
+ablations is reported in the paper.
 
-| Workflow | Time (h) | All (75) | Gold | Med+ | Mean percentile |
-|---|---:|---:|---:|---:|---:|
-| Claude Opus 5 (`/goal`) | 6 | 72.4 | 50.7 | 85.3 | 84.8 |
-| GPT-5.6-sol (`/goal`) | 6 | 68.0 | 47.6 | 81.3 | 81.3 |
-| ScienceFlow | 24 | 70.2 | — | — | — |
-| MLEvolve | 12 | 65.3 | 34.7 | 76.0 | — |
-| **HMA: Opus 5 ↔ GPT-5.6-sol** | **6** | **78.2** | **53.8** | **90.7** | **89.0** |
-| HMA: GPT-5.6-sol ↔ Opus 5 | 6 | 73.3 | 50.7 | 85.3 | 85.4 |
-| HMA: GPT-5.6-sol ↔ DeepSeek V4.1 Flash | 6 | 72.0 | 50.7 | 85.3 | 84.4 |
-| HMA: GPT-5.6-sol ↔ Kimi K3 | 6 | 70.7 | 50.7 | 85.3 | 83.9 |
+![Main results on 75 MLE-bench tasks](assets/main-results.png)
 
-“ All” is the any-medal rate over all 75 tasks. “Gold” is the gold-medal rate,
-“Med+” is the fraction above the human leaderboard median, and “Mean percentile”
-averages task-level leaderboard percentiles. HMA starts with the first listed
-model and uses the same six-hour budget as the native baselines.
+“Any medal” is the medal rate over all 75 tasks. “Med+” is the fraction above the
+human leaderboard median. HMA starts with the first listed model and uses the same
+six-hour budget as the native baselines.
 
 ### How it works
 
