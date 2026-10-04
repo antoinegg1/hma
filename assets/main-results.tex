@@ -1,38 +1,60 @@
-\documentclass[landscape]{article}
-\usepackage[paperwidth=16.2in,paperheight=4.1in,margin=0.2in]{geometry}
+\documentclass[10pt]{article}
+\usepackage[paperwidth=15.2in,paperheight=10.0in,margin=0.15in]{geometry}
+\usepackage{booktabs,makecell,graphicx,amsmath}
 \usepackage[table]{xcolor}
-\usepackage{booktabs}
-\usepackage{array}
-\usepackage{graphicx}
 \usepackage{helvet}
 \renewcommand{\familydefault}{\sfdefault}
-\definecolor{hma}{HTML}{2F7F68}
-\definecolor{soft}{HTML}{EEF6F2}
+\definecolor{gain}{HTML}{2F7F68}
+\newcommand{\hmastat}[2]{#1{\scriptsize\,\ensuremath{\pm}\,#2}}
+\newcommand{\gain}[1]{\textcolor{gain}{\scalebox{0.72}{\scriptsize{$+#1$}}}}
 \begin{document}
-\begin{minipage}{15.6in}
+\begin{table*}[t]
 \centering
-{\Large\bfseries Main results on 75 MLE-bench tasks}\par\vspace{10pt}
-{\large Matched-budget comparison; all entries are percentages}\par\vspace{14pt}
-\renewcommand{\arraystretch}{1.45}
-\setlength{\tabcolsep}{13pt}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{5.55in}rrrrr@{}}
+\begingroup
+\footnotesize
+\setlength{\tabcolsep}{3.3pt}
+\renewcommand{\arraystretch}{0.98}
+\resizebox{0.99\linewidth}{!}{%
+\begin{tabular}{l @{{\hskip2.5pt}} | c | c c c | c c c | c}
 \toprule
-\textbf{Workflow} & \textbf{Time (h)} & \textbf{Any medal} & \textbf{Gold} & \textbf{Med+} & \textbf{Mean percentile} \\
+\textbf{Workflow}
+& \makecell{\textbf{Time}\\\textbf{(h)}}
+& \multicolumn{3}{c|}{\textbf{Medal Rate (\%)}}
+& \multicolumn{3}{c|}{\textbf{Overall Metrics (\%)}}
+& \makecell{\textbf{Mean}\\\textbf{Percentile (\%)}} \\
+\cmidrule(lr){3-5}\cmidrule(lr){6-8}\cmidrule(lr){9-9}
+& & \makecell{\textbf{Lite}\\\textbf{(22)}} & \makecell{\textbf{Medium}\\\textbf{(38)}} & \makecell{\textbf{High}\\\textbf{(15)}}
+& \makecell{\textbf{All}\\\textbf{(75)}} & \textbf{Gold} & \textbf{Med+} & \\
 \midrule
-Claude Opus 5 (native /goal) & 6 & 72.4 & 50.7 & 85.3 & 84.8 \\
-GPT-5.6-sol (native /goal) & 6 & 68.0 & 47.6 & 81.3 & 81.3 \\
-ScienceFlow & 24 & 70.2 & -- & -- & -- \\
-MLEvolve & 12 & 65.3 & 34.7 & 76.0 & -- \\
-\addlinespace[3pt]
-\rowcolor{soft}
-\textbf{HMA: Opus 5 $\leftrightarrow$ GPT-5.6-sol} & \textbf{6} & \textbf{78.2} & \textbf{53.8} & \textbf{90.7} & \textbf{89.0} \\
-HMA: GPT-5.6-sol $\leftrightarrow$ Opus 5 & 6 & 73.3 & 50.7 & 85.3 & 85.4 \\
-HMA: GPT-5.6-sol $\leftrightarrow$ DeepSeek V4.1 Flash & 6 & 72.0 & 50.7 & 85.3 & 84.4 \\
-HMA: GPT-5.6-sol $\leftrightarrow$ Kimi K3 & 6 & 70.7 & 50.7 & 85.3 & 83.9 \\
+\multicolumn{9}{l}{\textit{Single Agents with Official Harnesses (\texttt{/goal})}} \\
+\midrule
+Claude Opus 5 & 6 & \hmastat{80.3}{1.5} & \hmastat{78.1}{2.3} & \hmastat{46.7}{0.0} & \hmastat{72.4}{1.6} & \hmastat{50.7}{0.8} & \hmastat{85.3}{1.3} & \hmastat{84.8}{0.6} \\
+GPT-5.6-sol & 6 & \hmastat{80.3}{1.5} & \hmastat{69.3}{2.3} & \hmastat{46.7}{6.7} & \hmastat{68.0}{1.3} & \hmastat{47.6}{2.5} & \hmastat{81.3}{0.8} & \hmastat{81.3}{1.3} \\
+\midrule
+\multicolumn{9}{l}{\textit{Open-Source Agent Baselines}} \\
+\midrule
+\makecell[l]{ScienceFlow\\{\scriptsize DeepSeek V4 Flash-preview}} & 24 & \hmastat{80.3}{1.5} & \hmastat{74.6}{0.9} & \hmastat{44.4}{2.2} & \hmastat{70.2}{1.2} & -- & -- & -- \\
+\makecell[l]{MLEvolve\\{\scriptsize Gemini-3.1-Pro-preview}} & 12 & \hmastat{80.3}{1.5} & \hmastat{64.0}{0.9} & \hmastat{46.7}{0.0} & \hmastat{65.3}{0.8} & \hmastat{34.7}{0.0} & \hmastat{76.0}{2.3} & -- \\
+\midrule
+\multicolumn{9}{l}{\textit{HMA (Ours)}} \\
+\midrule
+\multicolumn{9}{l}{\textbf{Opus 5 $\leftrightarrow$ GPT-5.6-sol}} \\
+\quad Avg. of Single & 6 & \hmastat{80.3}{1.1} & \hmastat{73.7}{1.6} & \hmastat{46.7}{3.3} & \hmastat{70.2}{1.0} & \hmastat{49.1}{1.3} & \hmastat{83.3}{0.8} & \hmastat{83.0}{0.7} \\
+\rowcolor{gray!15}
+\quad HMA (ours) & 6 & \textbf{84.8}\gain{4.5} & \textbf{80.7}\gain{7.0} & \textbf{62.2}\gain{15.6} & \textbf{78.2}\gain{8.0} & \textbf{53.8}\gain{4.7} & \textbf{90.7}\gain{7.3} & \textbf{89.0}\gain{5.9} \\
+\midrule
+\multicolumn{9}{l}{\textbf{GPT-5.6-sol $\leftrightarrow$ DeepSeek V4.1 Flash}} \\
+\quad Avg. of Single & 6 & \hmastat{78.8}{1.5} & \hmastat{65.4}{3.4} & \hmastat{42.2}{3.5} & \hmastat{64.7}{2.1} & \hmastat{42.7}{1.3} & \hmastat{77.8}{1.2} & \hmastat{78.0}{1.3} \\
+\rowcolor{gray!8}
+\quad HMA (ours) & 6 & 81.8\gain{3.0} & 76.3\gain{10.9} & 46.7\gain{4.5} & 72.0\gain{7.3} & 50.7\gain{8.0} & 85.3\gain{7.6} & 84.4\gain{6.4} \\
+\midrule
+\multicolumn{9}{l}{\textbf{GPT-5.6-sol $\leftrightarrow$ Kimi K3}} \\
+\quad Avg. of Single & 6 & \hmastat{78.8}{1.5} & \hmastat{57.5}{1.6} & \hmastat{44.4}{3.5} & \hmastat{61.1}{1.0} & \hmastat{41.1}{1.4} & \hmastat{77.3}{1.2} & \hmastat{77.6}{1.0} \\
+\rowcolor{gray!8}
+\quad HMA (ours) & 6 & 81.8\gain{3.0} & 71.1\gain{13.6} & 53.3\gain{8.9} & 70.7\gain{9.6} & 50.7\gain{9.6} & 85.3\gain{8.0} & 83.9\gain{6.4} \\
 \bottomrule
-\end{tabular}
-\par\vspace{12pt}
-\raggedright\small
-\textbf{Any medal} is the medal rate over all 75 tasks. \textbf{Med+} is the fraction above the human leaderboard median. HMA starts with the first listed model and uses the same six-hour budget as the native baselines.
-\end{minipage}
+\end{tabular}%
+}
+\endgroup
+\end{table*}
 \end{document}

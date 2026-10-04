@@ -55,8 +55,7 @@ handoff, and the final reviewer selects one already accepted candidate.
 
 ### Main results
 
-The key comparisons from the paper are rendered directly from LaTeX for consistent
- typography and spacing. All entries are percentages; the full set of model-pair
+The key comparisons from the paper are rendered directly from the paper table LaTeX, preserving its grouped headers, `booktabs` rules, uncertainty notation, gain annotations, and shaded HMA rows. All entries are percentages; the full set of model-pair
 ablations is reported in the paper.
 
 ![Main results on 75 MLE-bench tasks](assets/main-results.png)
