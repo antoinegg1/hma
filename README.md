@@ -18,6 +18,10 @@ model of this process and evaluates the workflow on 75 MLE-bench tasks.
 ## Table of Contents
 
 - [HMA](#hma)
+  - [Results summary](#results-summary)
+  - [Figure 1: HMA overview](#figure-1-hma-overview)
+  - [Main results](#main-results)
+  - [How it works](#how-it-works)
 - [Installation](#installation)
 - [Reproducing the Experiments](#reproducing-the-experiments)
 - [Dataset and Models](#dataset-and-models)
@@ -28,11 +32,52 @@ model of this process and evaluates the workflow on 75 MLE-bench tasks.
 
 ### Results summary
 
-The manuscript reports a **78.2% any-medal rate** on the 75 MLE-bench tasks with
-Opus→GPT alternation under a six-hour budget. Across six HMA configurations,
-the average improvement over the mean of each pair's constituent goal baselines
-is **6.4 percentage points**. These are the manuscript's results; this repository
-runs new experiments and generates reports from their outputs.
+HMA alternates native coding agents over a shared machine-learning workspace. On
+75 MLE-bench tasks under a matched six-hour budget, the strongest configuration
+(Opus 5 ↔ GPT-5.6-sol) reaches **78.2% any-medal rate**, **53.8% gold rate**, and
+**90.7% above the human median**. It improves over the mean of its two constituent
+single-agent baselines by **8.0 percentage points** in any-medal rate and **5.9
+points** in mean leaderboard percentile.
+
+Across the six evaluated HMA pairings, HMA improves over the corresponding mean
+single-agent baseline by an average of **6.4 percentage points** in any-medal rate.
+The table below reports the main manuscript results; all values are percentages.
+
+### Figure 1: HMA overview
+
+![HMA overview: harness staleness, context-reset alternation, and complementary search](assets/figure1.png)
+
+HMA combines context renewal with complementary agent capabilities. Each option
+runs a native agent for at most *k* accepted experiments (or until natural
+termination), then hands off the shared workspace to the other agent with a fresh
+context. Artifacts, evaluated results, and candidate solutions persist across the
+handoff, and the final reviewer selects one already accepted candidate.
+
+### Main results
+
+| Workflow | Time (h) | Lite (22) | Medium (38) | High (15) | All (75) | Gold | Med+ | Mean percentile |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Claude Opus 5 (`/goal`) | 6 | 80.3 | 78.1 | 46.7 | 72.4 | 50.7 | 85.3 | 84.8 |
+| GPT-5.6-sol (`/goal`) | 6 | 80.3 | 69.3 | 46.7 | 68.0 | 47.6 | 81.3 | 81.3 |
+| GLM-5.3 (`/goal`) | 6 | 77.3 | 57.0 | 40.0 | 59.6 | 38.2 | 75.1 | 75.7 |
+| DeepSeek V4.1 Flash (`/goal`) | 6 | 77.3 | 61.4 | 37.8 | 61.3 | 37.8 | 74.2 | 74.7 |
+| Kimi K3 (`/goal`) | 6 | 77.3 | 45.6 | 42.2 | 54.2 | 34.7 | 73.3 | 73.8 |
+| DeepSeek V4 Flash (`/goal`) | 6 | 54.5 | 24.6 | 24.4 | 33.3 | 15.6 | 50.2 | 51.8 |
+| ScienceFlow | 24 | 80.3 | 74.6 | 44.4 | 70.2 | — | — | — |
+| MLEvolve | 12 | 80.3 | 64.0 | 46.7 | 65.3 | 34.7 | 76.0 | — |
+| ML-Master 2.0 | 24 | 75.8 | 50.9 | 42.2 | 56.4 | 19.6 | 63.1 | — |
+| **HMA: Opus 5 ↔ GPT-5.6-sol** | **6** | **84.8** | **80.7** | **62.2** | **78.2** | **53.8** | **90.7** | **89.0** |
+| HMA: GPT-5.6-sol ↔ Opus 5 | 6 | 86.4 | 76.3 | 46.7 | 73.3 | 50.7 | 85.3 | 85.4 |
+| HMA: GPT-5.6-sol ↔ DeepSeek V4.1 Flash | 6 | 81.8 | 76.3 | 46.7 | 72.0 | 50.7 | 85.3 | 84.4 |
+| HMA: GPT-5.6-sol ↔ Kimi K3 | 6 | 81.8 | 71.1 | 53.3 | 70.7 | 50.7 | 85.3 | 83.9 |
+| HMA: GPT-5.6-sol ↔ GLM-5.3 | 6 | 77.3 | 73.7 | 46.7 | 69.3 | 50.7 | 82.7 | 81.5 |
+| HMA: DeepSeek V4.1 Flash ↔ Kimi K3 | 6 | 77.3 | 63.2 | 40.0 | 62.7 | 38.7 | 80.0 | 78.1 |
+
+**Metric definitions.** “All” is the any-medal rate over all 75 tasks; “Gold” is
+the gold-medal rate; “Med+” is the fraction of tasks above the human leaderboard
+median; and “Mean percentile” averages task-level leaderboard percentiles. HMA
+starts with the first listed model. The HMA rows compare against the mean of the
+two constituent six-hour single-agent baselines in the paper.
 
 ### How it works
 
