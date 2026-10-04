@@ -53,8 +53,8 @@ to the paper's tables and figures.
 Clone the repository and install the Python dependencies:
 
 ```bash
-git clone https://github.com/antoinegg1/hma.git
-cd hma
+git clone https://github.com/humanfia/HMA.git
+cd HMA
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-repro.lock
