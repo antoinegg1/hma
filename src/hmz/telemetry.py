@@ -108,7 +108,7 @@ _started: list[bool] = []
 _answered: list[bool | None] = []
 
 def enabled() -> bool | None:
-    """Telemetry is disabled in the anonymous HMA package."""
+    """Telemetry is disabled in the HMA package."""
     return False
 
 def again() -> None:

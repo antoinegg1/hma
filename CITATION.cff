@@ -8,7 +8,10 @@ abstract: >-
   Experiment code for Humanize MLE Agents (HMA), which alternates two native
   coding agents over a shared machine-learning workspace.
 authors:
-  - name: HMA contributors
+  - given-names: Changye
+    family-names: Li
+  - name: The HMA contributors
+    website: https://github.com/humanfia/hma/graphs/contributors
 version: 1.0.0
 license:
   - Apache-2.0
