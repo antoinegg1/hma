@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite it as below. The paper citation will be
+  added here with the paper release.
+type: software
+title: "Humanize MLE Agents: Multi-Agent Session Alternation Beyond Single-Agent Limits"
+abstract: >-
+  Experiment code for Humanize MLE Agents (HMA), which alternates two native
+  coding agents over a shared machine-learning workspace.
+authors:
+  - name: HMA contributors
+version: 1.0.0
+license:
+  - Apache-2.0
+  - MIT
+repository-code: "https://github.com/humanfia/hma"
+keywords:
+  - agents
+  - machine-learning-engineering
+  - mle-bench

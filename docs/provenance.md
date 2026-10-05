@@ -38,8 +38,9 @@ upstream trees or pretrained weights; builds fetch the pinned revisions and
 verify their allowlisted files. Consult each source's original license for use.
 The adapter provenance source does not carry a separate license grant in the
 imported folder; confirm the authors' redistribution terms when publishing it.
-The existing repository [LICENSE](../LICENSE) is preserved rather than assigning
-new third-party ownership or licensing terms.
+The repository's own terms ([LICENSE](../LICENSE), [NOTICE](../NOTICE) and
+[src/hma/benchmark/LICENSE](../src/hma/benchmark/LICENSE)) are preserved rather
+than assigning new third-party ownership or licensing terms.
 
 ## Hardware and protocol provenance
 
