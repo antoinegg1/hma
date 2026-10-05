@@ -25,8 +25,11 @@ model of this process and evaluates the workflow on 75 MLE-bench tasks.
 - [Installation](#installation)
 - [Reproducing the Experiments](#reproducing-the-experiments)
 - [Dataset and Models](#dataset-and-models)
+- [Use HMA with humanize](#use-hma-with-humanize)
 - [Citation](#citation)
 - [Acknowledgments](#acknowledgments)
+- [Maintainers](#maintainers)
+- [License](#license)
 
 ## HMA
 
@@ -93,8 +96,8 @@ to the paper's tables and figures.
 Clone the repository and install the Python dependencies:
 
 ```bash
-git clone https://github.com/humanfia/humanize-mle-agents.git
-cd humanize-mle-agents
+git clone https://github.com/humanfia/hma.git
+cd hma
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-repro.lock
@@ -227,9 +230,18 @@ multi-node execution remain unvalidated here. See the [validation record](docs/v
 for the completed checks and remaining limitations. [AGENTS.md](AGENTS.md) provides
 the maintenance and execution runbook.
 
+## Use HMA with humanize
+
+This repository reproduces the paper. To use HMA's fixed-*k* alternation in your
+own work, use [fixed-interrupt-flame-chase-flow](https://github.com/humanfia/fixed-interrupt-flame-chase-flow),
+which brings it to [humanize](https://github.com/humanfia/humanize) as a flow.
+See the [humanize documentation](https://docs.humanfia.ai/humanize/) for running flows.
+
 ## Citation
 
-The arXiv link and citation will be added with the paper release.
+The arXiv link and citation will be added with the paper release. Until then,
+cite this repository with [`CITATION.cff`](CITATION.cff) (GitHub's "Cite this
+repository").
 
 ## Acknowledgments
 
@@ -238,3 +250,18 @@ This repository builds on [MLE-bench](https://github.com/openai/mle-bench),
 [MLEvolve](https://github.com/InternScience/MLEvolve), and
 [ScienceFlow](https://github.com/science-learner/ScienceFlow).
 We thank their authors for releasing the code and benchmark resources.
+
+## Maintainers
+
+[@antoinegg1](https://github.com/antoinegg1).
+
+Issues and pull requests are welcome; see the humanfia
+[contributing guide](https://github.com/humanfia/.github/blob/main/CONTRIBUTING.md).
+
+## License
+
+`src/hma` and `src/hmz` are licensed under [Apache-2.0](LICENSE);
+`src/hma/benchmark` is licensed under [MIT](src/hma/benchmark/LICENSE)
+(SPDX: `Apache-2.0 AND MIT`). See [NOTICE](NOTICE). External model CLIs, the
+upstream MLE-bench grader, and task data retain their own licenses and are not
+included.

@@ -1,0 +1,17 @@
+HMA - anonymous review edition
+
+Copyright 2026 HMA contributors (identity omitted for anonymous review).
+
+src/hma: HMA controller and provider adapter, Apache License 2.0.
+src/hmz: supporting agent runtime, Apache License 2.0.
+src/hma/benchmark: benchmark evaluator integration, MIT License.
+
+SPDX-License-Identifier: Apache-2.0 AND MIT
+
+Identifying project metadata has been removed for anonymous review. This
+edition uses HMA module and container names, defaults to a five-experiment cap,
+removes operational comments and remote catalog links, and disables telemetry.
+These changes are packaging and anonymity adaptations. External model CLIs,
+the upstream MLE-bench grader, and task data retain their own licenses and are
+not included. The Apache License 2.0 text is in LICENSE; the MIT License text
+for src/hma/benchmark is in src/hma/benchmark/LICENSE.
