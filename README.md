@@ -233,7 +233,8 @@ the maintenance and execution runbook.
 ## Use HMA with humanize
 
 This repository reproduces the paper. To use HMA's fixed-*k* alternation in your
-own work, use [fixed-interrupt-flame-chase-flow](https://github.com/humanfia/fixed-interrupt-flame-chase-flow),
+own work, use `flame_chasoid:fixed_interrupt` from
+[flame-chasoid-flows](https://github.com/humanfia/flame-chasoid-flows#fixed_interrupt),
 which brings it to [humanize](https://github.com/humanfia/humanize) as a flow.
 See the [humanize documentation](https://docs.humanfia.ai/humanize/) for running flows.
 
